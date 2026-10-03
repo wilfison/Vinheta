@@ -1,8 +1,6 @@
 ---
 name: prd-vinheta
 description: "Writes the PRD of a phase or feature of Vinheta (a GTK4/libadwaita soundboard in Rust), with acceptance criteria that the project's scripts can verify. Use it in this repository instead of the generic prd skill. Triggers: create a prd, prd for phase N, prd for the next roadmap phase, plan this feature, spec out, write prd for, plan this phase, criar um prd, prd da fase N, planejar essa feature, especificar."
-model: fable
-effort: high
 allowed-tools: Glob, Grep, Read, Bash, Write, Edit, AskUserQuestion
 ---
 
