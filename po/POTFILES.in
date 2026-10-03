@@ -4,7 +4,8 @@ data/io.github.wilfison.Vinheta.desktop.in
 data/io.github.wilfison.Vinheta.metainfo.xml.in
 data/io.github.wilfison.Vinheta.gschema.xml
 src/application.rs
-src/folder-page.ui
-src/sound_pad.rs
-src/window.rs
-src/window.ui
+src/ui/folder-page.ui
+src/ui/shortcuts-dialog.ui
+src/ui/sound_pad.rs
+src/ui/window.rs
+src/ui/window.ui

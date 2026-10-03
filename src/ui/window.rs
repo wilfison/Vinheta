@@ -25,7 +25,7 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
-use crate::folder_page::FolderPage;
+use super::folder_page::FolderPage;
 use crate::sound::Sound;
 use crate::APP_ID;
 

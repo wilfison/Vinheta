@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
+  <!-- The aliases keep the resource paths flat: libadwaita looks for
+       shortcuts-dialog.ui and style.css right under the prefix. -->
   <gresource prefix="/io/github/wilfison/Vinheta">
-    <file preprocess="xml-stripblanks">window.ui</file>
-    <file preprocess="xml-stripblanks">folder-page.ui</file>
-    <file preprocess="xml-stripblanks">sound-pad.ui</file>
-    <file preprocess="xml-stripblanks">shortcuts-dialog.ui</file>
-    <file>style.css</file>
+    <file preprocess="xml-stripblanks" alias="window.ui">ui/window.ui</file>
+    <file preprocess="xml-stripblanks" alias="folder-page.ui">ui/folder-page.ui</file>
+    <file preprocess="xml-stripblanks" alias="sound-pad.ui">ui/sound-pad.ui</file>
+    <file preprocess="xml-stripblanks" alias="shortcuts-dialog.ui">ui/shortcuts-dialog.ui</file>
+    <file alias="style.css">ui/style.css</file>
   </gresource>
 </gresources>

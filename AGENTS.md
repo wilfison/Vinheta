@@ -90,10 +90,11 @@ dpkg-buildpackage -us -uc -b   # writes ../vinheta_<version>_<arch>.deb
 
 - `src/main.rs`: sets up gettext, registers the gresource, and starts `VinhetaApplication`.
 - `src/application.rs`: `adw::Application` subclass; registers the `app.*` actions in `setup_gactions()`. It owns the `AudioEngine` (started in `startup`, dropped in `shutdown`), consumes its events with `glib::spawn_future_local`, and keeps the map from `PlaybackId` to the `Sound` being played. `app.toggle-sound` (parameter: the absolute path of a sound of the library) and `app.stop-all` are the only way sounds are started and stopped; the pads activate them too.
-- `src/window.rs` + `src/window.ui`: `adw::ApplicationWindow` subclass using a composite template; widgets from the `.ui` file are bound with `#[template_child]`. It owns the tabs (`AdwViewStack` with an `AdwInlineViewSwitcher`), the `directories` setting, and the `win.add-folder` and `win.remove-folder` actions.
-- `src/folder_page.rs` + `src/folder-page.ui`: the content of one tab. It scans its folder off the main thread and shows the pads in a `GtkGridView`, or a status page when the folder is empty or missing.
-- `src/sound.rs`: the `Sound` GObject (path, name, `playing`). `src/sound_pad.rs` + `src/sound-pad.ui`: the widget of one pad.
-- `src/style.css`: custom styling, loaded by libadwaita from the `resource-base-path`.
+- `src/ui/`: the interface components. A widget's `.rs` file lives here next to its `.ui` template, together with the `.ui` and `.css` files that have no Rust side. `application.rs` and `sound.rs` are not widgets and stay in `src/`.
+- `src/ui/window.rs` + `src/ui/window.ui`: `adw::ApplicationWindow` subclass using a composite template; widgets from the `.ui` file are bound with `#[template_child]`. It owns the tabs (`AdwViewStack` with an `AdwInlineViewSwitcher`), the `directories` setting, and the `win.add-folder` and `win.remove-folder` actions.
+- `src/ui/folder_page.rs` + `src/ui/folder-page.ui`: the content of one tab. It scans its folder off the main thread and shows the pads in a `GtkGridView`, or a status page when the folder is empty or missing.
+- `src/sound.rs`: the `Sound` GObject (path, name, `playing`). `src/ui/sound_pad.rs` + `src/ui/sound-pad.ui`: the widget of one pad.
+- `src/ui/style.css`: custom styling, loaded by libadwaita from the `resource-base-path`.
 - `src/library.rs`: which files of a folder are sounds, and in what order. No GTK types, covered by unit tests.
 - `src/lib.rs`: library target that exposes `audio` and `library`, so other binaries and the tests can use them. The app modules above stay in `main.rs`.
 - `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `Event`, `Error`, `PlaybackId`); `graph.rs` owns the PipeWire thread (virtual microphone node, registry, links); `player.rs` builds one GStreamer pipeline per sound. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
@@ -111,7 +112,8 @@ GObject conventions used here: each type has a `mod imp` holding the state struc
 
 When adding files:
 
-- Every new `.ui` file must be listed in `src/vinheta.gresource.xml` (prefix `/io/github/wilfison/Vinheta`) and, if it has translatable strings, in `po/POTFILES.in`. `.rs` files that call `gettext()` must be listed there too.
+- New widgets go in `src/ui/` and are declared in `src/ui/mod.rs`.
+- Every new `.ui` file must be listed in `src/vinheta.gresource.xml` (prefix `/io/github/wilfison/Vinheta`) with an `alias` that drops the `ui/` directory, so resource paths stay flat (`/io/github/wilfison/Vinheta/window.ui`) and, if it has translatable strings, in `po/POTFILES.in`. `.rs` files that call `gettext()` must be listed there too.
 - `shortcuts-dialog.ui` is loaded automatically by libadwaita from the `resource-base-path`, which provides the `app.shortcuts` action; that is why it does not appear in `setup_gactions()`.
 - The primary menu references `app.preferences`, which does not exist yet.
 

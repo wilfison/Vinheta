@@ -26,8 +26,8 @@ use gtk::prelude::*;
 use gtk::{gio, glib};
 use vinheta::library;
 
+use super::sound_pad::SoundPad;
 use crate::sound::Sound;
-use crate::sound_pad::SoundPad;
 
 mod imp {
     use super::*;

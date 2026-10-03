@@ -20,13 +20,11 @@
 
 mod application;
 mod config;
-mod folder_page;
 mod sound;
-mod sound_pad;
-mod window;
+mod ui;
 
 use self::application::VinhetaApplication;
-use self::window::VinhetaWindow;
+use self::ui::window::VinhetaWindow;
 
 use config::{GETTEXT_PACKAGE, LOCALEDIR, PKGDATADIR};
 use gettextrs::{bind_textdomain_codeset, bindtextdomain, textdomain};
