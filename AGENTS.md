@@ -36,6 +36,8 @@ The Rust tests are unit tests of code that needs no GTK, PipeWire, or display (t
 
 ### Running in development
 
+`scripts/run-dev.sh` does everything below in one step: it builds, installs into the local prefix, and runs the app (`--debug` prints the app's debug messages). By hand:
+
 Install into a local prefix inside `build/`, so nothing touches the system and no `sudo` is needed:
 
 ```sh
@@ -50,6 +52,22 @@ build/install/bin/vinheta
 - `GSETTINGS_SCHEMA_DIR` points at the schema compiled into the local prefix; `XDG_DATA_DIRS` lets the app find its icon there.
 - Building requires `libgtk-4-dev` and `libadwaita-1-dev` (they pull in the GLib dev tools, including `glib-compile-resources`), plus `libpipewire-0.3-dev`, `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`, and `libclang-dev` for the audio engine (`libclang` is used by bindgen in the `pipewire` crate). Playing audio needs `gstreamer1.0-pipewire`, `gstreamer1.0-plugins-base`, and `gstreamer1.0-plugins-good` at run time. Installing `libxml2-utils` silences the `xmllint` warning when compiling the gresource.
 
+### Checks
+
+Run `scripts/check.sh` before committing. It prints one `PASS` or `FAIL` line per check and keeps the logs in `tmp/check/`.
+
+```sh
+scripts/check.sh           # clippy without warnings, a single glib version, no em dash, meson test
+scripts/check.sh --audio   # plus the audio engine harness (fake devices, about 1 minute)
+scripts/check.sh --app     # plus scripts/verify-app.sh on the installed app
+scripts/check.sh --deb     # plus the package build
+scripts/check.sh --all
+```
+
+- `scripts/verify-app.sh` checks the installed app end to end on a virtual display: the virtual microphone, playing and stopping through actions and through real clicks, the "Send sounds to call" switch measured on a recording, and the cleanup on exit. It uses the real PipeWire and plays a quiet tone on the default output for a few seconds.
+- `scripts/build-deb.sh` builds the package from a copy under `tmp/deb`, so nothing is written to the working tree or to its parent directory.
+- `scripts/dev-common.sh` holds what these scripts share (the local prefix environment, the virtual session, test sounds). New development scripts should source it.
+
 ### Checking the interface
 
 `scripts/screenshot.sh` runs the installed app on a virtual display, with its own D-Bus session and its own settings, and captures the window:
@@ -60,10 +78,11 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 ```
 
 - It writes `tmp/screenshots/NAME.png`. Screenshots are temporary: read them, then delete them.
-- `--folder` fills the library, `--action` activates an `app.*` or `win.*` action before the capture, `--no-audio` makes the engine fail to start, `--light` uses the light style.
-- There is no simulated input, so states are reached through settings and actions. Dialogs (the folder chooser) cannot be captured.
+- `--folder` fills the library, `--no-audio` makes the engine fail to start, `--light` uses the light style.
+- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y` and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits.
+- Portal dialogs (the folder chooser) do not work on the virtual display and cannot be captured; test them by hand.
 - The app still uses the real PipeWire: it creates the real "Vinheta" node for a few seconds and plays on the default output. Use silent files with `toggle-sound`.
-- It needs `xvfb-run`, `dbus-run-session`, and ImageMagick (`import`), which are development tools only.
+- It needs `xvfb-run`, `dbus-run-session`, `xdotool`, and ImageMagick (`import`), which are development tools only.
 
 Non-obvious points:
 
@@ -124,6 +143,10 @@ The app ID is `io.github.wilfison.Vinheta`. It is spread across file names (`dat
 ## Language
 
 UI strings are written in English in the code and marked as translatable (gettext, domain `vinheta`); `po/LINGUAS` has no languages yet.
+
+## Planning
+
+PRDs live in `tasks/` (git-ignored) and are the progress tracker of a phase. Write them with the project skill `prd-vinheta` (`.agents/skills/prd-vinheta/`), which knows how each kind of story is verified here.
 
 ## Writing style
 
