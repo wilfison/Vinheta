@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="vinheta">
 	<schema id="io.github.wilfison.Vinheta" path="/io/github/wilfison/Vinheta/">
+		<key name="directories" type="as">
+			<default>[]</default>
+			<summary>Sound folders</summary>
+			<description>Absolute paths of the folders shown as tabs, in tab order.</description>
+		</key>
+		<key name="send-sounds-to-call" type="b">
+			<default>true</default>
+			<summary>Send sounds to call</summary>
+			<description>Whether sounds are played into the virtual microphone in addition to the local output.</description>
+		</key>
 	</schema>
 </schemalist>

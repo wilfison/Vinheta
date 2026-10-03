@@ -1,0 +1,32 @@
+gridview.pads {
+  background: none;
+  padding: 8px 32px 24px;
+}
+
+gridview.pads > child {
+  padding: 8px;
+  border-radius: 18px;
+  background: none;
+}
+
+.pad {
+  min-width: 144px;
+  min-height: 96px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* An outline is drawn inside the pad, so pads do not move when they start. */
+.pad.playing {
+  outline: 3px solid var(--accent-color);
+  outline-offset: -3px;
+}
+
+.tab-switcher {
+  padding: 12px 40px 4px;
+}
+
+.bottom-bar {
+  padding: 12px 24px;
+}

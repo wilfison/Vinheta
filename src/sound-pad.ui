@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="VinhetaSoundPad" parent="AdwBin">
+    <property name="halign">center</property>
+    <property name="valign">center</property>
+    <style>
+      <class name="pad"/>
+      <class name="card"/>
+      <class name="activatable"/>
+    </style>
+    <property name="child">
+      <object class="GtkLabel" id="label">
+        <property name="ellipsize">end</property>
+        <property name="lines">2</property>
+        <property name="wrap">True</property>
+        <property name="wrap-mode">word-char</property>
+        <property name="justify">center</property>
+        <property name="max-width-chars">14</property>
+      </object>
+    </property>
+  </template>
+</interface>

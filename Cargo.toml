@@ -22,4 +22,4 @@ pipewire = "0.10"
 [dependencies.adw]
 package = "libadwaita"
 version = "0.7"
-features = ["v1_6"]
+features = ["v1_7"]
