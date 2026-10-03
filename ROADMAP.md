@@ -64,7 +64,7 @@ Notes for the next phases:
 - Both sinks set `state.restore-props=false`; without it WirePlumber applies a volume saved for an earlier stream.
 - A live GStreamer source (for example `audiotestsrc is-live=true`) linked by hand into the node stalls the graph. Files do not.
 - The capture ports of a virtual source carry `port.monitor=true`; do not filter monitor ports out when walking the registry.
-- What the engine did not do at the end of Phase 0: stop a sound, change a volume while playing, turn the call branch or the microphone link on and off, choose devices at run time. Phase 1 added the stop and the call branch switch.
+- What the engine did not do at the end of Phase 0: stop a sound, change a volume while playing, turn the call branch or the microphone link on and off, choose devices at run time. Phase 1 added the stop and the call branch switch; Phase 2 added the rest.
 - After changing audio code, run `scripts/verify-audio-poc.sh rust`.
 
 ### Phase 1: interface MVP ✅
@@ -98,14 +98,36 @@ Notes for the next phases:
 - The undo of a removal and the folder chooser were not exercised by the scripted checks (no simulated input); test them by hand.
 - The window was not checked at its minimum width (360 pixels) for the same reason.
 
-### Phase 2: mixing controls
+### Phase 2: mixing controls ✅
 
-- ⬜ Two volumes: monitor and call. The `tee` with two branches and a `volume` each exists since Phase 0, but the volumes are fixed when the engine starts; they must become adjustable while sounds play.
-- ⬜ Selectors for the real microphone and the monitor device.
-- ⬜ "Include my voice" option (creates and removes the real microphone link). The link logic exists; it needs a command to turn it on and off.
-- ⬜ The microphone selector must never offer the "Vinheta" node. The engine already falls back to a physical source when "Vinheta" is the system default.
-- ⬜ React to devices being plugged in and removed (PipeWire registry events). The engine already tracks the registry and relinks when the default source changes; the interface still has to list devices and show the changes.
-- ⬜ Preferences dialog (`mockups/preferences.svg`) and the `app.preferences` action, which the menu already references but does not exist yet.
+- ✅ Two volumes: monitor and call, adjustable while sounds play, as two sliders in the bottom bar.
+- ✅ Selectors for the real microphone (bottom bar and preferences) and the monitor device (preferences).
+- ✅ "Include my voice" option (creates and removes the real microphone link).
+- ✅ The microphone selector never offers the "Vinheta" node.
+- ✅ React to devices being plugged in and removed (PipeWire registry events): the lists follow, and a chosen device that is removed is used again when it comes back.
+- ✅ Preferences dialog (`mockups/preferences.svg`) and the `app.preferences` action.
+
+What changed from the original plan:
+
+- The preferences dialog only has the "Audio" group. "Playback", "Shortcuts", and "Library" come with the phases that own them.
+- The monitor selector lives only in the preferences; the microphone selector is in both places, as in the mockups.
+- The sliders go from 0% to 100% (no amplification) with a cubic curve from position to gain. The settings store the position.
+- Changing the monitor output moves the sounds that are playing, through the `target.object` key of the default metadata. The system default is asked for with `-1`, because removing the key does not undo the target a stream was created with.
+- A chosen device that is not connected is shown as "(unavailable)" and replaced by the system default until it returns. For the monitor WirePlumber does that by itself; for the microphone the engine does.
+- The minimum window width went from 360 to 820 pixels, which is what the bottom bar needs.
+- Virtual sources other than "Vinheta" are offered as microphones.
+- `Ctrl+,` opens the preferences.
+- Tooling: `scripts/screenshot.sh` gained `--setting` and `--exec`, `scripts/check.sh` no longer fails on a clean tree, and `scripts/verify-app.sh` measures levels with the voice off.
+
+Notes for the next phases:
+
+- A volume change is heard within 200 ms and does not touch the other branch (measured by the harness).
+- Phase 3 (per-pad volume) can multiply into the same `volume` elements, or add one before the `tee`.
+- Phase 4: the bottom bar needs an adaptive layout before the window can be narrow again.
+- Phase 5: consider a shortcut for "Include My Voice".
+- Phase 6: show which device is really in use behind "System Default" or an unavailable choice. The engine reports the linked microphone (`MicLinked`) but not the default output. The label of an unavailable device is ellipsized in the preferences rows, which can hide the "(unavailable)" part.
+- A noisy real microphone hides quiet test tones on the virtual microphone; turn the voice off before measuring.
+- Dragging a slider with the mouse and switching between two real outputs were not exercised by the scripted checks; test them by hand.
 
 ### Phase 3: per-pad features
 

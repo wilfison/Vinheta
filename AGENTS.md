@@ -19,7 +19,7 @@ The SVGs in `mockups/` are the visual reference:
 - `empty-state.svg`: window with no sounds yet, with an "Add Sounds…" call to action (files can also be dropped), a tip to pick the "Vinheta" virtual microphone in the call app, and the bottom bar with "Stop all", monitor and call volumes, the real microphone, and the "Send sounds to call" toggle.
 - `preferences.svg`: preferences dialog, covering audio (real microphone, monitor output, send sounds to call, include my voice), playback (behavior when a pad is triggered, fade out on stop), global shortcuts, and library (copy imported sounds, sounds folder).
 
-**Current state:** Phase 1 of `ROADMAP.md` is done. The window shows one tab per folder with a grid of pads, plays and stops sounds through the audio engine (`src/audio/`), and has the "Stop all" button and the "Send sounds to call" switch. Everything else in the mockups (volumes, device selection, preferences, per-pad features, search, shortcuts, loose files) belongs to later phases and is not in the window yet.
+**Current state:** Phases 1 and 2 of `ROADMAP.md` are done. The window shows one tab per folder with a grid of pads and plays and stops sounds through the audio engine (`src/audio/`). The bottom bar has "Stop all", the "Headphones" and "Call" volume sliders, the microphone selector, and the "Send sounds to call" switch. The preferences dialog has the "Audio" group only (microphone, monitor output, send sounds to call, include my voice). Everything else in the mockups (the other preferences groups, per-pad features, search, shortcuts, loose files) belongs to later phases and is not in the app yet.
 
 ## Build and run
 
@@ -32,7 +32,7 @@ meson test -C build          # validates the .desktop file, metainfo (appstreamc
 meson test -C build "Validate schema file"   # run a single test
 ```
 
-The Rust tests are unit tests of code that needs no GTK, PipeWire, or display (today `src/library.rs`); run them directly with `cargo test --lib`. The validations are defined in `data/meson.build` and the Rust test in `src/meson.build`. debhelper runs `meson test` while building the package, so tests must not depend on a session. The audio engine is checked by `scripts/verify-audio-poc.sh` (see Architecture).
+The Rust tests are unit tests of code that needs no GTK, PipeWire, or display (today `src/library.rs`, `src/devices.rs`, and the pure functions of `src/audio/`); run them directly with `cargo test --lib`. The validations are defined in `data/meson.build` and the Rust test in `src/meson.build`. debhelper runs `meson test` while building the package, so tests must not depend on a session. The audio engine is checked by `scripts/verify-audio-poc.sh` (see Architecture).
 
 ### Running in development
 
@@ -64,7 +64,7 @@ scripts/check.sh --deb     # plus the package build
 scripts/check.sh --all
 ```
 
-- `scripts/verify-app.sh` checks the installed app end to end on a virtual display: the virtual microphone, playing and stopping through actions and through real clicks, the "Send sounds to call" switch measured on a recording, and the cleanup on exit. It uses the real PipeWire and plays a quiet tone on the default output for a few seconds.
+- `scripts/verify-app.sh` checks the installed app end to end on a virtual display: the virtual microphone, playing and stopping through actions and through real clicks, the "Send sounds to call" switch and the call volume measured on a recording, the voice switch, the monitor output (with a fake sink), and the cleanup on exit. It uses the real PipeWire and plays a quiet tone on the default output for a few seconds. The levels are measured with the voice off, because a noisy real microphone hides the tone.
 - `scripts/build-deb.sh` builds the package from a copy under `tmp/deb`, so nothing is written to the working tree or to its parent directory.
 - `scripts/dev-common.sh` holds what these scripts share (the local prefix environment, the virtual session, test sounds). New development scripts should source it.
 
@@ -78,8 +78,9 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 ```
 
 - It writes `tmp/screenshots/NAME.png`. Screenshots are temporary: read them, then delete them.
-- `--folder` fills the library, `--no-audio` makes the engine fail to start, `--light` uses the light style.
-- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y` and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits.
+- `--folder` fills the library, `--setting 'KEY VALUE'` sets any other key of the app's settings before it starts (`VALUE` is a GVariant: `0.5`, `false`, `"'name'"`), `--no-audio` makes the engine fail to start, `--light` uses the light style.
+- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y` and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits, `--exec COMMAND` runs a shell command (for example to create or destroy a fake device while the app runs).
+- Dialogs opened by an action (`--action preferences`) and open popovers are captured. The device lists come from the real PipeWire; for a known entry, create a fake device with `create_node` from `scripts/audio-poc-common.sh` (prefix `vinheta-shot-`) and destroy it afterwards.
 - Portal dialogs (the folder chooser) do not work on the virtual display and cannot be captured; test them by hand.
 - The app still uses the real PipeWire: it creates the real "Vinheta" node for a few seconds and plays on the default output. Use silent files with `toggle-sound`.
 - It needs `xvfb-run`, `dbus-run-session`, `xdotool`, and ImageMagick (`import`), which are development tools only.
@@ -108,15 +109,19 @@ dpkg-buildpackage -us -uc -b   # writes ../vinheta_<version>_<arch>.deb
 ## Architecture
 
 - `src/main.rs`: sets up gettext, registers the gresource, and starts `VinhetaApplication`.
-- `src/application.rs`: `adw::Application` subclass; registers the `app.*` actions in `setup_gactions()`. It owns the `AudioEngine` (started in `startup`, dropped in `shutdown`), consumes its events with `glib::spawn_future_local`, and keeps the map from `PlaybackId` to the `Sound` being played. `app.toggle-sound` (parameter: the absolute path of a sound of the library) and `app.stop-all` are the only way sounds are started and stopped; the pads activate them too.
+- `src/application.rs`: `adw::Application` subclass; registers the `app.*` actions in `setup_gactions()`. It owns the `AudioEngine` (started in `startup`, dropped in `shutdown`), consumes its events with `glib::spawn_future_local`, and keeps the map from `PlaybackId` to the `Sound` being played. `app.toggle-sound` (parameter: the absolute path of a sound of the library) and `app.stop-all` are the only way sounds are started and stopped; the pads activate them too. `app.preferences` opens the preferences dialog.
+- The settings are the single source of truth for the mix: the application builds the engine `Config` from them and forwards every change of a key to the engine (`call-volume`, `monitor-volume`, `microphone`, `monitor-output`, `include-my-voice`, `send-sounds-to-call`). The interface only binds widgets to keys and never calls the engine for these. The application also keeps the device lists reported by the engine and emits its `devices-changed` signal when they, or the audio availability, change.
 - `src/ui/`: the interface components. A widget's `.rs` file lives here next to its `.ui` template, together with the `.ui` and `.css` files that have no Rust side. `application.rs` and `sound.rs` are not widgets and stay in `src/`.
-- `src/ui/window.rs` + `src/ui/window.ui`: `adw::ApplicationWindow` subclass using a composite template; widgets from the `.ui` file are bound with `#[template_child]`. It owns the tabs (`AdwViewStack` with an `AdwInlineViewSwitcher`), the `directories` setting, and the `win.add-folder` and `win.remove-folder` actions.
+- `src/ui/window.rs` + `src/ui/window.ui`: `adw::ApplicationWindow` subclass using a composite template; widgets from the `.ui` file are bound with `#[template_child]`. It owns the tabs (`AdwViewStack` with an `AdwInlineViewSwitcher`), the `directories` setting, the `win.add-folder` and `win.remove-folder` actions, and the bottom bar. The minimum width (820) is what the bottom bar needs; a narrow layout is Phase 4.
+- `src/ui/preferences_dialog.rs` + `src/ui/preferences-dialog.ui`: the `AdwPreferencesDialog`.
+- `src/ui/device_selector.rs`: not a widget. `bind` keeps a `GtkDropDown` or an `AdwComboRow` in sync with a device list of the application and with the key that stores the chosen device. It is the only place that writes `microphone` and `monitor-output`.
+- `src/devices.rs`: the entries of a device selector (system default, devices, a chosen device that is not connected). No GTK types, covered by unit tests.
 - `src/ui/folder_page.rs` + `src/ui/folder-page.ui`: the content of one tab. It scans its folder off the main thread and shows the pads in a `GtkGridView`, or a status page when the folder is empty or missing.
 - `src/sound.rs`: the `Sound` GObject (path, name, `playing`). `src/ui/sound_pad.rs` + `src/ui/sound-pad.ui`: the widget of one pad.
 - `src/ui/style.css`: custom styling, loaded by libadwaita from the `resource-base-path`.
 - `src/library.rs`: which files of a folder are sounds, and in what order. No GTK types, covered by unit tests.
-- `src/lib.rs`: library target that exposes `audio` and `library`, so other binaries and the tests can use them. The app modules above stay in `main.rs`.
-- `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `Event`, `Error`, `PlaybackId`); `graph.rs` owns the PipeWire thread (virtual microphone node, registry, links); `player.rs` builds one GStreamer pipeline per sound. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
+- `src/lib.rs`: library target that exposes `audio`, `devices`, and `library`, so other binaries and the tests can use them. The app modules above stay in `main.rs`.
+- `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `Event`, `Error`, `PlaybackId`, `Device`, `slider_gain`); `graph.rs` owns the PipeWire thread (virtual microphone node, registry, links); `player.rs` builds one GStreamer pipeline per sound. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
 - `src/bin/vinheta-audio-poc.rs`: diagnostic binary behind the `audio-poc` cargo feature (`cargo run --features audio-poc --bin vinheta-audio-poc -- --help`). Meson does not build or install it.
 
 Audio behavior that is easy to get wrong (details in `docs/audio-poc.md`):
@@ -124,7 +129,12 @@ Audio behavior that is easy to get wrong (details in `docs/audio-poc.md`):
 - WirePlumber does not route playback into the virtual microphone. The call branch sink uses `node.autoconnect=false` and `graph.rs` links any stream whose node name starts with `vinheta-call-`.
 - The node and links are created without `object.linger`, so they vanish when the process ends. Do not add it.
 - A playback that was stopped on request never reports an event afterwards; the interface relies on that, and on events carrying the `PlaybackId`.
-- "Send sounds to call" mutes the `call-volume` element of each pipeline. The call stream and its links stay in place.
+- "Send sounds to call" mutes the `call-volume` element of each pipeline. The call stream and its links stay in place. The call volume is the `volume` property of the same element, independent of the mute.
+- The volumes and the mute are set by `player.rs` on the caller's thread; the microphone, the voice switch, and the monitor output are commands for the PipeWire thread.
+- The settings store slider positions (0 to 1); the engine takes gains. `slider_gain` (cubic) converts.
+- The monitor branch is routed by WirePlumber. A new playback gets the chosen output as `target-object`; a running one is moved by writing `target.object` for its stream (node name `vinheta-monitor-*`) in the default metadata. The system default is asked for with the value `-1`: removing the key would leave the target the stream was created with.
+- A chosen device that does not exist is not an error to recover from in the interface. For the monitor, WirePlumber uses the default sink and moves the stream when the device shows up. For the microphone, `graph.rs` reports `MicNotFound` once, links the default source, and links the chosen one when it appears.
+- `Event::DevicesChanged` is only sent when a list really changed, and never lists the "Vinheta" node.
 - After changing audio code, run `scripts/verify-audio-poc.sh rust`. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`.
 
 GObject conventions used here: each type has a `mod imp` holding the state struct and the subclass `impl`s, plus a public `glib::wrapper!`. UI is declared in XML (`.ui`), not built in code.
@@ -134,7 +144,6 @@ When adding files:
 - New widgets go in `src/ui/` and are declared in `src/ui/mod.rs`.
 - Every new `.ui` file must be listed in `src/vinheta.gresource.xml` (prefix `/io/github/wilfison/Vinheta`) with an `alias` that drops the `ui/` directory, so resource paths stay flat (`/io/github/wilfison/Vinheta/window.ui`) and, if it has translatable strings, in `po/POTFILES.in`. `.rs` files that call `gettext()` must be listed there too.
 - `shortcuts-dialog.ui` is loaded automatically by libadwaita from the `resource-base-path`, which provides the `app.shortcuts` action; that is why it does not appear in `setup_gactions()`.
-- The primary menu references `app.preferences`, which does not exist yet.
 
 ## App ID
 
