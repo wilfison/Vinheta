@@ -60,6 +60,21 @@ pw-link vinheta-play:output_FR vinheta:input_FR
 - The links disappear with the stream when playback ends. Nothing has to be removed by hand.
 - `target-object` does work for the monitor branch, where the target is a regular `Audio/Sink`.
 
+## Moving the monitor branch (Phase 2)
+
+The monitor stream is routed by WirePlumber, which follows the `target.object` key of the default metadata, per stream:
+
+```sh
+pw-metadata STREAM_ID target.object SINK_NAME   # moves a playing stream within a second
+pw-metadata STREAM_ID target.object -- -1       # back to the default sink
+```
+
+- The value is the plain node name (a JSON-quoted name does not work). The sink's `object.serial` with the type `Spa:Id` works too.
+- Removing the key (`pw-metadata -d`) only goes back to the default when the stream was created without a target. A stream created with `target-object=X` returns to X. The value `-1` always means the default, so that is what the engine writes.
+- A target that does not exist (set at creation or through the metadata) leaves the stream on the default sink; it moves when a sink with that name appears, and moves back when that sink is removed, without stopping the pipeline.
+- From Rust: `Metadata::set_property(stream_id, "target.object", None, Some(name))` on the bound default metadata.
+- The engine names the monitor stream `vinheta-monitor-PID-ID` to find it in the registry.
+
 ## Linking the microphone
 
 The default source name comes from the `default` metadata:
@@ -143,6 +158,11 @@ cargo run --features audio-poc --bin vinheta-audio-poc -- [OPTIONS] [FILE...]
 - `--stop-after SECONDS`: stops the first file that many seconds after the playback starts.
 - `--stop-all-after SECONDS`: stops every file.
 - `--mute-call-after SECONDS`, `--unmute-call-after SECONDS`: turn the call branch off and on while the files play.
+- `--call-volume-after SECONDS GAIN`, `--monitor-volume-after SECONDS GAIN`: change the gain of a branch (0 to 1) while the files play.
+- `--no-voice`: starts without the microphone link. `--voice-off-after SECONDS`, `--voice-on-after SECONDS`: remove and restore it.
+- `--mic-after SECONDS NODE_NAME`, `--monitor-after SECONDS NODE_NAME`: switch the microphone and the monitor output; the name `default` follows the system default.
+- `--replay-after SECONDS`: plays the files again.
+- The device lists are printed after the start and whenever they change (`devices changed`, then `microphone: NAME (DESCRIPTION)` and `output: NAME (DESCRIPTION)` lines).
 - `--mic`, `--monitor`, `--call-volume`, `--monitor-volume`: same meaning as in the script.
 - `--version`: prints the PipeWire and GStreamer library versions.
 
@@ -161,8 +181,16 @@ It never uses the real microphone or headphones. A fake microphone (a mono virtu
 - (Rust only) stopping one sound, or all of two sounds, silences both branches while the process, the node, and the voice stay,
 - (Rust only) muting the call branch silences the sound in the call recording only, keeps the voice there, and unmuting brings the sound back,
 - (Rust only) with `--no-call` the sound never reaches the call recording,
+- (Rust only) a gain of 0.1 on one branch lowers it by 20 dB within 200 ms and leaves the other branch and the voice alone,
+- (Rust only) the device lists name the fake devices, never the virtual microphone, and follow a sink that is created and destroyed,
+- (Rust only) turning the voice off removes it from the call recording and keeps the sound, and `--no-voice` starts that way,
+- (Rust only) switching to a second fake microphone (880 Hz) replaces the voice in the call recording,
+- (Rust only) switching to a second fake sink moves the playing sound within a second, without a gap in the call recording, and the next sound starts there,
+- (Rust only) when the chosen sink or microphone is destroyed, the engine falls back to the system default and keeps running, and the chosen microphone is linked again when it returns,
 - nothing is left behind after each kind of exit,
 - the default source and sink are unchanged.
+
+The two removal checks fall back to the real default devices, so the sink one plays with the monitor volume at 0 and the microphone one plays and records nothing.
 
 It prints one `PASS` or `FAIL` line per check and exits with status 0 only when all pass. Recordings and logs go to `tmp/audio-poc/`. It needs `ffmpeg` and `python3`, which are development tools only, not package dependencies.
 

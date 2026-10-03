@@ -47,6 +47,8 @@ pub struct Config {
     pub monitor_volume: f64,
     /// When false, the call branch of every sound is muted.
     pub send_to_call: bool,
+    /// When false, the microphone is not linked to the virtual microphone.
+    pub include_voice: bool,
 }
 
 impl Default for Config {
@@ -57,6 +59,7 @@ impl Default for Config {
             call_volume: 1.0,
             monitor_volume: 1.0,
             send_to_call: true,
+            include_voice: true,
         }
     }
 }
@@ -65,15 +68,31 @@ impl Default for Config {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PlaybackId(u64);
 
+/// A microphone or an output. `name` is the PipeWire node name, which is what
+/// [`AudioEngine::set_microphone`] and [`AudioEngine::set_monitor`] take.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Device {
+    pub name: String,
+    pub description: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     /// The virtual microphone exists; the value is its PipeWire node id.
     NodeCreated(u32),
-    /// `fallback` is set when the default source was the virtual microphone
-    /// itself and a physical source was linked instead.
+    /// `fallback` is set when the linked microphone is not the one asked
+    /// for: the chosen one does not exist, or the default source is the
+    /// virtual microphone itself.
     MicLinked {
         name: String,
         fallback: bool,
+    },
+    /// The voice was turned off, so no microphone is linked.
+    MicUnlinked,
+    /// Sent once after the start and whenever either list changes.
+    DevicesChanged {
+        microphones: Vec<Device>,
+        outputs: Vec<Device>,
     },
     PlaybackFinished {
         id: PlaybackId,
@@ -128,11 +147,15 @@ impl AudioEngine {
         let (events, receiver) = async_channel::unbounded();
         let player = Player::new(&config, events.clone())?;
 
+        let options = graph::Options {
+            mic: config.mic,
+            include_voice: config.include_voice,
+        };
         let (commands, command_receiver) = pw::channel::channel();
         let (started, started_receiver) = mpsc::channel();
         let thread = std::thread::Builder::new()
             .name("vinheta-pipewire".into())
-            .spawn(move || graph::run(config.mic, events, command_receiver, started))
+            .spawn(move || graph::run(options, events, command_receiver, started))
             .map_err(|error| Error::PipeWire(error.to_string()))?;
 
         started_receiver
@@ -166,6 +189,43 @@ impl AudioEngine {
     pub fn set_send_to_call(&self, enabled: bool) {
         self.player.set_send_to_call(enabled);
     }
+
+    /// Sets the gain of the call branch (0.0 to 1.0) of current and future
+    /// playbacks. It does not undo the mute of [`Self::set_send_to_call`].
+    pub fn set_call_volume(&self, gain: f64) {
+        self.player.set_call_volume(gain);
+    }
+
+    /// Sets the gain of the monitor branch (0.0 to 1.0) of current and future
+    /// playbacks.
+    pub fn set_monitor_volume(&self, gain: f64) {
+        self.player.set_monitor_volume(gain);
+    }
+
+    /// Links another microphone, by node name. `None` follows the system
+    /// default source, which is also used while the chosen one does not exist.
+    pub fn set_microphone(&self, name: Option<String>) {
+        let _ = self.commands.send(Command::SetMic(name));
+    }
+
+    /// Removes or restores the link from the microphone to the virtual one.
+    pub fn set_include_voice(&self, enabled: bool) {
+        let _ = self.commands.send(Command::SetIncludeVoice(enabled));
+    }
+
+    /// Moves the monitor branch of current and future playbacks to another
+    /// output, by node name. `None` is the system default sink, which is also
+    /// used while the chosen one does not exist.
+    pub fn set_monitor(&self, name: Option<String>) {
+        self.player.set_monitor(name.clone());
+        let _ = self.commands.send(Command::SetMonitor(name));
+    }
+}
+
+/// The gain of a volume slider at `position` (0.0 to 1.0). The curve is
+/// cubic, so the slider feels even to the ear.
+pub fn slider_gain(position: f64) -> f64 {
+    position.clamp(0.0, 1.0).powi(3)
 }
 
 impl Drop for AudioEngine {
@@ -187,4 +247,22 @@ pub fn versions() -> Result<(String, String), Error> {
         pipewire.to_string_lossy().into_owned(),
         gst::version_string().to_string(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slider_gain;
+
+    #[test]
+    fn slider_gain_is_cubic() {
+        assert_eq!(slider_gain(0.0), 0.0);
+        assert_eq!(slider_gain(1.0), 1.0);
+        assert_eq!(slider_gain(0.5), 0.125);
+    }
+
+    #[test]
+    fn slider_gain_clamps_the_position() {
+        assert_eq!(slider_gain(-0.5), 0.0);
+        assert_eq!(slider_gain(1.5), 1.0);
+    }
 }

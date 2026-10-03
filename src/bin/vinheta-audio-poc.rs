@@ -33,7 +33,10 @@ use vinheta::audio::{self, AudioEngine, Config, Event, PlaybackId};
 const USAGE: &str = "usage: vinheta-audio-poc [--help] [--version] [--once] [--mic NODE_NAME] \
 [--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] [--no-call] \
 [--stop-after SECONDS] [--stop-all-after SECONDS] [--mute-call-after SECONDS] \
-[--unmute-call-after SECONDS] [FILE...]
+[--unmute-call-after SECONDS] [--call-volume-after SECONDS GAIN] \
+[--monitor-volume-after SECONDS GAIN] [--no-voice] [--voice-off-after SECONDS] \
+[--voice-on-after SECONDS] [--mic-after SECONDS NODE_NAME] \
+[--monitor-after SECONDS NODE_NAME] [--replay-after SECONDS] [FILE...]
 
 Without FILE, only the virtual microphone and the microphone link are created.
 With FILEs, they are played together once, and again each time Enter is pressed.
@@ -41,7 +44,14 @@ With FILEs, they are played together once, and again each time Enter is pressed.
 --no-call starts with the call branch muted.
 The --*-after options act that many seconds after the first playback starts:
 --stop-after stops the first FILE, --stop-all-after stops every FILE, and
---mute-call-after and --unmute-call-after turn the call branch off and on.";
+--mute-call-after and --unmute-call-after turn the call branch off and on,
+--call-volume-after and --monitor-volume-after set the gain of a branch (0 to 1),
+--voice-off-after and --voice-on-after remove and restore the microphone link,
+--mic-after and --monitor-after switch the microphone and the monitor output
+(the name \"default\" follows the system default), and --replay-after plays
+the FILEs again.
+--no-voice starts without the microphone link.
+The device lists are printed after the start and whenever they change.";
 
 #[derive(Default)]
 struct Args {
@@ -53,6 +63,13 @@ struct Args {
     stop_all_after: Option<Duration>,
     mute_call_after: Option<Duration>,
     unmute_call_after: Option<Duration>,
+    call_volume_after: Option<(Duration, f64)>,
+    monitor_volume_after: Option<(Duration, f64)>,
+    voice_off_after: Option<Duration>,
+    voice_on_after: Option<Duration>,
+    mic_after: Option<(Duration, Option<String>)>,
+    monitor_after: Option<(Duration, Option<String>)>,
+    replay_after: Option<Duration>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -69,6 +86,7 @@ fn parse_args() -> Result<Args, String> {
                 .map(Some)
                 .map_err(|_| format!("bad number of seconds: {text}"))
         };
+        let device = |name: String| (name != "default").then_some(name);
         match arg.as_str() {
             "--version" => parsed.version = true,
             "--once" => parsed.once = true,
@@ -81,6 +99,20 @@ fn parse_args() -> Result<Args, String> {
             "--stop-all-after" => parsed.stop_all_after = seconds(value()?)?,
             "--mute-call-after" => parsed.mute_call_after = seconds(value()?)?,
             "--unmute-call-after" => parsed.unmute_call_after = seconds(value()?)?,
+            "--call-volume-after" => {
+                parsed.call_volume_after = seconds(value()?)?.zip(Some(volume(value()?)?));
+            }
+            "--monitor-volume-after" => {
+                parsed.monitor_volume_after = seconds(value()?)?.zip(Some(volume(value()?)?));
+            }
+            "--no-voice" => parsed.config.include_voice = false,
+            "--voice-off-after" => parsed.voice_off_after = seconds(value()?)?,
+            "--voice-on-after" => parsed.voice_on_after = seconds(value()?)?,
+            "--mic-after" => parsed.mic_after = seconds(value()?)?.zip(Some(device(value()?))),
+            "--monitor-after" => {
+                parsed.monitor_after = seconds(value()?)?.zip(Some(device(value()?)));
+            }
+            "--replay-after" => parsed.replay_after = seconds(value()?)?,
             _ if arg.starts_with('-') => return Err(format!("unknown option: {arg}")),
             _ => parsed.files.push(PathBuf::from(&arg)),
         }
@@ -156,6 +188,42 @@ impl Poc {
         self.schedule(self.args.unmute_call_after, |poc| {
             poc.engine.set_send_to_call(true);
             println!("call branch unmuted");
+        });
+        if let Some((delay, gain)) = self.args.call_volume_after {
+            self.schedule(Some(delay), move |poc| {
+                poc.engine.set_call_volume(gain);
+                println!("call volume set to {gain}");
+            });
+        }
+        if let Some((delay, gain)) = self.args.monitor_volume_after {
+            self.schedule(Some(delay), move |poc| {
+                poc.engine.set_monitor_volume(gain);
+                println!("monitor volume set to {gain}");
+            });
+        }
+        self.schedule(self.args.voice_off_after, |poc| {
+            poc.engine.set_include_voice(false);
+            println!("voice turned off");
+        });
+        self.schedule(self.args.voice_on_after, |poc| {
+            poc.engine.set_include_voice(true);
+            println!("voice turned on");
+        });
+        if let Some((delay, name)) = self.args.mic_after.clone() {
+            self.schedule(Some(delay), move |poc| {
+                println!("microphone set to {name:?}");
+                poc.engine.set_microphone(name);
+            });
+        }
+        if let Some((delay, name)) = self.args.monitor_after.clone() {
+            self.schedule(Some(delay), move |poc| {
+                println!("monitor output set to {name:?}");
+                poc.engine.set_monitor(name);
+            });
+        }
+        self.schedule(self.args.replay_after, |poc| {
+            println!("playing the files again");
+            poc.play_all();
         });
     }
 }
@@ -252,7 +320,20 @@ fn main() -> ExitCode {
                         name,
                         fallback: true,
                     } => {
-                        println!("the default source is Vinheta itself, linked {name} instead");
+                        println!("microphone linked as a fallback: {name}");
+                    }
+                    Event::MicUnlinked => println!("microphone unlinked"),
+                    Event::DevicesChanged {
+                        microphones,
+                        outputs,
+                    } => {
+                        println!("devices changed");
+                        for device in microphones {
+                            println!("microphone: {} ({})", device.name, device.description);
+                        }
+                        for device in outputs {
+                            println!("output: {} ({})", device.name, device.description);
+                        }
                     }
                     Event::PlaybackFinished { id, path } => {
                         println!("finished playing {}", path.display());
