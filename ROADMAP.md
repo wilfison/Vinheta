@@ -29,6 +29,8 @@ The node is created by the app's connection and disappears when the app closes, 
 
 The biggest risk in the project. No interface here.
 
+**Done.** The findings, the scripts, and how to re-run the checks are in [docs/audio-poc.md](docs/audio-poc.md). A test on a real call is still pending (the manual call checklist in that document).
+
 First on the command line, without writing any Rust:
 
 - Create the virtual node with `pw-cli create-node adapter` and check in Helvum or `qpwgraph` that it shows up.
@@ -60,6 +62,7 @@ Done when: someone on a call hears your voice and the sound together, and the no
 - Two volumes: monitor and call. This needs a `tee` in the pipeline with two branches, each with its own `volume`.
 - Selectors for the real microphone and the monitor device.
 - "Include my voice" option (creates and removes the real microphone link).
+- The microphone selector must never offer the "Vinheta" node. The engine already falls back to a physical source when "Vinheta" is the system default.
 - React to devices being plugged in and removed (PipeWire registry events).
 - Preferences dialog (`mockups/preferences.svg`) and the `app.preferences` action, which the menu already references but does not exist yet.
 
@@ -93,11 +96,12 @@ Done when: someone on a call hears your voice and the sound together, and the no
 - Error handling: PipeWire missing, corrupted file, directory removed, microphone removed.
 - Icon, metainfo, screenshots, and translations (gettext; `po/LINGUAS` is still empty).
 - Publishing the `.deb` (GitHub releases or a PPA).
+- Before the release, remove `vinheta-audio-poc`, the `audio-poc` cargo feature, and the `rust` mode of `scripts/verify-audio-poc.sh`.
 
 ## Risks to check early
 
-- **Playback into an `Audio/Source/Virtual` node**: may require manual links instead of `target-object`. Settle this in Phase 0.
-- **Noise suppression in call apps**: Discord (Krisp), Meet, and similar apps may cut the sounds out as if they were noise. Test in Phase 0 and warn the user on first run.
+- **Playback into an `Audio/Source/Virtual` node**: settled in Phase 0. `target-object` does not work (WirePlumber sends the stream to the default sink), so the engine always uses `node.autoconnect=false` and creates the links itself, whatever the WirePlumber version.
+- **Noise suppression in call apps**: Discord (Krisp), Meet, and similar apps may cut the sounds out as if they were noise. Not tested yet: run the manual call checklist in `docs/audio-poc.md`; the result feeds the first-run screen of Phase 6.
 - **Echo**: if the local monitor leaks into the real microphone, the call hears the sound twice. Recommend headphones.
 - **Mono microphone into a stereo node**: link the microphone to both channels, otherwise the call hears the voice on one side only.
 - **Latency and sync** between the two `tee` branches: use a `queue` on each branch.

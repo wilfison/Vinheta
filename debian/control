@@ -12,6 +12,10 @@ Build-Depends:
  gettext,
  libgtk-4-dev (>= 4.16),
  libadwaita-1-dev (>= 1.8),
+ libpipewire-0.3-dev,
+ libgstreamer1.0-dev,
+ libgstreamer-plugins-base1.0-dev,
+ libclang-dev,
  desktop-file-utils,
  appstream,
 Standards-Version: 4.7.2
@@ -21,6 +25,9 @@ Architecture: any
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
+ gstreamer1.0-pipewire,
+ gstreamer1.0-plugins-base,
+ gstreamer1.0-plugins-good,
 Description: Soundboard for GNOME with virtual microphone support
  Vinheta is a soundboard for the GNOME desktop. Each directory added by
  the user becomes a tab, and every sound in it can be played with a click.

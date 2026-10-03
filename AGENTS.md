@@ -19,7 +19,7 @@ The SVGs in `mockups/` are the visual reference:
 - `empty-state.svg`: window with no sounds yet, with an "Add Sounds…" call to action (files can also be dropped), a tip to pick the "Vinheta" virtual microphone in the call app, and the bottom bar with "Stop all", monitor and call volumes, the real microphone, and the "Send sounds to call" toggle.
 - `preferences.svg`: preferences dialog, covering audio (real microphone, monitor output, send sounds to call, include my voice), playback (behavior when a pad is triggered, fade out on stop), global shortcuts, and library (copy imported sounds, sounds folder).
 
-**Current state:** the code is still the GNOME Builder template ("Hello, World!"). None of the behavior above is implemented: there is no audio dependency in `Cargo.toml`, and the GSettings schema is empty.
+**Current state:** the interface is still the GNOME Builder template ("Hello, World!") and the GSettings schema is empty. The audio engine exists (`src/audio/`, Phase 0 of `ROADMAP.md`) but is not wired into the app yet; it is only reachable through the `vinheta-audio-poc` diagnostic binary.
 
 ## Build and run
 
@@ -32,7 +32,7 @@ meson test -C build          # validates the .desktop file, metainfo (appstreamc
 meson test -C build "Validate schema file"   # run a single test
 ```
 
-There are no Rust tests; the only tests are the validations above, defined in `data/meson.build`.
+There are no Rust tests; the only Meson tests are the validations above, defined in `data/meson.build`. The audio engine is checked by `scripts/verify-audio-poc.sh` (see Architecture).
 
 ### Running in development
 
@@ -48,7 +48,7 @@ build/install/bin/vinheta
 
 - The prefix is baked into `PKGDATADIR` at configure time, which is how the binary finds `vinheta.gresource`.
 - `GSETTINGS_SCHEMA_DIR` points at the schema compiled into the local prefix; `XDG_DATA_DIRS` lets the app find its icon there.
-- Building requires `libgtk-4-dev` and `libadwaita-1-dev` (they pull in the GLib dev tools, including `glib-compile-resources`). Installing `libxml2-utils` silences the `xmllint` warning when compiling the gresource.
+- Building requires `libgtk-4-dev` and `libadwaita-1-dev` (they pull in the GLib dev tools, including `glib-compile-resources`), plus `libpipewire-0.3-dev`, `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`, and `libclang-dev` for the audio engine (`libclang` is used by bindgen in the `pipewire` crate). Playing audio needs `gstreamer1.0-pipewire`, `gstreamer1.0-plugins-base`, and `gstreamer1.0-plugins-good` at run time. Installing `libxml2-utils` silences the `xmllint` warning when compiling the gresource.
 
 Non-obvious points:
 
@@ -76,6 +76,15 @@ dpkg-buildpackage -us -uc -b   # writes ../vinheta_<version>_<arch>.deb
 - `src/main.rs`: sets up gettext, registers the gresource, and starts `VinhetaApplication`.
 - `src/application.rs`: `adw::Application` subclass; registers the `app.*` actions in `setup_gactions()`.
 - `src/window.rs` + `src/window.ui`: `adw::ApplicationWindow` subclass using a composite template; widgets from the `.ui` file are bound with `#[template_child]`.
+- `src/lib.rs`: library target that exposes `audio`, so other binaries can use the engine. The app modules above stay in `main.rs`.
+- `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `Event`, `Error`); `graph.rs` owns the PipeWire thread (virtual microphone node, registry, links); `player.rs` builds one GStreamer pipeline per sound. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
+- `src/bin/vinheta-audio-poc.rs`: diagnostic binary behind the `audio-poc` cargo feature (`cargo run --features audio-poc --bin vinheta-audio-poc -- --help`). Meson does not build or install it.
+
+Audio behavior that is easy to get wrong (details in `docs/audio-poc.md`):
+
+- WirePlumber does not route playback into the virtual microphone. The call branch sink uses `node.autoconnect=false` and `graph.rs` links any stream whose node name starts with `vinheta-call-`.
+- The node and links are created without `object.linger`, so they vanish when the process ends. Do not add it.
+- After changing audio code, run `scripts/verify-audio-poc.sh rust`. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`.
 
 GObject conventions used here: each type has a `mod imp` holding the state struct and the subclass `impl`s, plus a public `glib::wrapper!`. UI is declared in XML (`.ui`), not built in code.
 
