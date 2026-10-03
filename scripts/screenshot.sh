@@ -6,10 +6,13 @@ set -uo pipefail
 
 usage() {
     cat >&2 <<'USAGE'
-usage: screenshot.sh NAME [--folder DIR]... [STEP]... [--no-audio] [--light]
+usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [STEP]...
+                     [--no-audio] [--light]
 
 Writes tmp/screenshots/NAME.png from the app installed in build/install.
 --folder DIR   adds DIR to the library before the app starts
+--setting 'KEY VALUE'  sets a key of the app's settings before the app starts;
+               VALUE is a GVariant such as 0.5, false, or "'text'"
 --no-audio     makes PipeWire unreachable, to capture the audio failure state
 --light        uses the light style instead of the dark one
 
@@ -20,6 +23,7 @@ Steps run in the given order once the window is up, before the capture:
 --key KEYS     presses keys, in xdotool syntax (Return, ctrl+q, Tab)
 --size W,H     resizes the window
 --wait SECONDS waits
+--exec COMMAND runs a shell command, for example to create a fake device
 USAGE
     exit 2
 }
@@ -28,13 +32,15 @@ USAGE
 
 name=
 folders=()
+settings=()
 steps=()
 scheme=prefer-dark
 no_audio=
 while [ $# -gt 0 ]; do
     case $1 in
         --folder) [ $# -ge 2 ] || usage; folders+=("$(realpath "$2")"); shift ;;
-        --action | --click | --key | --size | --wait)
+        --setting) [ $# -ge 2 ] || usage; settings+=("$2"); shift ;;
+        --action | --click | --key | --size | --wait | --exec)
             [ $# -ge 2 ] || usage
             steps+=("${1#--} $2")
             shift
@@ -60,8 +66,11 @@ rm -f "$output"
 directories=$(gvariant_strv "${folders[@]}")
 
 session() {
-    local step kind value
+    local step kind value setting
     gsettings set "$app_id" directories "$directories" || return 1
+    for setting in "${settings[@]}"; do
+        gsettings set "$app_id" "${setting%% *}" "${setting#* }" || return 1
+    done
     start_app || return 1
 
     for step in "${steps[@]}"; do
@@ -79,6 +88,7 @@ session() {
             key) key "$value" ;;
             size) resize_window "${value%,*}" "${value#*,}" ;;
             wait) sleep "$value" ;;
+            exec) bash -c "$value" ;;
         esac || echo "step failed: $step" >&2
         sleep 0.5
     done
@@ -92,7 +102,7 @@ session() {
 # handed over as a script.
 {
     echo ". '$root/scripts/dev-common.sh'"
-    declare -p directories output steps
+    declare -p directories output settings steps
     declare -f session
     echo session
 } >"$config/session.sh"
