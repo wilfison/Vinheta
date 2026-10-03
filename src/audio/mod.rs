@@ -45,6 +45,8 @@ pub struct Config {
     pub monitor: Option<String>,
     pub call_volume: f64,
     pub monitor_volume: f64,
+    /// When false, the call branch of every sound is muted.
+    pub send_to_call: bool,
 }
 
 impl Default for Config {
@@ -54,9 +56,14 @@ impl Default for Config {
             monitor: None,
             call_volume: 1.0,
             monitor_volume: 1.0,
+            send_to_call: true,
         }
     }
 }
+
+/// Identifies one playback started by [`AudioEngine::play`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PlaybackId(u64);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
@@ -68,7 +75,10 @@ pub enum Event {
         name: String,
         fallback: bool,
     },
-    PlaybackFinished(PathBuf),
+    PlaybackFinished {
+        id: PlaybackId,
+        path: PathBuf,
+    },
     Error(Error),
 }
 
@@ -80,7 +90,11 @@ pub enum Error {
     MicNotFound(String),
     NoMicrophone,
     FileNotFound(PathBuf),
-    Playback { path: PathBuf, message: String },
+    Playback {
+        id: PlaybackId,
+        path: PathBuf,
+        message: String,
+    },
 }
 
 impl fmt::Display for Error {
@@ -92,7 +106,7 @@ impl fmt::Display for Error {
             Self::MicNotFound(name) => write!(f, "microphone \"{name}\" not found"),
             Self::NoMicrophone => write!(f, "no microphone available to link"),
             Self::FileNotFound(path) => write!(f, "file not found: {}", path.display()),
-            Self::Playback { path, message } => {
+            Self::Playback { path, message, .. } => {
                 write!(f, "could not play {}: {message}", path.display())
             }
         }
@@ -133,9 +147,24 @@ impl AudioEngine {
         Ok((engine, receiver))
     }
 
-    /// Plays a file on both branches. Failures arrive as [`Event::Error`].
-    pub fn play(&self, path: impl AsRef<Path>) {
-        self.player.play(path.as_ref());
+    /// Plays a file on both branches. Failures after the start arrive as
+    /// [`Event::Error`].
+    pub fn play(&self, path: impl AsRef<Path>) -> Result<PlaybackId, Error> {
+        self.player.play(path.as_ref())
+    }
+
+    /// Stops one playback. It reports no event afterwards.
+    pub fn stop(&self, id: PlaybackId) {
+        self.player.stop(id);
+    }
+
+    pub fn stop_all(&self) {
+        self.player.stop_all();
+    }
+
+    /// Mutes or unmutes the call branch of current and future playbacks.
+    pub fn set_send_to_call(&self, enabled: bool) {
+        self.player.set_send_to_call(enabled);
     }
 }
 

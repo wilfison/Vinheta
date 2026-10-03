@@ -20,21 +20,21 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use gst::glib;
 use gst::prelude::*;
 
 use super::graph::CALL_STREAM_PREFIX;
-use super::{Config, Error, Event};
+use super::{Config, Error, Event, PlaybackId};
 
 // One queue per branch so a slow sink cannot stall the other one.
 const PIPELINE: &str = "uridecodebin name=source ! audioconvert ! audioresample ! tee name=tee \
     tee. ! queue ! volume name=call-volume ! pipewiresink name=call \
     tee. ! queue ! volume name=monitor-volume ! pipewiresink name=monitor";
 
-type Pipelines = Arc<Mutex<HashMap<u64, gst::Pipeline>>>;
+type Pipelines = Arc<Mutex<HashMap<PlaybackId, gst::Pipeline>>>;
 
 pub(super) struct Player {
     events: async_channel::Sender<Event>,
@@ -43,6 +43,7 @@ pub(super) struct Player {
     monitor: Option<String>,
     call_volume: f64,
     monitor_volume: f64,
+    send_to_call: AtomicBool,
 }
 
 impl Player {
@@ -58,17 +59,14 @@ impl Player {
             monitor: config.monitor.clone(),
             call_volume: config.call_volume,
             monitor_volume: config.monitor_volume,
+            send_to_call: AtomicBool::new(config.send_to_call),
         })
     }
 
-    pub(super) fn play(&self, path: &Path) {
-        if let Err(error) = self.try_play(path) {
-            let _ = self.events.try_send(Event::Error(error));
-        }
-    }
-
-    fn try_play(&self, path: &Path) -> Result<(), Error> {
+    pub(super) fn play(&self, path: &Path) -> Result<PlaybackId, Error> {
+        let id = PlaybackId(self.next_id.fetch_add(1, Ordering::Relaxed));
         let playback_error = |message: String| Error::Playback {
+            id,
             path: path.to_owned(),
             message,
         };
@@ -80,7 +78,6 @@ impl Player {
         let uri =
             glib::filename_to_uri(&absolute, None).map_err(|e| playback_error(e.to_string()))?;
 
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let pipeline = gst::parse::launch(PIPELINE)
             .map_err(|e| playback_error(e.to_string()))?
             .downcast::<gst::Pipeline>()
@@ -89,11 +86,12 @@ impl Player {
 
         element("source").set_property("uri", uri.as_str());
         element("call-volume").set_property("volume", self.call_volume);
+        element("call-volume").set_property("mute", !self.send_to_call.load(Ordering::Relaxed));
         element("monitor-volume").set_property("volume", self.monitor_volume);
 
         // WirePlumber does not route a playback stream to an Audio/Source/Virtual
         // node, so the call branch stays unconnected and the graph thread links it.
-        let stream_name = format!("{CALL_STREAM_PREFIX}{}-{id}", std::process::id());
+        let stream_name = format!("{CALL_STREAM_PREFIX}{}-{}", std::process::id(), id.0);
         let call = element("call");
         call.set_property("client-name", "Vinheta");
         call.set_property(
@@ -143,7 +141,25 @@ impl Player {
                 return Err(playback_error("the pipeline refused to start".into()));
             }
         }
-        Ok(())
+        Ok(id)
+    }
+
+    // Removing the pipeline from the map first is what keeps a stopped
+    // playback from reporting an event afterwards.
+    pub(super) fn stop(&self, id: PlaybackId) {
+        let pipeline = self.pipelines.lock().unwrap().remove(&id);
+        if let Some(pipeline) = pipeline {
+            let _ = pipeline.set_state(gst::State::Null);
+        }
+    }
+
+    pub(super) fn set_send_to_call(&self, enabled: bool) {
+        self.send_to_call.store(enabled, Ordering::Relaxed);
+        for pipeline in self.pipelines.lock().unwrap().values() {
+            if let Some(volume) = pipeline.by_name("call-volume") {
+                volume.set_property("mute", !enabled);
+            }
+        }
     }
 
     pub(super) fn stop_all(&self) {
@@ -155,7 +171,7 @@ impl Player {
 }
 
 struct Finisher {
-    id: u64,
+    id: PlaybackId,
     path: PathBuf,
     pipelines: Pipelines,
     events: async_channel::Sender<Event>,
@@ -171,8 +187,12 @@ impl Finisher {
             let _ = pipeline.set_state(gst::State::Null);
         });
         let event = match error {
-            None => Event::PlaybackFinished(self.path.clone()),
+            None => Event::PlaybackFinished {
+                id: self.id,
+                path: self.path.clone(),
+            },
             Some(message) => Event::Error(Error::Playback {
+                id: self.id,
                 path: self.path.clone(),
                 message,
             }),

@@ -39,6 +39,7 @@ pub(super) const NODE_NAME: &str = "vinheta";
 /// Playback streams whose node name starts with this are linked to the
 /// virtual microphone as soon as their ports show up.
 pub(super) const CALL_STREAM_PREFIX: &str = "vinheta-call-";
+const EPIPE: i32 = 32;
 
 pub(super) enum Command {
     Quit,
@@ -431,8 +432,11 @@ fn run_loop(
         .add_listener_local()
         .error({
             let main_loop = main_loop.clone();
-            move |id, _, _, message| {
-                if id == pw::core::PW_ID_CORE {
+            move |id, _, res, message| {
+                // Other core errors are not fatal. The usual one is "unknown
+                // resource": the server removed a link along with a stream
+                // that ended, just before the engine dropped its proxy.
+                if id == pw::core::PW_ID_CORE && res == -EPIPE {
                     let error = Error::PipeWire(format!("connection lost: {message}"));
                     let _ = events.try_send(Event::Error(error));
                     main_loop.quit();

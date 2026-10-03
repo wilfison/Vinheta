@@ -108,12 +108,17 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-# Plays the sound through the subject and records the call, the monitor, and a
-# probe whose left channel is the call branch and right channel the monitor branch.
+# Plays the files (the sound by default) through the subject and records the
+# call, the monitor, and a probe whose left channel is the call branch and right
+# channel the monitor branch. With run_for set, the subject is not expected to
+# exit: after that many seconds its state is noted and it is interrupted.
+files=()
+run_for=
 playback() {
     local label=$1 recorders subject_pid
     shift
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" "$@" "$sound" </dev/null >"$work/$label.log" 2>&1 &
+    [ ${#files[@]} -eq 0 ] && files=("$sound")
+    "${subject[@]}" --mic "$mic" --monitor "$monitor" "$@" "${files[@]}" </dev/null >"$work/$label.log" 2>&1 &
     subject_pid=$!
     wait_for "the vinheta node" port_exists vinheta:capture_FR || return 1
 
@@ -128,20 +133,28 @@ playback() {
     pw-link vinheta:capture_FL vinheta-test-rec-probe:input_FL
     pw-link "$monitor:monitor_FL" vinheta-test-rec-probe:input_FR
 
+    if [ -n "$run_for" ]; then
+        sleep "$run_for"
+        subject_alive=no
+        kill -0 "$subject_pid" 2>/dev/null && node_exists vinheta && subject_alive=ok
+        kill -INT "$subject_pid" 2>/dev/null
+    fi
     wait "$subject_pid"
     subject_status=$?
+    files=()
+    run_for=
     sleep 0.3
     kill -INT "${pids[@]:$recorders}" 2>/dev/null
     wait "${pids[@]:$recorders}" 2>/dev/null
     pids=("${pids[@]:0:$recorders}")
 }
 
-# expect LABEL FILE FREQ present|absent: checks both channels, measured over
-# the 2 seconds that start half a second after the sound begins.
+# expect LABEL FILE FREQ present|absent START [SECONDS]: checks both channels
+# over SECONDS (2 by default) from START, which usually comes from window().
 expect() {
-    local label=$1 file=$2 freq=$3 want=$4 start=$5 channel value result
+    local label=$1 file=$2 freq=$3 want=$4 start=$5 length=${6:-2} channel value result
     for channel in 0 1; do
-        value=$(analyze level "$file" "$channel" "$freq" "$start" 2)
+        value=$(analyze level "$file" "$channel" "$freq" "$start" "$length")
         result=fail
         if [ "$want" = present ]; then
             louder "$value" "$present" && result=ok
@@ -152,12 +165,13 @@ expect() {
     done
 }
 
-# Half a second after the sound starts in the given recording, in seconds.
+# window FILE [OFFSET]: OFFSET seconds (half a second by default) after the
+# sound starts in the given recording, in seconds.
 window() {
     local onset
     onset=$(analyze onset "$1" 0 1000)
     [ "$onset" = none ] && onset=1000
-    python3 -c 'import sys; print(float(sys.argv[1]) / 1000 + 0.5)' "$onset"
+    python3 -c 'import sys; print(float(sys.argv[1]) / 1000 + float(sys.argv[2]))' "$onset" "${2:-0.5}"
 }
 
 defaults_before=$(defaults)
@@ -213,6 +227,56 @@ playback monitor-muted "${once[@]}" --monitor-volume 0
 start=$(window "$work/monitor-muted-call.wav")
 expect "call" "$work/monitor-muted-call.wav" 1000 present "$start"
 expect "monitor" "$work/monitor-muted-monitor.wav" 1000 absent "$start"
+
+if [ "$mode" = rust ]; then
+    # 8 seconds of tone, so there is room to act in the middle of it.
+    long="$work/sound-long.wav"
+    other="$work/sound-other.wav"
+    for spec in "1000 $long" "2000 $other"; do
+        ffmpeg -v error -y -f lavfi -i "sine=frequency=${spec%% *}:duration=8" \
+            -af "volume=-12dB,adelay=1500:all=1,pan=stereo|c0=c0|c1=c0" -ar 48000 "${spec#* }" || exit 1
+    done
+
+    # The tone starts 1.5 s into the file, so an action 4 s after the playback
+    # starts lands 2.5 s after the tone does.
+    echo "== stop one sound"
+    files=("$long") run_for=8
+    playback stop --stop-after 4
+    check "subject and node still there after the stop" "$subject_alive"
+    for branch in call monitor; do
+        expect "$branch before the stop" "$work/stop-$branch.wav" 1000 present "$(window "$work/stop-$branch.wav")" 1.5
+        expect "$branch after the stop" "$work/stop-$branch.wav" 1000 absent "$(window "$work/stop-$branch.wav" 3.2)"
+    done
+    expect "call after the stop" "$work/stop-call.wav" 440 present "$(window "$work/stop-call.wav" 3.2)"
+
+    echo "== stop all sounds"
+    files=("$long" "$other") run_for=8
+    playback stop-all --stop-all-after 4
+    check "subject and node still there after the stop" "$subject_alive"
+    for branch in call monitor; do
+        for freq in 1000 2000; do
+            expect "$branch before the stop" "$work/stop-all-$branch.wav" "$freq" present "$(window "$work/stop-all-$branch.wav")" 1.5
+            expect "$branch after the stop" "$work/stop-all-$branch.wav" "$freq" absent "$(window "$work/stop-all-$branch.wav" 3.2)"
+        done
+    done
+
+    echo "== mute and unmute the call branch"
+    files=("$long")
+    playback mute --once --mute-call-after 4 --unmute-call-after 6.5
+    call="$work/mute-call.wav"
+    expect "call before the mute" "$call" 1000 present "$(window "$call")" 1.5
+    expect "call while muted" "$call" 1000 absent "$(window "$call" 3)" 1.5
+    expect "call while muted" "$call" 440 present "$(window "$call" 3)" 1.5
+    expect "monitor while muted" "$work/mute-monitor.wav" 1000 present "$(window "$work/mute-monitor.wav" 3)" 1.5
+    expect "call after the unmute" "$call" 1000 present "$(window "$call" 5.5)" 1.5
+
+    echo "== call branch off from the start"
+    playback no-call --once --no-call
+    start=$(window "$work/no-call-monitor.wav")
+    expect "call" "$work/no-call-call.wav" 1000 absent "$start"
+    expect "call" "$work/no-call-call.wav" 440 present "$start"
+    expect "monitor" "$work/no-call-monitor.wav" 1000 present "$start"
+fi
 
 # The shell subject uses lingering nodes, so SIGKILL does not apply to it, and
 # bash ignores SIGINT in background jobs, so it gets SIGTERM instead.

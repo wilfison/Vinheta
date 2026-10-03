@@ -120,6 +120,7 @@ All three pass. The shell script uses lingering nodes and removes them in a `tra
 - **An unlinked call branch blocks the whole pipeline**, including the monitor branch, because the sink does not consume data until it is linked. The engine links the stream as soon as its ports show up in the registry, so in practice the delay is not noticeable.
 - **`pw-link` by port name failed once** with "No such file or directory" right after the node was created, and worked on retry and by port id. It was not reproduced.
 - **Noise suppression and echo have not been tested**; see the manual call checklist below.
+- **The server removes the engine's links together with a stream that ends.** When the engine then drops its own proxy for such a link, PipeWire reports "unknown resource" on the core. That error is harmless and must not be treated as a lost connection; only `EPIPE` on the core is. This was found in Phase 1, when stopping a sound while the process keeps running became possible.
 
 ## Running it
 
@@ -132,12 +133,16 @@ scripts/audio-poc.sh [--mic NODE_NAME] [--monitor NODE_NAME] [--call-volume N] [
 The Rust engine, through the diagnostic binary (behind the `audio-poc` cargo feature, never installed or packaged):
 
 ```sh
-cargo run --features audio-poc --bin vinheta-audio-poc -- [OPTIONS] [FILE]
+cargo run --features audio-poc --bin vinheta-audio-poc -- [OPTIONS] [FILE...]
 ```
 
 - Without `FILE`: creates the node, links the microphone, and waits for Ctrl+C.
-- With `FILE`: plays it once, and again each time Enter is pressed.
-- `--once`: plays `FILE` once and exits when it ends.
+- With one or more `FILE`s: plays them together once, and again each time Enter is pressed.
+- `--once`: plays the files once and exits when they end.
+- `--no-call`: starts with the call branch muted (the "Send sounds to call" switch turned off).
+- `--stop-after SECONDS`: stops the first file that many seconds after the playback starts.
+- `--stop-all-after SECONDS`: stops every file.
+- `--mute-call-after SECONDS`, `--unmute-call-after SECONDS`: turn the call branch off and on while the files play.
 - `--mic`, `--monitor`, `--call-volume`, `--monitor-volume`: same meaning as in the script.
 - `--version`: prints the PipeWire and GStreamer library versions.
 
@@ -153,6 +158,9 @@ It never uses the real microphone or headphones. A fake microphone (a mono virtu
 - the call recording has both tones on both channels (-40 dBFS or louder),
 - the monitor recording has the sound and not the voice (below -60 dBFS),
 - a branch volume of 0 silences only that branch,
+- (Rust only) stopping one sound, or all of two sounds, silences both branches while the process, the node, and the voice stay,
+- (Rust only) muting the call branch silences the sound in the call recording only, keeps the voice there, and unmuting brings the sound back,
+- (Rust only) with `--no-call` the sound never reaches the call recording,
 - nothing is left behind after each kind of exit,
 - the default source and sink are unchanged.
 
