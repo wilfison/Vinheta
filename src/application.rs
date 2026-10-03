@@ -20,17 +20,42 @@
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::time::Instant;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
+use glib::subclass::Signal;
 use gtk::{gio, glib};
-use vinheta::audio::{self, AudioEngine, Config, Event, PlaybackId};
+use vinheta::audio::{self, AudioEngine, Config, Device, Event, PlaybackId};
+use vinheta::devices::{self, Entry};
 
 use crate::config::VERSION;
 use crate::sound::Sound;
+use crate::ui::preferences_dialog::PreferencesDialog;
 use crate::{VinhetaWindow, APP_ID};
+
+/// The two device selectors: the settings key of each, and its list.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DeviceKind {
+    Microphone,
+    Output,
+}
+
+impl DeviceKind {
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Microphone => "microphone",
+            Self::Output => "monitor-output",
+        }
+    }
+}
+
+/// The engine takes `None` for the system default, the settings store "".
+fn device_setting(settings: &gio::Settings, key: &str) -> Option<String> {
+    Some(settings.string(key).to_string()).filter(|name| !name.is_empty())
+}
 
 mod imp {
     use super::*;
@@ -42,6 +67,12 @@ mod imp {
         pub playing: RefCell<HashMap<PlaybackId, Sound>>,
         pub audio_error: RefCell<Option<String>>,
         pub settings: OnceCell<gio::Settings>,
+        pub microphones: RefCell<Vec<Device>>,
+        pub outputs: RefCell<Vec<Device>>,
+        /// Descriptions of the devices seen in this run, by node name, to
+        /// keep naming a chosen device after it is removed.
+        pub descriptions: RefCell<HashMap<String, String>>,
+        pub preferences: glib::WeakRef<PreferencesDialog>,
     }
 
     #[glib::object_subclass]
@@ -57,6 +88,13 @@ mod imp {
             let obj = self.obj();
             obj.setup_gactions();
             obj.set_accels_for_action("app.quit", &["<control>q"]);
+            obj.set_accels_for_action("app.preferences", &["<control>comma"]);
+        }
+
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
+            // Emitted when the device lists or the audio availability change.
+            SIGNALS.get_or_init(|| vec![Signal::builder("devices-changed").build()])
         }
     }
 
@@ -129,9 +167,13 @@ impl VinhetaApplication {
         let stop_all_action = gio::ActionEntry::builder("stop-all")
             .activate(move |app: &Self, _, _| app.stop_all())
             .build();
+        let preferences_action = gio::ActionEntry::builder("preferences")
+            .activate(move |app: &Self, _, _| app.show_preferences())
+            .build();
         self.add_action_entries([
             quit_action,
             about_action,
+            preferences_action,
             toggle_sound_action,
             stop_all_action,
         ]);
@@ -141,8 +183,12 @@ impl VinhetaApplication {
     fn start_audio(&self) {
         let settings = gio::Settings::new(APP_ID);
         let config = Config {
+            mic: device_setting(&settings, "microphone"),
+            monitor: device_setting(&settings, "monitor-output"),
+            call_volume: audio::slider_gain(settings.double("call-volume")),
+            monitor_volume: audio::slider_gain(settings.double("monitor-volume")),
             send_to_call: settings.boolean("send-sounds-to-call"),
-            ..Default::default()
+            include_voice: settings.boolean("include-my-voice"),
         };
         match AudioEngine::start(config) {
             Ok((engine, events)) => {
@@ -161,14 +207,25 @@ impl VinhetaApplication {
         }
 
         settings.connect_changed(
-            Some("send-sounds-to-call"),
+            None,
             glib::clone!(
                 #[weak(rename_to = app)]
                 self,
                 move |settings, key| {
                     let engine = app.imp().engine.borrow();
-                    if let Some(engine) = engine.as_ref() {
-                        engine.set_send_to_call(settings.boolean(key));
+                    let Some(engine) = engine.as_ref() else { return };
+                    match key {
+                        "send-sounds-to-call" => engine.set_send_to_call(settings.boolean(key)),
+                        "include-my-voice" => engine.set_include_voice(settings.boolean(key)),
+                        "call-volume" => {
+                            engine.set_call_volume(audio::slider_gain(settings.double(key)));
+                        }
+                        "monitor-volume" => {
+                            engine.set_monitor_volume(audio::slider_gain(settings.double(key)));
+                        }
+                        "microphone" => engine.set_microphone(device_setting(settings, key)),
+                        "monitor-output" => engine.set_monitor(device_setting(settings, key)),
+                        _ => {}
                     }
                 }
             ),
@@ -187,6 +244,10 @@ impl VinhetaApplication {
                     self.toast_playback_failure(&sound);
                 }
             }
+            Event::DevicesChanged {
+                microphones,
+                outputs,
+            } => self.set_devices(microphones, outputs),
             Event::Error(error @ audio::Error::PipeWire(_)) => self.set_audio_error(&error),
             Event::Error(error) => glib::g_warning!("vinheta", "{error}"),
             event => glib::g_debug!("vinheta", "{event:?}"),
@@ -273,6 +334,51 @@ impl VinhetaApplication {
         self.imp().audio_error.replace(Some(message));
         self.imp().engine.take();
         self.forget_playbacks();
+        self.set_devices(Vec::new(), Vec::new());
+    }
+
+    fn set_devices(&self, microphones: Vec<Device>, outputs: Vec<Device>) {
+        let imp = self.imp();
+        imp.descriptions.borrow_mut().extend(
+            microphones
+                .iter()
+                .chain(&outputs)
+                .map(|device| (device.name.clone(), device.description.clone())),
+        );
+        imp.microphones.replace(microphones);
+        imp.outputs.replace(outputs);
+        self.emit_by_name::<()>("devices-changed", &[]);
+    }
+
+    pub fn audio_available(&self) -> bool {
+        self.imp().engine.borrow().is_some()
+    }
+
+    /// The entries of a device selector and the selected position. Without
+    /// audio there is only the system default.
+    pub fn device_entries(&self, kind: DeviceKind) -> (Vec<Entry>, usize) {
+        let imp = self.imp();
+        if !self.audio_available() {
+            return devices::selector_entries(&[], "", None);
+        }
+        let chosen = imp.settings.get().unwrap().string(kind.key());
+        let devices = match kind {
+            DeviceKind::Microphone => imp.microphones.borrow(),
+            DeviceKind::Output => imp.outputs.borrow(),
+        };
+        let descriptions = imp.descriptions.borrow();
+        let last_description = descriptions.get(chosen.as_str()).map(String::as_str);
+        devices::selector_entries(&devices, &chosen, last_description)
+    }
+
+    fn show_preferences(&self) {
+        let imp = self.imp();
+        if imp.preferences.upgrade().is_some() {
+            return;
+        }
+        let dialog = PreferencesDialog::new(self);
+        imp.preferences.set(Some(&dialog));
+        dialog.present(self.active_window().as_ref());
     }
 
     fn toast_playback_failure(&self, sound: &Sound) {

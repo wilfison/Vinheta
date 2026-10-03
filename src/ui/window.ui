@@ -6,7 +6,7 @@
     <property name="title" translatable="yes">Vinheta</property>
     <property name="default-width">1000</property>
     <property name="default-height">700</property>
-    <property name="width-request">360</property>
+    <property name="width-request">820</property>
     <property name="height-request">294</property>
     <property name="content">
       <object class="AdwToastOverlay" id="toasts">
@@ -113,13 +113,15 @@
               </object>
             </property>
             <child type="bottom">
-              <object class="GtkCenterBox">
+              <object class="GtkBox">
+                <property name="spacing">24</property>
                 <style>
                   <class name="bottom-bar"/>
                 </style>
-                <property name="start-widget">
+                <child>
                   <object class="GtkButton" id="stop_all">
                     <property name="action-name">app.stop-all</property>
+                    <property name="valign">center</property>
                     <property name="child">
                       <object class="AdwButtonContent">
                         <property name="icon-name">media-playback-stop-symbolic</property>
@@ -127,24 +129,153 @@
                       </object>
                     </property>
                   </object>
-                </property>
-                <property name="end-widget">
+                </child>
+                <child>
                   <object class="GtkBox">
-                    <property name="spacing">12</property>
+                    <property name="orientation">vertical</property>
+                    <property name="valign">center</property>
+                    <property name="hexpand">True</property>
                     <child>
-                      <object class="GtkLabel">
-                        <property name="label" translatable="yes">Send sounds to call</property>
-                        <property name="mnemonic-widget">send_to_call</property>
-                        <property name="ellipsize">end</property>
+                      <object class="GtkBox">
+                        <property name="spacing">8</property>
+                        <child>
+                          <object class="GtkImage">
+                            <property name="icon-name">audio-headphones-symbolic</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="label" translatable="yes">Headphones</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="volume-name"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkScale">
+                            <property name="hexpand">True</property>
+                            <property name="adjustment">
+                              <object class="GtkAdjustment" id="monitor_volume">
+                                <property name="upper">1</property>
+                                <property name="step-increment">0.05</property>
+                                <property name="page-increment">0.1</property>
+                              </object>
+                            </property>
+                            <accessibility>
+                              <property name="label" translatable="yes">Headphones volume</property>
+                            </accessibility>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="monitor_percent">
+                            <property name="xalign">1</property>
+                            <style>
+                              <class name="volume-percent"/>
+                              <class name="numeric"/>
+                              <class name="dimmed"/>
+                            </style>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkSwitch" id="send_to_call">
-                        <property name="valign">center</property>
+                      <object class="GtkBox" id="call_volume_row">
+                        <property name="spacing">8</property>
+                        <child>
+                          <object class="GtkImage">
+                            <property name="icon-name">audio-input-microphone-symbolic</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="label" translatable="yes">Call</property>
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="volume-name"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkScale">
+                            <property name="hexpand">True</property>
+                            <property name="adjustment">
+                              <object class="GtkAdjustment" id="call_volume">
+                                <property name="upper">1</property>
+                                <property name="step-increment">0.05</property>
+                                <property name="page-increment">0.1</property>
+                              </object>
+                            </property>
+                            <accessibility>
+                              <property name="label" translatable="yes">Call volume</property>
+                            </accessibility>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="call_percent">
+                            <property name="xalign">1</property>
+                            <style>
+                              <class name="volume-percent"/>
+                              <class name="numeric"/>
+                              <class name="dimmed"/>
+                            </style>
+                          </object>
+                        </child>
                       </object>
                     </child>
                   </object>
-                </property>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="valign">center</property>
+                    <property name="spacing">8</property>
+                    <property name="hexpand">False</property>
+                    <property name="hexpand-set">True</property>
+                    <property name="width-request">262</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="spacing">8</property>
+                        <child>
+                          <object class="GtkImage">
+                            <property name="icon-name">audio-input-microphone-symbolic</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkDropDown" id="microphone">
+                            <property name="hexpand">True</property>
+                            <property name="tooltip-text" translatable="yes">Microphone</property>
+                            <accessibility>
+                              <property name="label" translatable="yes">Microphone</property>
+                            </accessibility>
+                            <style>
+                              <class name="microphone"/>
+                            </style>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="spacing">12</property>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="label" translatable="yes">Send sounds to call</property>
+                            <property name="mnemonic-widget">send_to_call</property>
+                            <property name="ellipsize">end</property>
+                            <property name="hexpand">True</property>
+                            <property name="xalign">0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSwitch" id="send_to_call">
+                            <property name="valign">center</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
               </object>
             </child>
           </object>

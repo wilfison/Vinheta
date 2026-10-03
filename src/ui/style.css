@@ -30,3 +30,20 @@ gridview.pads > child {
 .bottom-bar {
   padding: 12px 24px;
 }
+
+.bottom-bar .volume-name {
+  min-width: 88px;
+}
+
+/* A fixed width, so the sliders do not move when the value changes. */
+.bottom-bar .volume-percent {
+  min-width: 40px;
+}
+
+.bottom-bar scale {
+  min-width: 120px;
+}
+
+.bottom-bar .microphone {
+  min-width: 220px;
+}

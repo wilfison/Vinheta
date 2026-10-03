@@ -6,6 +6,7 @@
     <file preprocess="xml-stripblanks" alias="window.ui">ui/window.ui</file>
     <file preprocess="xml-stripblanks" alias="folder-page.ui">ui/folder-page.ui</file>
     <file preprocess="xml-stripblanks" alias="sound-pad.ui">ui/sound-pad.ui</file>
+    <file preprocess="xml-stripblanks" alias="preferences-dialog.ui">ui/preferences-dialog.ui</file>
     <file preprocess="xml-stripblanks" alias="shortcuts-dialog.ui">ui/shortcuts-dialog.ui</file>
     <file alias="style.css">ui/style.css</file>
   </gresource>

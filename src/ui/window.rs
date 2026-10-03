@@ -25,7 +25,9 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
+use super::device_selector;
 use super::folder_page::FolderPage;
+use crate::application::{DeviceKind, VinhetaApplication};
 use crate::sound::Sound;
 use crate::APP_ID;
 
@@ -47,6 +49,18 @@ mod imp {
         pub stop_all: TemplateChild<gtk::Button>,
         #[template_child]
         pub send_to_call: TemplateChild<gtk::Switch>,
+        #[template_child]
+        pub monitor_volume: TemplateChild<gtk::Adjustment>,
+        #[template_child]
+        pub monitor_percent: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub call_volume: TemplateChild<gtk::Adjustment>,
+        #[template_child]
+        pub call_percent: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub call_volume_row: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub microphone: TemplateChild<gtk::DropDown>,
         pub settings: OnceCell<gio::Settings>,
     }
 
@@ -74,6 +88,27 @@ mod imp {
             settings
                 .bind("send-sounds-to-call", &*self.send_to_call, "active")
                 .build();
+            // The call volume has no effect while sounds are not sent.
+            settings
+                .bind("send-sounds-to-call", &*self.call_volume_row, "sensitive")
+                .get_only()
+                .build();
+            for (key, volume, percent) in [
+                ("monitor-volume", &self.monitor_volume, &self.monitor_percent),
+                ("call-volume", &self.call_volume, &self.call_percent),
+            ] {
+                let percent = percent.get();
+                volume.connect_value_changed(move |volume| {
+                    let value = (volume.value() * 100.0).round();
+                    // Translators: {} is a volume, from 0 to 100.
+                    percent.set_label(&gettext("{}%").replace("{}", &value.to_string()));
+                });
+                settings.bind(key, &**volume, "value").build();
+                volume.emit_by_name::<()>("value-changed", &[]);
+            }
+            if let Some(app) = gio::Application::default().and_downcast::<VinhetaApplication>() {
+                device_selector::bind(&*self.microphone, &app, DeviceKind::Microphone);
+            }
             let directories = settings.strv("directories");
             self.settings.set(settings).unwrap();
 
