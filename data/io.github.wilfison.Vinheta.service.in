@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=io.github.wilfison.Vinheta
+Exec=@bindir@/vinheta --gapplication-service

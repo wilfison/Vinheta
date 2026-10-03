@@ -1,0 +1,6 @@
+# List of source files containing translatable strings.
+# Please keep this file sorted alphabetically.
+data/io.github.wilfison.Vinheta.desktop.in
+data/io.github.wilfison.Vinheta.metainfo.xml.in
+data/io.github.wilfison.Vinheta.gschema.xml
+src/window.ui

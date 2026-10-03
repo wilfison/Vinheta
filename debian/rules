@@ -1,0 +1,8 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem=meson
+
+# src/meson.build only passes --release to cargo when buildtype is "release"
+override_dh_auto_configure:
+	dh_auto_configure -- --buildtype=release

@@ -1,0 +1,29 @@
+Source: vinheta
+Section: sound
+Priority: optional
+Maintainer: wilfison <wilfisonbatista@gmail.com>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+ meson (>= 1.0.0),
+ cargo,
+ rustc,
+ pkgconf,
+ gettext,
+ libgtk-4-dev (>= 4.16),
+ libadwaita-1-dev (>= 1.8),
+ desktop-file-utils,
+ appstream,
+Standards-Version: 4.7.2
+
+Package: vinheta
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+Description: Soundboard for GNOME with virtual microphone support
+ Vinheta is a soundboard for the GNOME desktop. Each directory added by
+ the user becomes a tab, and every sound in it can be played with a click.
+ .
+ Sounds are played on the audio output and can also be sent to a virtual
+ microphone, so they can be heard by other people in calls.

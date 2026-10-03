@@ -1,0 +1,31 @@
+# Common build directory names
+_build/
+build/
+builddir/
+
+# Cargo
+target/
+
+# Supported build systems
+.flatpak-builder
+.flatpak
+.fenv
+.foundry
+
+# Temporary files
+tmp/
+*.ui.in~
+*.ui~
+
+# Dynamically-generated files
+src/config.rs
+hooks/checks-bin
+
+# Debian packaging
+debian/.debhelper/
+debian/vinheta/
+debian/files
+debian/*.substvars
+debian/*.debhelper.log
+debian/debhelper-build-stamp
+obj-*/
