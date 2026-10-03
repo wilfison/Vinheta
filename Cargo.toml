@@ -2,10 +2,22 @@
 name = "vinheta"
 version = "0.1.0"
 edition = "2021"
+default-run = "vinheta"
+
+[features]
+audio-poc = []
+
+[[bin]]
+name = "vinheta-audio-poc"
+path = "src/bin/vinheta-audio-poc.rs"
+required-features = ["audio-poc"]
 
 [dependencies]
 gettext-rs = { version = "0.7", features = ["gettext-system"] }
+async-channel = "2"
+gst = { version = "0.23", package = "gstreamer" }
 gtk = { version = "0.9", package = "gtk4", features = ["gnome_47"] }
+pipewire = "0.10"
 
 [dependencies.adw]
 package = "libadwaita"
