@@ -79,8 +79,10 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 
 - It writes `tmp/screenshots/NAME.png`. Screenshots are temporary: read them, then delete them.
 - `--folder` fills the library, `--setting 'KEY VALUE'` sets any other key of the app's settings before it starts (`VALUE` is a GVariant: `0.5`, `false`, `"'name'"`), `--no-audio` makes the engine fail to start, `--light` uses the light style.
-- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y` and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits, `--exec COMMAND` runs a shell command (for example to create or destroy a fake device while the app runs).
-- Dialogs opened by an action (`--action preferences`) and open popovers are captured. The device lists come from the real PipeWire; for a known entry, create a fake device with `create_node` from `scripts/audio-poc-common.sh` (prefix `vinheta-shot-`) and destroy it afterwards.
+- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y` and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits, `--exec COMMAND` runs a shell command.
+- One run can take several pictures: the step `--capture NAME` writes `tmp/screenshots/NAME.png` at that point, and `--crop WxH+X+Y` crops the captures that follow (`--crop full` undoes it). Prefer that to starting the app once per state.
+- Dialogs opened by an action (`--action preferences`) and open popovers are captured.
+- The device lists come from the real PipeWire, so they differ between machines. For a known entry use a fake device: `--fake-mic 'NODE DESCRIPTION'` and `--fake-sink 'NODE DESCRIPTION'` create one before the app starts, the steps `--plug-mic`, `--plug-sink`, and `--unplug NODE` do it while the app runs. Name the nodes `vinheta-shot-*`. The script destroys them when it ends.
 - Portal dialogs (the folder chooser) do not work on the virtual display and cannot be captured; test them by hand.
 - The app still uses the real PipeWire: it creates the real "Vinheta" node for a few seconds and plays on the default output. Use silent files with `toggle-sound`.
 - It needs `xvfb-run`, `dbus-run-session`, `xdotool`, and ImageMagick (`import`), which are development tools only.
@@ -92,6 +94,7 @@ Non-obvious points:
 - The Flatpak manifest `io.github.wilfison.Vinheta.json` is a leftover from the GNOME Builder template and is only useful for building/running through GNOME Builder. It is not the distribution channel, and its module source (`file:///home/will/Projects`) is not valid for `flatpak-builder`.
 - cargo downloads crates during compilation (sources are not vendored), so builds need network access.
 - The `gnome_47` (gtk4) and `v1_7` (libadwaita) features in `Cargo.toml` cap the APIs available in the Rust bindings; bump the features to use newer APIs.
+- rust-analyzer needs the `rust-src` component. Without it, it reports errors that the compiler does not (`cannot apply unary operator` on `bool` or `i32`, `None` flagged as a variable name). The asdf Rust install does not ship it: download `rust-src-VERSION.tar.xz` from `static.rust-lang.org/dist` and run its `install.sh --prefix=` with the install directory of that Rust version. Trust `cargo clippy` over the editor when they disagree.
 
 ## Debian package
 
@@ -100,6 +103,8 @@ Packaging lives in `debian/` and uses debhelper with the Meson build system.
 ```sh
 dpkg-buildpackage -us -uc -b   # writes ../vinheta_<version>_<arch>.deb
 ```
+
+Prefer `scripts/build-deb.sh`: run in the working tree, `dpkg-buildpackage` leaves `obj-*/` and files under `debian/` behind (all git-ignored; `git clean -Xd debian obj-*` removes them), and rust-analyzer indexes the copy of `config.rs` in there.
 
 - `debian/rules` forces `--buildtype=release`; debhelper's default (`plain`) would make `src/meson.build` produce an unoptimized debug binary.
 - The minimum versions in `debian/control` (GTK 4.16, libadwaita 1.8) come from the `Cargo.toml` features and from `AdwShortcutsDialog` in `shortcuts-dialog.ui`. Keep them in sync when either changes. The package targets Ubuntu 26.04 (`resolute`).
@@ -135,7 +140,7 @@ Audio behavior that is easy to get wrong (details in `docs/audio-poc.md`):
 - The monitor branch is routed by WirePlumber. A new playback gets the chosen output as `target-object`; a running one is moved by writing `target.object` for its stream (node name `vinheta-monitor-*`) in the default metadata. The system default is asked for with the value `-1`: removing the key would leave the target the stream was created with.
 - A chosen device that does not exist is not an error to recover from in the interface. For the monitor, WirePlumber uses the default sink and moves the stream when the device shows up. For the microphone, `graph.rs` reports `MicNotFound` once, links the default source, and links the chosen one when it appears.
 - `Event::DevicesChanged` is only sent when a list really changed, and never lists the "Vinheta" node.
-- After changing audio code, run `scripts/verify-audio-poc.sh rust`. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`.
+- After changing audio code, run `scripts/verify-audio-poc.sh rust`. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`. In a new check, place the measurements with `after FILE SECONDS [MARGIN]` (an action scheduled `SECONDS` into the playback) instead of hand-computed offsets. A real device unplugged during the run is reported as a `NOTE`, not as a failure.
 
 GObject conventions used here: each type has a `mod imp` holding the state struct and the subclass `impl`s, plus a public `glib::wrapper!`. UI is declared in XML (`.ui`), not built in code.
 

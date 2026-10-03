@@ -49,8 +49,10 @@ Every technical claim in the PRD must have been checked, not remembered. Use `Ba
 
 - Confirm that the API exists in the version in use: the crate feature in `Cargo.toml` and in the crate source under `~/.cargo/registry` or `build/cargo-home`, the symbol in the installed library (`pkg-config --modversion`, `strings`), the GStreamer element (`gst-inspect-1.0 --exists`) and the package that ships it (`dpkg -S`).
 - Check that the minimum version in `debian/control` covers what the phase uses.
-- Run `scripts/check.sh` and record the starting state under "Technical Considerations". If something already fails before the phase, the first story fixes it.
+- Run `scripts/check.sh --all` (several minutes; run it in the background while writing) and record the starting state under "Technical Considerations". If something already fails before the phase, the first story fixes it.
 - Test cheap hypotheses on the spot (an environment variable, an action over D-Bus, a screenshot of the current app) instead of writing them down as facts.
+- For a PipeWire or WirePlumber behavior, try it with the command line tools before designing on top of it: a silent file played with `gst-launch-1.0 ... ! pipewiresink`, a fake device from `create_node` in `scripts/audio-poc-common.sh`, then `pw-link -l`, `pw-metadata`, and `pw-cli destroy`. Name the test nodes without the `vinheta` prefix, and destroy them. `docs/audio-poc.md` has the findings so far; read it first.
+- A claim about a crate API that the design depends on is worth a throwaway program in the scratchpad when reading the source is not enough.
 
 What could not be verified goes into the PRD as a target or an assumption, with a criterion in the story that measures it. Never as a fact.
 
@@ -111,14 +113,20 @@ There is no browser and no Playwright here. Every story ends with the criterion 
 
 When writing a "Screenshot check", say how the state is reached. The tools of `scripts/screenshot.sh`:
 
-- `--folder DIR` fills the library; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--key KEYS`, `--size W,H`, and `--wait SECONDS` simulate the user, in the given order; `--no-audio` takes the engine down; `--light` switches the style.
-- A new state that can only be reached by a click that is hard to place deserves an action (`app.*` or `win.*`) in the story itself; actions also serve the shortcuts.
+- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
+- `--capture NAME` takes a picture in the middle of the sequence and `--crop WxH+X+Y` crops the ones that follow, so one run can check several states.
+- `--fake-mic 'NODE DESCRIPTION'` and `--fake-sink 'NODE DESCRIPTION'` create a fake device before the app starts; the steps `--plug-mic`, `--plug-sink`, and `--unplug NODE` do it while the app runs. Use them whenever a criterion names a device: the real device list differs between machines.
+- Dialogs opened by an action and open popovers (menus, drop-downs) are captured.
+- A state stored in GSettings is reached with `--setting`. A new state that can only be reached by a click that is hard to place deserves an action (`app.*` or `win.*`) in the story itself; actions also serve the shortcuts.
 
 Limits the PRD must respect (do not write criteria that depend on them):
 
 - Portal dialogs (the file or folder chooser) do not work on the virtual display. Whatever depends on them is marked for manual testing.
 - The app on the virtual display uses the real PipeWire: it creates the real "Vinheta" node and plays on the default output. Test sounds are silent (`silent_sound`) or the quiet tone of `tone_sound`, both in `scripts/dev-common.sh`.
-- If another Vinheta instance is open, the engine fails with "node already exists".
+- If another Vinheta instance is open, the engine fails with "node already exists". For the same reason, two checks that start the app (screenshots, `verify-app.sh`) cannot run at the same time.
+- The fallback of a removed or missing device is the real default device. A check of that fallback must play nothing audible (monitor volume at 0, or a silent file) and record nothing from the real microphone.
+- A level measured on the virtual microphone includes the real microphone, which can be noisy enough to hide a quiet tone. Turn "Include My Voice" off (`include-my-voice false`) before measuring.
+- Real clicks on a list entry, drags, and typing are not simulated reliably. Write the criterion on the state (the setting, the action) and mark the gesture for manual testing.
 - Screenshots go to `tmp/screenshots/` and are deleted at the end of the story.
 - The audio harness only uses fake devices; nothing in it needs a person listening. A test on a real call is always optional.
 
