@@ -207,10 +207,27 @@ device_blocks() {
          END { if (block) print block }' "$1"
 }
 
+# after FILE SECONDS [MARGIN]: where to measure the effect of an action that
+# happens SECONDS into the playback. The tone starts tone_delay_ms into the
+# sound files, and the window starts MARGIN seconds (0.7 by default) after
+# the action.
+tone_delay_ms=1500
+after() {
+    window "$1" "$(python3 -c 'import sys; print(float(sys.argv[1]) - float(sys.argv[2]) / 1000 + float(sys.argv[3]))' "$2" "$tone_delay_ms" "${3:-0.7}")"
+}
+
+# The node names of the default source and sink that no longer exist.
+missing_defaults() {
+    local name
+    for name in $(echo "$defaults_before" | grep -o '"name": *"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/'); do
+        node_exists "$name" || echo "$name"
+    done
+}
+
 defaults_before=$(defaults)
 
 ffmpeg -v error -y -f lavfi -i "sine=frequency=1000:duration=4" \
-    -af "volume=-12dB,adelay=1500:all=1,pan=stereo|c0=c0|c1=c0" -ar 48000 "$sound" || exit 1
+    -af "volume=-12dB,adelay=$tone_delay_ms:all=1,pan=stereo|c0=c0|c1=c0" -ar 48000 "$sound" || exit 1
 
 nodes+=("$(create_node "$mic" "Vinheta test microphone" Audio/Source/Virtual MONO)")
 nodes+=("$(create_node "$monitor" "Vinheta test monitor" Audio/Sink "FL FR")")
@@ -267,20 +284,19 @@ if [ "$mode" = rust ]; then
     other="$work/sound-other.wav"
     for spec in "1000 $long" "2000 $other"; do
         ffmpeg -v error -y -f lavfi -i "sine=frequency=${spec%% *}:duration=8" \
-            -af "volume=-12dB,adelay=1500:all=1,pan=stereo|c0=c0|c1=c0" -ar 48000 "${spec#* }" || exit 1
+            -af "volume=-12dB,adelay=$tone_delay_ms:all=1,pan=stereo|c0=c0|c1=c0" -ar 48000 "${spec#* }" || exit 1
     done
 
-    # The tone starts 1.5 s into the file, so an action 4 s after the playback
-    # starts lands 2.5 s after the tone does.
+    # The actions below happen 4 s into the playback, in the middle of the tone.
     echo "== stop one sound"
     files=("$long") run_for=8
     playback stop --stop-after 4
     check "subject and node still there after the stop" "$subject_alive"
     for branch in call monitor; do
         expect "$branch before the stop" "$work/stop-$branch.wav" 1000 present "$(window "$work/stop-$branch.wav")" 1.5
-        expect "$branch after the stop" "$work/stop-$branch.wav" 1000 absent "$(window "$work/stop-$branch.wav" 3.2)"
+        expect "$branch after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4)"
     done
-    expect "call after the stop" "$work/stop-call.wav" 440 present "$(window "$work/stop-call.wav" 3.2)"
+    expect "call after the stop" "$work/stop-call.wav" 440 present "$(after "$work/stop-call.wav" 4)"
 
     echo "== stop all sounds"
     files=("$long" "$other") run_for=8
@@ -289,7 +305,7 @@ if [ "$mode" = rust ]; then
     for branch in call monitor; do
         for freq in 1000 2000; do
             expect "$branch before the stop" "$work/stop-all-$branch.wav" "$freq" present "$(window "$work/stop-all-$branch.wav")" 1.5
-            expect "$branch after the stop" "$work/stop-all-$branch.wav" "$freq" absent "$(window "$work/stop-all-$branch.wav" 3.2)"
+            expect "$branch after the stop" "$work/stop-all-$branch.wav" "$freq" absent "$(after "$work/stop-all-$branch.wav" 4)"
         done
     done
 
@@ -298,10 +314,10 @@ if [ "$mode" = rust ]; then
     playback mute --once --mute-call-after 4 --unmute-call-after 6.5
     call="$work/mute-call.wav"
     expect "call before the mute" "$call" 1000 present "$(window "$call")" 1.5
-    expect "call while muted" "$call" 1000 absent "$(window "$call" 3)" 1.5
-    expect "call while muted" "$call" 440 present "$(window "$call" 3)" 1.5
-    expect "monitor while muted" "$work/mute-monitor.wav" 1000 present "$(window "$work/mute-monitor.wav" 3)" 1.5
-    expect "call after the unmute" "$call" 1000 present "$(window "$call" 5.5)" 1.5
+    expect "call while muted" "$call" 1000 absent "$(after "$call" 4 0.5)" 1.5
+    expect "call while muted" "$call" 440 present "$(after "$call" 4 0.5)" 1.5
+    expect "monitor while muted" "$work/mute-monitor.wav" 1000 present "$(after "$work/mute-monitor.wav" 4 0.5)" 1.5
+    expect "call after the unmute" "$call" 1000 present "$(after "$call" 6.5 0.5)" 1.5
 
     echo "== call branch off from the start"
     playback no-call --once --no-call
@@ -310,7 +326,6 @@ if [ "$mode" = rust ]; then
     expect "call" "$work/no-call-call.wav" 440 present "$start"
     expect "monitor" "$work/no-call-monitor.wav" 1000 present "$start"
 
-    # The gain changes 2.5 s after the tone starts.
     for branch in call monitor; do
         other=monitor
         [ "$branch" = monitor ] && other=call
@@ -319,14 +334,14 @@ if [ "$mode" = rust ]; then
         playback "$branch-volume" --once "--$branch-volume-after" 4 0.1
         changed="$work/$branch-volume-$branch.wav"
         kept="$work/$branch-volume-$other.wav"
-        value=$(drop "$changed" 1000 "$(window "$changed")" "$(window "$changed" 3.2)")
+        value=$(drop "$changed" 1000 "$(window "$changed")" "$(after "$changed" 4)")
         check "$branch falls by 20 dB at gain 0.1 ($value dB)" "$(between "$value" 17 23)"
-        value=$(drop "$changed" 1000 "$(window "$changed")" "$(window "$changed" 2.7)" 0.5)
+        value=$(drop "$changed" 1000 "$(window "$changed")" "$(after "$changed" 4 0.2)" 0.5)
         check "$branch has fallen 200 ms after the change ($value dB)" "$(between "$value" 17 23)"
-        value=$(drop "$kept" 1000 "$(window "$kept")" "$(window "$kept" 3.2)")
+        value=$(drop "$kept" 1000 "$(window "$kept")" "$(after "$kept" 4)")
         check "$other keeps its level ($value dB)" "$(between "$value" -2 2)"
         call="$work/$branch-volume-call.wav"
-        value=$(drop "$call" 440 "$(window "$call")" "$(window "$call" 3.2)")
+        value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
         check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
     done
 
@@ -360,9 +375,9 @@ if [ "$mode" = rust ]; then
     playback voice --once --voice-off-after 4 --voice-on-after 6.5
     call="$work/voice-call.wav"
     expect "call before the voice is off" "$call" 440 present "$(window "$call")" 1.5
-    expect "call while the voice is off" "$call" 440 absent "$(window "$call" 3)" 1.5
-    expect "call while the voice is off" "$call" 1000 present "$(window "$call" 3)" 1.5
-    expect "call after the voice is back" "$call" 440 present "$(window "$call" 5.5)" 1.5
+    expect "call while the voice is off" "$call" 440 absent "$(after "$call" 4 0.5)" 1.5
+    expect "call while the voice is off" "$call" 1000 present "$(after "$call" 4 0.5)" 1.5
+    expect "call after the voice is back" "$call" 440 present "$(after "$call" 6.5 0.5)" 1.5
 
     echo "== voice off from the start"
     playback no-voice --once --no-voice
@@ -388,9 +403,9 @@ if [ "$mode" = rust ]; then
     call="$work/mic-switch-call.wav"
     expect "call before the switch" "$call" 440 present "$(window "$call")" 1.5
     expect "call before the switch" "$call" 880 absent "$(window "$call")" 1.5
-    expect "call after the switch" "$call" 440 absent "$(window "$call" 3.2)" 1.5
-    expect "call after the switch" "$call" 880 present "$(window "$call" 3.2)" 1.5
-    expect "call after the switch" "$call" 1000 present "$(window "$call" 3.2)" 1.5
+    expect "call after the switch" "$call" 440 absent "$(after "$call" 4)" 1.5
+    expect "call after the switch" "$call" 880 present "$(after "$call" 4)" 1.5
+    expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
 
     echo "== monitor switch"
     files=("$long") record_monitor2=1
@@ -399,16 +414,16 @@ if [ "$mode" = rust ]; then
     second="$work/monitor-switch-monitor2.wav"
     call="$work/monitor-switch-call.wav"
     expect "first sink before the switch" "$first" 1000 present "$(window "$first")" 1.5
-    expect "first sink 1 s after the switch" "$first" 1000 absent "$(window "$first" 3.5)" 1.5
+    expect "first sink 1 s after the switch" "$first" 1000 absent "$(after "$first" 4 1)" 1.5
     expect "second sink after the switch" "$second" 1000 present "$(window "$second")" 1.5
-    # The tone reaches the second sink when the stream is moved, 2.5 s after
-    # it reached the first one.
+    # The tone reaches the second sink when the stream is moved, 4 s into the
+    # playback, which is 2.5 s after it reached the first one.
     moved=$(python3 -c 'import sys; print(f"{(float(sys.argv[2]) - float(sys.argv[1])) / 1000:.2f}")' \
         "$(analyze onset "$first" 0 1000)" "$(analyze onset "$second" 0 1000)" 2>/dev/null)
     check "the stream moved within 1 s of the request ($moved s after the tone started)" "$(between "${moved:-0}" 2 3.5)"
     expect "call before the switch" "$call" 1000 present "$(window "$call")" 1.5
-    expect "call during the switch" "$call" 1000 present "$(window "$call" 2.2)" 1
-    expect "call after the switch" "$call" 1000 present "$(window "$call" 3.2)" 1.5
+    expect "call during the switch" "$call" 1000 present "$(after "$call" 4 -0.3)" 1
+    expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
 
     # The output changes before the tone of the first playback starts, and
     # the files are played again after it ended. Without --once, which would
@@ -420,7 +435,8 @@ if [ "$mode" = rust ]; then
     second="$work/next-output-monitor2.wav"
     check "nothing reaches the first sink" "$([ "$(analyze onset "$first" 0 1000)" = none ] && echo ok)"
     expect "second sink, first playback" "$second" 1000 present "$(window "$second")"
-    expect "second sink, second playback" "$second" 1000 present "$(window "$second" 7)"
+    # The second playback starts at 6.5 s, so its tone starts at 8 s.
+    expect "second sink, second playback" "$second" 1000 present "$(after "$second" 8 0.5)"
 
     # The fallback of a removed output is the real default sink, so this one
     # plays with the monitor volume at 0.
@@ -494,7 +510,14 @@ cleanup
 sleep 0.3
 stray=$(pw-dump | grep -c '"node.name": "vinheta' || true)
 check "no vinheta node left ($stray found)" "$([ "$stray" -eq 0 ] && echo ok)"
-check "default source and sink unchanged" "$([ "$(defaults)" = "$defaults_before" ] && echo ok)"
+# A real device unplugged during the run changes the defaults by itself. The
+# checks only use fake devices, so that is reported without failing.
+unplugged=$(missing_defaults)
+if [ "$(defaults)" != "$defaults_before" ] && [ -n "$unplugged" ]; then
+    echo "NOTE the default devices changed because a device went away during the run:" $unplugged
+else
+    check "default source and sink unchanged" "$([ "$(defaults)" = "$defaults_before" ] && echo ok)"
+fi
 
 if [ "$failures" -eq 0 ]; then
     echo "ALL CHECKS PASSED"

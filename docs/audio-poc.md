@@ -190,6 +190,8 @@ It never uses the real microphone or headphones. A fake microphone (a mono virtu
 - nothing is left behind after each kind of exit,
 - the default source and sink are unchanged.
 
+If a real device is unplugged during the run, the system defaults change by themselves; that is printed as a `NOTE` instead of failing the "default source and sink unchanged" check.
+
 The two removal checks fall back to the real default devices, so the sink one plays with the monitor volume at 0 and the microphone one plays and records nothing.
 
 It prints one `PASS` or `FAIL` line per check and exits with status 0 only when all pass. Recordings and logs go to `tmp/audio-poc/`. It needs `ffmpeg` and `python3`, which are development tools only, not package dependencies.
