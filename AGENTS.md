@@ -34,10 +34,26 @@ meson test -C build "Validate schema file"   # run a single test
 
 There are no Rust tests; the only tests are the validations above, defined in `data/meson.build`.
 
+### Running in development
+
+Install into a local prefix inside `build/`, so nothing touches the system and no `sudo` is needed:
+
+```sh
+meson setup build --prefix="$PWD/build/install"   # once; add --reconfigure if build/ already exists
+meson install -C build                            # rebuilds and reinstalls after each change
+GSETTINGS_SCHEMA_DIR="$PWD/build/install/share/glib-2.0/schemas" \
+XDG_DATA_DIRS="$PWD/build/install/share:$XDG_DATA_DIRS" \
+build/install/bin/vinheta
+```
+
+- The prefix is baked into `PKGDATADIR` at configure time, which is how the binary finds `vinheta.gresource`.
+- `GSETTINGS_SCHEMA_DIR` points at the schema compiled into the local prefix; `XDG_DATA_DIRS` lets the app find its icon there.
+- Building requires `libgtk-4-dev` and `libadwaita-1-dev` (they pull in the GLib dev tools, including `glib-compile-resources`). Installing `libxml2-utils` silences the `xmllint` warning when compiling the gresource.
+
 Non-obvious points:
 
 - `src/config.rs` is **generated** from `src/config.rs.in` by Meson and copied back into `src/`. Edit the `.in`, never the `.rs`. New build-time constants also need a `conf.set_quoted(...)` in `src/meson.build`.
-- `cargo build` / `cargo check` / `cargo clippy` work directly for checking the code (as long as `src/config.rs` already exists), but the resulting binary does not run on its own: `main.rs` loads `vinheta.gresource` from `PKGDATADIR` (`/usr/share/vinheta` in the `.deb`) and panics if it is missing. To run the app, install it through Meson or install the `.deb`.
+- `cargo build` / `cargo check` / `cargo clippy` work directly for checking the code (as long as `src/config.rs` already exists), but the resulting binary does not run on its own: `main.rs` loads `vinheta.gresource` from `PKGDATADIR` (`/usr/share/vinheta` in the `.deb`) and panics if it is missing. To run the app, install it through Meson (see "Running in development") or install the `.deb`.
 - The Flatpak manifest `io.github.wilfison.Vinheta.json` is a leftover from the GNOME Builder template and is only useful for building/running through GNOME Builder. It is not the distribution channel, and its module source (`file:///home/will/Projects`) is not valid for `flatpak-builder`.
 - cargo downloads crates during compilation (sources are not vendored), so builds need network access.
 - The `gnome_47` (gtk4) and `v1_6` (libadwaita) features in `Cargo.toml` cap the APIs available in the Rust bindings; bump the features to use newer APIs.
