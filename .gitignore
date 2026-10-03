@@ -9,14 +9,15 @@ target/
 # Supported build systems
 .flatpak-builder
 .flatpak
-.fenv
-.foundry
 
 # Temporary files
 tmp/
 tasks/
 *.ui.in~
 *.ui~
+
+# AI Files
+.claude*
 
 # Dynamically-generated files
 src/config.rs
