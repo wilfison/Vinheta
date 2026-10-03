@@ -52,7 +52,13 @@ clippy() { cargo clippy --all-targets --features audio-poc -- -D warnings; }
 one_glib() { [ "$(cargo tree -i glib --depth 0 | grep -c '^glib ')" -eq 1 ]; }
 # The mockups are drawings, not text of the project.
 no_em_dash() { ! git grep -nIP '\x{2014}' -- . ':!mockups'; }
-untracked_em_dash() { ! git ls-files -o --exclude-standard -z | xargs -0 -r grep -nIP '\x{2014}'; }
+# The status of the pipeline cannot be used: with no untracked files xargs
+# runs nothing and succeeds, like grep does when it finds the character.
+untracked_em_dash() {
+    local found
+    found=$(git ls-files -o --exclude-standard -z | xargs -0 -r grep -nHIP '\x{2014}')
+    [ -z "$found" ] || { echo "$found"; return 1; }
+}
 
 run "clippy without warnings" clippy
 run "a single glib version" one_glib
