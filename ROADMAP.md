@@ -64,20 +64,39 @@ Notes for the next phases:
 - Both sinks set `state.restore-props=false`; without it WirePlumber applies a volume saved for an earlier stream.
 - A live GStreamer source (for example `audiotestsrc is-live=true`) linked by hand into the node stalls the graph. Files do not.
 - The capture ports of a virtual source carry `port.monitor=true`; do not filter monitor ports out when walking the registry.
-- What the engine does not do yet: stop a sound, change a volume while playing, turn the call branch or the microphone link on and off, choose devices at run time. Starting several sounds at once works, but was not verified beyond that.
+- What the engine did not do at the end of Phase 0: stop a sound, change a volume while playing, turn the call branch or the microphone link on and off, choose devices at run time. Phase 1 added the stop and the call branch switch.
 - After changing audio code, run `scripts/verify-audio-poc.sh rust`.
 
-### Phase 1: interface MVP
+### Phase 1: interface MVP ✅
 
-- ⬜ Window following `mockups/main-page.svg` and `mockups/empty-state.svg`.
-- ⬜ Add a directory with `GtkFileDialog` (`select_folder`); each directory becomes a tab.
-- ⬜ Pad grid using `GtkGridView` on top of a list model (makes search and sorting easier later).
-- ⬜ Wire `AudioEngine` (`src/audio/`) into the application: start it with the app and consume its events with `glib::spawn_future_local`.
-- ⬜ Clicking plays, clicking again stops. The engine needs a per-sound stop operation; today it can only start sounds.
-- ⬜ Bottom bar with "Stop all" and the "Send sounds to call" toggle. Both need engine support: a public stop-all, and a way to mute or drop the call branch.
-- ⬜ Empty state with the "Add Sounds…" call to action and the tip to pick the "Vinheta" microphone in the call app.
-- ⬜ Persist the directories in GSettings (the schema is currently empty).
-- ⬜ Removing a tab only removes the directory from the library, never the files.
+- ✅ Window following `mockups/main-page.svg` and `mockups/empty-state.svg`.
+- ✅ Add a directory with `GtkFileDialog` (`select_folder`); each directory becomes a tab.
+- ✅ Pad grid using `GtkGridView` on top of a list model (makes search and sorting easier later).
+- ✅ Wire `AudioEngine` (`src/audio/`) into the application: start it with the app and consume its events with `glib::spawn_future_local`.
+- ✅ Clicking plays, clicking again stops. The engine has a per-sound stop, keyed by a `PlaybackId` returned by `play`.
+- ✅ Bottom bar with "Stop all" and the "Send sounds to call" toggle, with a public stop-all and a call branch mute in the engine.
+- ✅ Empty state with the call to action and the tip to pick the "Vinheta" microphone in the call app.
+- ✅ Persist the directories in GSettings (`directories`, plus `send-sounds-to-call`).
+- ✅ Removing a tab only removes the directory from the library, never the files.
+
+What changed from the original plan:
+
+- The add button and the empty state only add folders ("Add Folder…"). Loose files and "Add Sounds…" stay in Phase 4.
+- The controls of later phases that the mockup shows (volume sliders, microphone selector, search, hotkey badges, favorites, loop, times, playing counter, "Add sound" tile, "All" tab) are left out instead of shown disabled.
+- Tabs are an `AdwViewStack` with an `AdwInlineViewSwitcher`, which needs the `v1_7` feature of the `libadwaita` crate. The switcher scrolls horizontally when the tabs do not fit.
+- A folder is removed from the primary menu ("Remove Folder"), with an "Undo" toast. Only files directly inside a folder are listed; subfolders are not entered.
+- The call branch is muted, not dropped: the stream stays linked, so turning the switch back on is instant and applies to sounds already playing.
+- Sounds are started and stopped through the `app.toggle-sound` and `app.stop-all` actions, which Phase 5 can reuse for shortcuts.
+- When the engine cannot start, the window opens with a banner and disabled pads; playback failures are toasts. The rest of the error handling is still Phase 6.
+- Stopping a sound exposed a bug in the engine: a harmless PipeWire error ("unknown resource", after the server removes a link with its stream) was treated as a lost connection. Only `EPIPE` is now.
+- New tooling: `scripts/screenshot.sh` captures the window on a virtual display, the project has its first Rust tests (`src/library.rs`, run by `meson test`), and `scripts/verify-audio-poc.sh rust` checks stop, stop all, and the call mute.
+
+Notes for the next phases:
+
+- Starting a sound takes about 1 to 3 ms on the GTK thread, so it stays there.
+- A folder is scanned once, when its tab is created. Phase 4 adds the file monitor.
+- The undo of a removal and the folder chooser were not exercised by the scripted checks (no simulated input); test them by hand.
+- The window was not checked at its minimum width (360 pixels) for the same reason.
 
 ### Phase 2: mixing controls
 
