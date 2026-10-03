@@ -54,3 +54,9 @@ cargo_build = custom_target(
     cargo_opt, '&&', 'cp', 'src' / rust_target / meson.project_name(), '@OUTPUT@',
   ]
 )
+
+# The timeout leaves room for a cold build of the test profile.
+test('Rust tests', find_program('env'),
+  args: [cargo_env, cargo_bin, 'test', '--lib', cargo_opt],
+  timeout: 1800,
+)
