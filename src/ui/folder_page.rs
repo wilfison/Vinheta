@@ -27,6 +27,7 @@ use gtk::{gio, glib};
 use vinheta::library;
 
 use super::sound_pad::SoundPad;
+use crate::application::VinhetaApplication;
 use crate::sound::Sound;
 
 mod imp {
@@ -94,6 +95,29 @@ mod imp {
                 }
             });
             self.sounds.set(sounds).unwrap();
+
+            // The focus is on the cell that holds the pad, so the keys that
+            // open a context menu are handled here.
+            let open_menu = gtk::CallbackAction::new(|grid, _| {
+                let focus = grid.root().and_then(|root| root.focus());
+                let pad = focus
+                    .filter(|focus| focus.is_ancestor(grid))
+                    .and_then(|focus| focus.first_child())
+                    .and_downcast::<SoundPad>();
+                match pad {
+                    Some(pad) => {
+                        pad.open_menu(None);
+                        glib::Propagation::Stop
+                    }
+                    None => glib::Propagation::Proceed,
+                }
+            });
+            let keys = gtk::ShortcutController::new();
+            keys.add_shortcut(gtk::Shortcut::new(
+                gtk::ShortcutTrigger::parse_string("Menu|<Shift>F10"),
+                Some(open_menu),
+            ));
+            self.grid.add_controller(keys);
         }
     }
 
@@ -151,10 +175,16 @@ impl FolderPage {
                     imp.stack.set_visible_child_name("missing");
                     return;
                 };
+                // The application owns the pad settings.
+                let app = gio::Application::default().and_downcast::<VinhetaApplication>();
                 // The action that plays a sound takes its path as a string.
                 let sounds: Vec<_> = files
                     .iter()
-                    .filter_map(|file| Some(Sound::new(file.path.to_str()?, &file.name)))
+                    .filter_map(|file| {
+                        let path = file.path.to_str()?;
+                        let settings = app.as_ref().map(|app| app.pad_settings(path));
+                        Some(Sound::new(path, &file.name, &settings.unwrap_or_default()))
+                    })
                     .collect();
                 imp.sounds.get().unwrap().extend_from_slice(&sounds);
                 let child = if sounds.is_empty() { "empty" } else { "grid" };

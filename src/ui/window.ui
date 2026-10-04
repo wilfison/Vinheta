@@ -84,21 +84,52 @@
                       <object class="GtkBox">
                         <property name="orientation">vertical</property>
                         <child>
-                          <object class="GtkScrolledWindow">
-                            <property name="hscrollbar-policy">external</property>
-                            <property name="vscrollbar-policy">never</property>
-                            <property name="child">
-                              <object class="AdwInlineViewSwitcher">
-                                <property name="stack">tabs</property>
-                                <property name="display-mode">labels</property>
-                                <property name="can-shrink">False</property>
-                                <property name="halign">start</property>
-                                <style>
-                                  <class name="tab-switcher"/>
-                                  <class name="round"/>
-                                </style>
+                          <object class="GtkBox">
+                            <child>
+                              <object class="GtkScrolledWindow">
+                                <property name="hexpand">True</property>
+                                <property name="hscrollbar-policy">external</property>
+                                <property name="vscrollbar-policy">never</property>
+                                <property name="child">
+                                  <object class="AdwInlineViewSwitcher">
+                                    <property name="stack">tabs</property>
+                                    <property name="display-mode">labels</property>
+                                    <property name="can-shrink">False</property>
+                                    <property name="halign">start</property>
+                                    <style>
+                                      <class name="tab-switcher"/>
+                                      <class name="round"/>
+                                    </style>
+                                  </object>
+                                </property>
                               </object>
-                            </property>
+                            </child>
+                            <child>
+                              <object class="GtkBox" id="playing_counter">
+                                <property name="visible">False</property>
+                                <property name="spacing">8</property>
+                                <property name="valign">center</property>
+                                <style>
+                                  <class name="playing-counter"/>
+                                </style>
+                                <child>
+                                  <object class="AdwBin">
+                                    <property name="valign">center</property>
+                                    <style>
+                                      <class name="playing-dot"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="playing_count">
+                                    <style>
+                                      <class name="dimmed"/>
+                                      <class name="numeric"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
                           </object>
                         </child>
                         <child>

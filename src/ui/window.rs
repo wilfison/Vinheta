@@ -22,11 +22,12 @@ use std::cell::OnceCell;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gettextrs::gettext;
+use gettextrs::{gettext, ngettext};
 use gtk::{gio, glib};
 
 use super::device_selector;
 use super::folder_page::FolderPage;
+use super::sound_dialog::SoundDialog;
 use crate::application::{DeviceKind, VinhetaApplication};
 use crate::sound::Sound;
 use crate::APP_ID;
@@ -48,6 +49,10 @@ mod imp {
         #[template_child]
         pub stop_all: TemplateChild<gtk::Button>,
         #[template_child]
+        pub playing_counter: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub playing_count: TemplateChild<gtk::Label>,
+        #[template_child]
         pub send_to_call: TemplateChild<gtk::Switch>,
         #[template_child]
         pub monitor_volume: TemplateChild<gtk::Adjustment>,
@@ -62,6 +67,7 @@ mod imp {
         #[template_child]
         pub microphone: TemplateChild<gtk::DropDown>,
         pub settings: OnceCell<gio::Settings>,
+        pub sound_dialog: glib::WeakRef<SoundDialog>,
     }
 
     #[glib::object_subclass]
@@ -148,8 +154,8 @@ impl VinhetaWindow {
             .find(|sound| sound.path() == path)
     }
 
-    /// Shows or hides the banner that says audio does not work, and disables
-    /// the pads along with it.
+    /// Shows or hides the banner that says audio does not work, and dims the
+    /// pads along with it (the application ignores the triggers).
     pub fn set_audio_error(&self, message: Option<&str>) {
         let imp = self.imp();
         if let Some(message) = message {
@@ -158,11 +164,23 @@ impl VinhetaWindow {
             imp.banner.set_title(&title);
         }
         imp.banner.set_revealed(message.is_some());
-        imp.tabs.set_sensitive(message.is_none());
+        // The pads stay reachable: their settings can still be edited.
+        if message.is_some() {
+            imp.tabs.add_css_class("no-audio");
+        } else {
+            imp.tabs.remove_css_class("no-audio");
+        }
     }
 
-    pub fn set_any_playing(&self, playing: bool) {
-        if playing {
+    /// Shows how many sounds are playing, in every tab, or nothing for none.
+    pub fn set_playing_count(&self, count: usize) {
+        let imp = self.imp();
+        imp.playing_counter.set_visible(count > 0);
+        let number = u32::try_from(count).unwrap_or(u32::MAX);
+        // Translators: {} is how many sounds are playing.
+        let text = ngettext("{} playing", "{} playing", number).replace("{}", &count.to_string());
+        imp.playing_count.set_label(&text);
+        if count > 0 {
             self.imp().stop_all.add_css_class("destructive-action");
         } else {
             self.imp().stop_all.remove_css_class("destructive-action");
@@ -186,7 +204,30 @@ impl VinhetaWindow {
         let remove_folder = gio::ActionEntry::builder("remove-folder")
             .activate(|window: &Self, _, _| window.remove_folder())
             .build();
-        self.add_action_entries([add_folder, remove_folder]);
+        // The parameter is the absolute path of a sound of the library.
+        let edit_sound = gio::ActionEntry::builder("edit-sound")
+            .parameter_type(Some(glib::VariantTy::STRING))
+            .activate(|window: &Self, _, path| {
+                if let Some(path) = path.and_then(|path| path.str()) {
+                    window.edit_sound(path);
+                }
+            })
+            .build();
+        self.add_action_entries([add_folder, remove_folder, edit_sound]);
+    }
+
+    fn edit_sound(&self, path: &str) {
+        let imp = self.imp();
+        if imp.sound_dialog.upgrade().is_some() {
+            return;
+        }
+        let app = self.application().and_downcast::<VinhetaApplication>();
+        let (Some(app), Some(sound)) = (app, self.find_sound(path)) else {
+            return;
+        };
+        let dialog = SoundDialog::new(&app, &sound);
+        imp.sound_dialog.set(Some(&dialog));
+        dialog.present(Some(self));
     }
 
     async fn choose_folder(&self) {
@@ -230,7 +271,7 @@ impl VinhetaWindow {
 
         for sound in page.sounds().filter(Sound::playing) {
             let path = sound.path().to_variant();
-            let _ = WidgetExt::activate_action(self, "app.toggle-sound", Some(&path));
+            let _ = WidgetExt::activate_action(self, "app.stop-sound", Some(&path));
         }
         directories.remove(position);
         self.set_directories(directories);

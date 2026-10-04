@@ -7,7 +7,11 @@ src/application.rs
 src/ui/device_selector.rs
 src/ui/folder-page.ui
 src/ui/preferences-dialog.ui
+src/ui/preferences_dialog.rs
 src/ui/shortcuts-dialog.ui
+src/ui/sound-dialog.ui
+src/ui/sound-pad.ui
+src/ui/sound_dialog.rs
 src/ui/sound_pad.rs
 src/ui/window.rs
 src/ui/window.ui

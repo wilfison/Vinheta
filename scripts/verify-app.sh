@@ -2,7 +2,8 @@
 # Checks the installed app end to end, on a virtual display: the virtual
 # microphone, playing and stopping through actions and through real clicks, the
 # "Send sounds to call" switch and the call volume measured on a recording, the
-# voice switch, the monitor output, and the cleanup on exit.
+# voice switch, the monitor output, the pad settings (volume, loop), the
+# trigger modes, and the cleanup on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
 # output for a few seconds, and the real microphone is linked as usual.
 set -uo pipefail
@@ -18,6 +19,17 @@ rm -rf "$work"
 mkdir -p "$work/Tones"
 tone="$work/Tones/tone.wav"
 tone_sound "$tone" 60 || exit 1
+# The same tone with a pad volume, and a short one that loops. The pad
+# settings go into the data directory of the session.
+quiet="$work/Tones/tone-quiet.wav"
+looped="$work/Tones/tone-loop.wav"
+cp "$tone" "$quiet"
+tone_sound "$looped" 2 || exit 1
+pads="$work/config/data/vinheta/pads.json"
+mkdir -p "$(dirname "$pads")"
+cat >"$pads" <<JSON
+{"version": 1, "pads": {"$quiet": {"volume": 0.5}, "$looped": {"loop": true}}}
+JSON
 test_sink=vinheta-app-test-sink
 
 check() {
@@ -29,6 +41,26 @@ check() {
 node_exists() { pw-dump | grep -q '"node.name": "vinheta"'; }
 call_linked() { pw-link -l | grep -q "vinheta-call-"; }
 not() { ! "$@"; }
+call_streams() { pw-dump | grep -c '"node.name": "vinheta-call-'; }
+one_call_stream() { [ "$(call_streams)" -eq 1 ]; }
+# within SECONDS COMMAND...: the command succeeds before the time is over.
+within() {
+    local i tries=$(($1 * 10))
+    shift
+    for i in $(seq "$tries"); do
+        "$@" && return 0
+        sleep 0.1
+    done
+    return 1
+}
+# pad_field PATH FIELD: the value stored for a pad, or nothing.
+pad_field() {
+    python3 -c 'import json, sys
+pad = json.load(open(sys.argv[1]))["pads"].get(sys.argv[2])
+print("no entry" if pad is None else json.dumps(pad.get(sys.argv[3])))' "$pads" "$1" "$2"
+}
+loop_saved() { [ "$(pad_field "$tone" loop)" = true ]; }
+entry_removed() { [ "$(pad_field "$quiet" volume)" = "no entry" ]; }
 
 # Level of the 1000 Hz tone on the virtual microphone, in dBFS, over 2 seconds.
 call_level() {
@@ -53,7 +85,7 @@ falls_by() { python3 -c 'import sys; a, b, low, high = map(float, sys.argv[1:]);
 at_least() { python3 -c 'import sys; a, b, m = map(float, sys.argv[1:]); sys.exit(0 if a - b >= m else 1)' "$@"; }
 
 session() {
-    local on off back half sink had_voice
+    local on off back half sink had_voice full
     gsettings set "$app_id" directories "$(gvariant_strv "$work/Tones")" || return 1
     start_app || { echo "FAIL the app starts"; return 1; }
     check "the virtual microphone exists while the app runs" node_exists
@@ -125,7 +157,55 @@ session() {
     sleep 1
     check "stop all removes the call stream" not call_linked
 
-    # The only pad is the first cell of the grid.
+    # The curve of the pad volume is the one of the sliders. Voice off, as
+    # for the other levels.
+    echo "== pad volume"
+    gsettings set "$app_id" include-my-voice false
+    activate toggle-sound "'$tone'"
+    sleep 1
+    full=$(call_level pad-full)
+    activate stop-all
+    activate toggle-sound "'$quiet'"
+    sleep 1
+    half=$(call_level pad-half)
+    activate stop-all
+    gsettings set "$app_id" include-my-voice true
+    check "pad volume 0.5 is 18 dB quieter ($full dBFS at 1.0, $half dBFS at 0.5)" falls_by "$full" "$half" 15 21
+
+    # The file lasts 2 seconds.
+    echo "== loop"
+    sleep 1
+    activate toggle-sound "'$looped'"
+    sleep 5
+    check "a looping pad still plays after 5 s" call_linked
+    activate toggle-loop "'$looped'"
+    check "it ends within 4 s once the loop is off" within 4 not call_linked
+
+    echo "== trigger modes"
+    gsettings set "$app_id" trigger-mode "'restart'"
+    activate toggle-sound "'$tone'"
+    sleep 1
+    activate toggle-sound "'$tone'"
+    sleep 1
+    check "restart: a second trigger keeps the sound playing" one_call_stream
+    activate stop-sound "'$tone'"
+    sleep 1
+    check "restart: stop-sound stops it" not call_linked
+    gsettings set "$app_id" trigger-mode "'stop-others'"
+    activate toggle-sound "'$tone'"
+    sleep 0.5
+    activate toggle-sound "'$quiet'"
+    sleep 1.5
+    check "stop others: one sound is left after starting a second one" one_call_stream
+    activate stop-all
+    gsettings set "$app_id" trigger-mode "'overlap'"
+    sleep 1
+
+    # Written when the app quits, checked below.
+    activate toggle-loop "'$tone'"
+    activate reset-sound "'$quiet'"
+
+    # The first pad is the first cell of the grid.
     echo "== play and stop through clicks"
     click 129 177
     sleep 1
@@ -139,14 +219,17 @@ session() {
     sleep 0.5
     check "nothing is left after the app quits" not node_exists
     check "the folders were saved" grep -q "directories=.*Tones" "$work/config/glib-2.0/settings/keyfile"
+    check "a loop set through an action was saved" loop_saved
+    check "a reset pad has no entry in the file" entry_removed
 }
 
 {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-poc-common.sh'"
-    declare -p work tone test_sink
+    declare -p work tone quiet looped pads test_sink
     declare -f check node_exists call_linked not call_level at_least voice_links no_voice_links \
-        monitor_on monitor_linked falls_by session
+        monitor_on monitor_linked falls_by call_streams one_call_stream within pad_field \
+        loop_saved entry_removed session
     echo session
 } >"$work/session.sh"
 

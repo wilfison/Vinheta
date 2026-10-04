@@ -35,6 +35,31 @@
             </child>
           </object>
         </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Playback</property>
+            <child>
+              <object class="AdwComboRow" id="trigger_mode">
+                <property name="title" translatable="yes">When a Pad Is Triggered</property>
+                <property name="model">
+                  <object class="GtkStringList">
+                    <items>
+                      <item translatable="yes">Overlap</item>
+                      <item translatable="yes">Restart</item>
+                      <item translatable="yes">Stop Others</item>
+                    </items>
+                  </object>
+                </property>
+              </object>
+            </child>
+            <child>
+              <object class="AdwSwitchRow" id="fade_out">
+                <property name="title" translatable="yes">Fade Out on Stop</property>
+                <property name="subtitle" translatable="yes">Avoids abrupt cuts when stopping a sound</property>
+              </object>
+            </child>
+          </object>
+        </child>
       </object>
     </child>
   </template>

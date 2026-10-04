@@ -31,6 +31,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use pipewire as pw;
 
@@ -49,6 +50,8 @@ pub struct Config {
     pub send_to_call: bool,
     /// When false, the microphone is not linked to the virtual microphone.
     pub include_voice: bool,
+    /// How long a stopped playback takes to fade out. Zero stops at once.
+    pub fade_out: Duration,
 }
 
 impl Default for Config {
@@ -60,8 +63,34 @@ impl Default for Config {
             monitor_volume: 1.0,
             send_to_call: true,
             include_voice: true,
+            fade_out: Duration::ZERO,
         }
     }
+}
+
+/// How one playback starts. Both can be changed while it plays.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlayOptions {
+    /// The gain of this playback (0.0 to 1.0), on both branches.
+    pub volume: f64,
+    pub looping: bool,
+}
+
+impl Default for PlayOptions {
+    fn default() -> Self {
+        Self {
+            volume: 1.0,
+            looping: false,
+        }
+    }
+}
+
+/// How far along a playback is. In a loop, `elapsed` starts again on each
+/// pass.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Position {
+    pub elapsed: Duration,
+    pub duration: Option<Duration>,
 }
 
 /// Identifies one playback started by [`AudioEngine::play`].
@@ -172,17 +201,46 @@ impl AudioEngine {
 
     /// Plays a file on both branches. Failures after the start arrive as
     /// [`Event::Error`].
-    pub fn play(&self, path: impl AsRef<Path>) -> Result<PlaybackId, Error> {
-        self.player.play(path.as_ref())
+    pub fn play(&self, path: impl AsRef<Path>, options: PlayOptions) -> Result<PlaybackId, Error> {
+        self.player.play(path.as_ref(), options)
     }
 
-    /// Stops one playback. It reports no event afterwards.
+    /// Stops one playback, fading it out when a fade is set. Either way it
+    /// is forgotten at once and reports no event afterwards.
     pub fn stop(&self, id: PlaybackId) {
         self.player.stop(id);
     }
 
     pub fn stop_all(&self) {
         self.player.stop_all();
+    }
+
+    /// Sets how long the playbacks stopped from now on take to fade out.
+    pub fn set_fade_out(&self, duration: Duration) {
+        self.player.set_fade_out(duration);
+    }
+
+    /// Sets the gain of one playback (0.0 to 1.0), which multiplies the gain
+    /// of each branch.
+    pub fn set_playback_volume(&self, id: PlaybackId, gain: f64) {
+        self.player.set_playback_volume(id, gain);
+    }
+
+    /// Turned off, the playback ends with the pass that is being heard,
+    /// unless that pass is in its last 350 ms or so: then one more plays.
+    pub fn set_playback_loop(&self, id: PlaybackId, looping: bool) {
+        self.player.set_playback_loop(id, looping);
+    }
+
+    /// Starts a playback again from the beginning. It keeps its id and
+    /// reports nothing.
+    pub fn restart(&self, id: PlaybackId) {
+        self.player.restart(id);
+    }
+
+    /// `None` for a playback that is over or has not started yet.
+    pub fn position(&self, id: PlaybackId) -> Option<Position> {
+        self.player.position(id)
     }
 
     /// Mutes or unmutes the call branch of current and future playbacks.
@@ -230,7 +288,7 @@ pub fn slider_gain(position: f64) -> f64 {
 
 impl Drop for AudioEngine {
     fn drop(&mut self) {
-        self.player.stop_all();
+        self.player.shutdown();
         let _ = self.commands.send(Command::Quit);
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();

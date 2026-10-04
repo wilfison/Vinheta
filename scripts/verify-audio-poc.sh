@@ -42,11 +42,15 @@ check() {
 
 # analyze level FILE CHANNEL FREQ START SECONDS: level of one frequency, in dBFS.
 # analyze onset FILE CHANNEL FREQ: time in ms when that frequency first shows up.
+# analyze gaps FILE CHANNEL START END: the longest silence (below -50 dBFS)
+# between two times in seconds, in ms.
+# analyze span FILE CHANNEL: seconds from the first sound to the last one.
 analyze() {
     python3 - "$@" <<'PY'
 import array, math, sys, wave
 
-cmd, path, channel, freq = sys.argv[1], sys.argv[2], int(sys.argv[3]), float(sys.argv[4])
+cmd, path, channel = sys.argv[1], sys.argv[2], int(sys.argv[3])
+freq = float(sys.argv[4]) if cmd in ("level", "onset") else 0
 with wave.open(path) as wav:
     rate, channels = wav.getframerate(), wav.getnchannels()
     data = array.array("h", wav.readframes(wav.getnframes()))
@@ -61,9 +65,24 @@ def level(block):
     amplitude = 2 * math.hypot(re, im) / len(block) / 32768
     return 20 * math.log10(max(amplitude, 1e-10))
 
+def loud(start, end, block):
+    # Whether each block between two sample positions is above -50 dBFS (RMS).
+    for pos in range(start, min(end, len(samples)) - block + 1, block):
+        yield math.sqrt(sum(s * s for s in samples[pos:pos + block]) / block) > 32768 * 10 ** (-50 / 20)
+
 if cmd == "level":
     start, length = int(float(sys.argv[5]) * rate), int(float(sys.argv[6]) * rate)
     print(f"{level(samples[start:start + length]):.1f}")
+elif cmd == "gaps":
+    block, longest, run = rate // 200, 0, 0
+    for sound in loud(int(float(sys.argv[4]) * rate), int(float(sys.argv[5]) * rate), block):
+        run = 0 if sound else run + 1
+        longest = max(longest, run)
+    print(longest * 5)
+elif cmd == "span":
+    block = rate // 100
+    sounds = [i for i, sound in enumerate(loud(0, len(samples), block)) if sound]
+    print(f"{(sounds[-1] - sounds[0] + 1) / 100:.2f}" if sounds else "0")
 else:
     block, hop = rate // 200, rate // 2000
     for pos in range(0, len(samples) - block, hop):
@@ -97,6 +116,9 @@ gone_within_2s() {
     return 1
 }
 
+# The node names of the engine's playback streams.
+streams() { pw-dump | grep -oE '"node.name": "vinheta-(call|monitor)-[0-9-]+"'; }
+
 defaults() { pw-metadata 0 | grep -E "default\.audio\.(source|sink)'" | sort; }
 
 cleanup() {
@@ -121,6 +143,7 @@ playback() {
     local label=$1 recorders subject_pid
     shift
     [ ${#files[@]} -eq 0 ] && files=("$sound")
+    subject_started=$(date +%s.%N)
     "${subject[@]}" --mic "$mic" --monitor "$monitor" "$@" "${files[@]}" </dev/null >"$work/$label.log" 2>&1 &
     subject_pid=$!
     wait_for "the vinheta node" port_exists vinheta:capture_FR || return 1
@@ -149,6 +172,7 @@ playback() {
     fi
     wait "$subject_pid"
     subject_status=$?
+    subject_seconds=$(python3 -c 'import sys, time; print(f"{time.time() - float(sys.argv[1]):.1f}")' "$subject_started")
     files=()
     run_for=
     record_monitor2=
@@ -295,6 +319,8 @@ if [ "$mode" = rust ]; then
     for branch in call monitor; do
         expect "$branch before the stop" "$work/stop-$branch.wav" 1000 present "$(window "$work/stop-$branch.wav")" 1.5
         expect "$branch after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4)"
+        # Without a fade the sound is cut at once.
+        expect "$branch 150 ms after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4 0.15)" 0.5
     done
     expect "call after the stop" "$work/stop-call.wav" 440 present "$(after "$work/stop-call.wav" 4)"
 
@@ -344,6 +370,105 @@ if [ "$mode" = rust ]; then
         value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
         check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
     done
+
+    echo "== playback volume"
+    files=("$long")
+    playback playback-volume --once --volume 0.1 --playback-volume-after 4 1.0
+    # At gain 0.1 the tone is below the level that counts as its onset, so
+    # the onset found is the change itself, 2.5 s after the tone started.
+    for branch in call monitor; do
+        file="$work/playback-volume-$branch.wav"
+        value=$(drop "$file" 1000 "$(window "$file" -2)" "$(window "$file" 0.7)")
+        check "$branch rises by 20 dB from gain 0.1 to 1 ($value dB)" "$(between "$value" -23 -17)"
+        value=$(drop "$file" 1000 "$(window "$file" -0.7)" "$(window "$file" 0.2)" 0.5)
+        check "$branch has risen 200 ms after the change ($value dB)" "$(between "$value" -23 -17)"
+    done
+    call="$work/playback-volume-call.wav"
+    value=$(drop "$call" 440 "$(window "$call" -2)" "$(window "$call" 0.7)")
+    check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
+
+    echo "== playback volume and branch volume"
+    files=("$long")
+    playback playback-branch-volume --once --volume 0.5 --call-volume-after 4 0.1
+    file="$work/playback-branch-volume-call.wav"
+    value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
+    check "call falls by 20 dB more ($value dB)" "$(between "$value" 17 23)"
+    file="$work/playback-branch-volume-monitor.wav"
+    value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
+    check "monitor keeps the playback gain ($value dB)" "$(between "$value" -2 2)"
+
+    # One second of tone with no silence around it. The voice is off in the
+    # loop checks, so that silence on the call recording means a gap.
+    loop="$work/sound-loop.wav"
+    ffmpeg -v error -y -f lavfi -i "sine=frequency=1000:duration=1" \
+        -af "volume=-12dB,pan=stereo|c0=c0|c1=c0" -ar 48000 "$loop" || exit 1
+
+    echo "== loop"
+    files=("$loop") run_for=7
+    playback loop --no-voice --start-after 1 --loop --stop-after 3.5
+    for branch in call monitor; do
+        file="$work/loop-$branch.wav"
+        expect "$branch in the third pass" "$file" 1000 present "$(window "$file" 2)" 1
+        value=$(analyze gaps "$file" 0 "$(window "$file" 0.2)" "$(window "$file" 3)")
+        check "$branch has no gap at the seams (longest silence: $value ms)" "$(between "$value" 0 15)"
+        expect "$branch after the stop" "$file" 1000 absent "$(window "$file" 4.2)" 1
+    done
+    check "no end is reported while it loops" "$(grep -q '^finished playing' "$work/loop.log" || echo ok)"
+
+    echo "== loop off"
+    files=("$loop")
+    playback loop-off --no-voice --start-after 1 --once --loop --loop-off-after 1.5
+    check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
+    check "subject exited within 4 s of the start of the sound ($subject_seconds s with the 1 s wait)" \
+        "$(between "$subject_seconds" 0 5)"
+    check "the end is reported once" "$([ "$(grep -c '^finished playing' "$work/loop-off.log")" -eq 1 ] && echo ok)"
+    value=$(analyze span "$work/loop-off-call.wav" 0)
+    check "the tone lasts two passes ($value s)" "$(between "$value" 1.8 2.2)"
+
+    echo "== restart"
+    files=("$long")
+    playback restart --once --restart-after 4
+    for branch in call monitor; do
+        file="$work/restart-$branch.wav"
+        expect "$branch before the restart" "$file" 1000 present "$(window "$file")" 1.5
+        expect "$branch in the silence after the restart" "$file" 1000 absent "$(after "$file" 4 0.4)" 0.8
+        expect "$branch playing again" "$file" 1000 present "$(after "$file" 4 1.9)" 1.5
+    done
+    expect "call after the restart" "$work/restart-call.wav" 440 present "$(after "$work/restart-call.wav" 4 0.4)" 0.8
+
+    echo "== position"
+    files=("$long")
+    playback position --once --position-after 2
+    read -r _ elapsed duration < <(grep '^position ' "$work/position.log")
+    check "elapsed time 2 s into the playback (${elapsed:-none} ms)" "$(between "${elapsed:-0}" 1500 2500 2>/dev/null)"
+    check "duration of the file (${duration:-none} ms)" "$(between "${duration:-0}" 9400 9600 2>/dev/null)"
+
+    echo "== fade out"
+    files=("$long") run_for=8
+    playback fade --fade-out 0.3 --stop-after 4
+    for branch in call monitor; do
+        file="$work/fade-$branch.wav"
+        value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4 0.1)" 0.1)
+        check "$branch is fading 100 to 200 ms after the stop ($value dB down)" "$(between "$value" 1 15)"
+        expect "$branch 600 ms after the stop" "$file" 1000 absent "$(after "$file" 4 0.6)" 1.5
+    done
+    call="$work/fade-call.wav"
+    value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
+    check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
+    check "no end is reported for the stopped sound" "$(grep -q '^finished playing' "$work/fade.log" || echo ok)"
+
+    echo "== fade and exit"
+    "${subject[@]}" --mic "$mic" --monitor "$monitor" --fade-out 2 --stop-all-after 4 "$long" \
+        </dev/null >"$work/fade-exit.log" 2>&1 &
+    subject_pid=$!
+    if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 4.5; then
+        check "the sound is still fading" "$(streams | grep -q . && echo ok)"
+        kill -INT "$subject_pid"
+        check "nothing left after an exit during a fade" "$(gone_within_2s && [ -z "$(streams)" ] && echo ok)"
+    else
+        check "subject started for the fade and exit" fail
+    fi
+    wait "$subject_pid" 2>/dev/null
 
     echo "== device list"
     "${subject[@]}" --mic "$mic" --monitor "$monitor" </dev/null >"$work/devices.log" 2>&1 &

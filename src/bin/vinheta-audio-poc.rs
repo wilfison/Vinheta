@@ -28,7 +28,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gst::glib;
-use vinheta::audio::{self, AudioEngine, Config, Event, PlaybackId};
+use vinheta::audio::{self, AudioEngine, Config, Event, PlayOptions, PlaybackId};
 
 const USAGE: &str = "usage: vinheta-audio-poc [--help] [--version] [--once] [--mic NODE_NAME] \
 [--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] [--no-call] \
@@ -36,7 +36,10 @@ const USAGE: &str = "usage: vinheta-audio-poc [--help] [--version] [--once] [--m
 [--unmute-call-after SECONDS] [--call-volume-after SECONDS GAIN] \
 [--monitor-volume-after SECONDS GAIN] [--no-voice] [--voice-off-after SECONDS] \
 [--voice-on-after SECONDS] [--mic-after SECONDS NODE_NAME] \
-[--monitor-after SECONDS NODE_NAME] [--replay-after SECONDS] [FILE...]
+[--monitor-after SECONDS NODE_NAME] [--replay-after SECONDS] [--volume GAIN] \
+[--playback-volume-after SECONDS GAIN] [--loop] [--loop-off-after SECONDS] \
+[--restart-after SECONDS] [--position-after SECONDS] [--fade-out SECONDS] \
+[--start-after SECONDS] [FILE...]
 
 Without FILE, only the virtual microphone and the microphone link are created.
 With FILEs, they are played together once, and again each time Enter is pressed.
@@ -51,6 +54,13 @@ The --*-after options act that many seconds after the first playback starts:
 (the name \"default\" follows the system default), and --replay-after plays
 the FILEs again.
 --no-voice starts without the microphone link.
+--volume is the gain of every FILE (0 to 1) and --playback-volume-after changes
+the gain of the first FILE. --loop makes every FILE loop, --loop-off-after ends
+the loop of the first FILE, and --restart-after starts it again from the
+beginning. --position-after prints \"position ELAPSED_MS DURATION_MS\" for the
+first FILE (\"unknown\" for a missing duration, \"position none\" when it is over).
+--fade-out is how long a stopped FILE takes to fade out (0 by default).
+--start-after waits before the first playback, so a recorder can be ready.
 The device lists are printed after the start and whenever they change.";
 
 #[derive(Default)]
@@ -70,6 +80,12 @@ struct Args {
     mic_after: Option<(Duration, Option<String>)>,
     monitor_after: Option<(Duration, Option<String>)>,
     replay_after: Option<Duration>,
+    options: PlayOptions,
+    playback_volume_after: Option<(Duration, f64)>,
+    loop_off_after: Option<Duration>,
+    restart_after: Option<Duration>,
+    position_after: Option<Duration>,
+    start_after: Option<Duration>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -113,6 +129,16 @@ fn parse_args() -> Result<Args, String> {
                 parsed.monitor_after = seconds(value()?)?.zip(Some(device(value()?)));
             }
             "--replay-after" => parsed.replay_after = seconds(value()?)?,
+            "--volume" => parsed.options.volume = volume(value()?)?,
+            "--playback-volume-after" => {
+                parsed.playback_volume_after = seconds(value()?)?.zip(Some(volume(value()?)?));
+            }
+            "--loop" => parsed.options.looping = true,
+            "--loop-off-after" => parsed.loop_off_after = seconds(value()?)?,
+            "--restart-after" => parsed.restart_after = seconds(value()?)?,
+            "--position-after" => parsed.position_after = seconds(value()?)?,
+            "--start-after" => parsed.start_after = seconds(value()?)?,
+            "--fade-out" => parsed.config.fade_out = seconds(value()?)?.unwrap_or_default(),
             _ if arg.starts_with('-') => return Err(format!("unknown option: {arg}")),
             _ => parsed.files.push(PathBuf::from(&arg)),
         }
@@ -134,7 +160,7 @@ struct Poc {
 impl Poc {
     fn play_all(&self) {
         for file in &self.args.files {
-            match self.engine.play(file) {
+            match self.engine.play(file, self.args.options) {
                 Ok(id) => self.playing.borrow_mut().push(id),
                 Err(error) => self.playback_failed(&error),
             }
@@ -221,6 +247,36 @@ impl Poc {
                 poc.engine.set_monitor(name);
             });
         }
+        if let (Some((delay, gain)), Some(id)) = (self.args.playback_volume_after, first) {
+            self.schedule(Some(delay), move |poc| {
+                poc.engine.set_playback_volume(id, gain);
+                println!("playback volume set to {gain}");
+            });
+        }
+        self.schedule(self.args.loop_off_after, move |poc| {
+            if let Some(id) = first {
+                poc.engine.set_playback_loop(id, false);
+                println!("loop turned off");
+            }
+        });
+        self.schedule(self.args.restart_after, move |poc| {
+            if let Some(id) = first {
+                poc.engine.restart(id);
+                println!("restarted the first file");
+            }
+        });
+        self.schedule(self.args.position_after, move |poc| {
+            match first.and_then(|id| poc.engine.position(id)) {
+                Some(position) => println!(
+                    "position {} {}",
+                    position.elapsed.as_millis(),
+                    position
+                        .duration
+                        .map_or("unknown".into(), |duration| duration.as_millis().to_string())
+                ),
+                None => println!("position none"),
+            }
+        });
         self.schedule(self.args.replay_after, |poc| {
             println!("playing the files again");
             poc.play_all();
@@ -308,7 +364,13 @@ fn main() -> ExitCode {
                 match event {
                     Event::NodeCreated(id) => {
                         println!("virtual microphone created, node id {id}");
-                        poc.start();
+                        match poc.args.start_after {
+                            Some(delay) => {
+                                let poc = poc.clone();
+                                glib::timeout_add_local_once(delay, move || poc.start());
+                            }
+                            None => poc.start(),
+                        }
                     }
                     Event::MicLinked {
                         name,

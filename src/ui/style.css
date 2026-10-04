@@ -23,6 +23,239 @@ gridview.pads > child {
   outline-offset: -3px;
 }
 
+/* Without audio a pad cannot play, but its menu still works. */
+.no-audio .pad > overlay {
+  opacity: 0.5;
+}
+
+.pad .loop-mark {
+  opacity: 0.7;
+}
+
+.pad .progress {
+  font-size: 11px;
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.pad .progress progressbar > trough,
+.pad .progress progressbar > trough > progress {
+  min-width: 16px;
+  min-height: 4px;
+  border-radius: 2px;
+}
+
+/* The palette: the color mixed into the card, and a stronger step of it for
+   the border and the bar while the pad plays (the dark style picks a bright step
+   below). */
+.pad.blue {
+  background-color: color-mix(in srgb, var(--blue-3) 35%, var(--card-bg-color));
+}
+
+.pad.blue.playing {
+  outline-color: var(--blue-4);
+}
+
+.pad.blue .progress progressbar > trough > progress {
+  background-color: var(--blue-4);
+}
+
+.pad.green {
+  background-color: color-mix(in srgb, var(--green-3) 35%, var(--card-bg-color));
+}
+
+.pad.green.playing {
+  outline-color: var(--green-4);
+}
+
+.pad.green .progress progressbar > trough > progress {
+  background-color: var(--green-4);
+}
+
+.pad.yellow {
+  background-color: color-mix(in srgb, var(--yellow-3) 35%, var(--card-bg-color));
+}
+
+.pad.yellow.playing {
+  outline-color: var(--yellow-4);
+}
+
+.pad.yellow .progress progressbar > trough > progress {
+  background-color: var(--yellow-4);
+}
+
+.pad.orange {
+  background-color: color-mix(in srgb, var(--orange-3) 35%, var(--card-bg-color));
+}
+
+.pad.orange.playing {
+  outline-color: var(--orange-4);
+}
+
+.pad.orange .progress progressbar > trough > progress {
+  background-color: var(--orange-4);
+}
+
+.pad.red {
+  background-color: color-mix(in srgb, var(--red-3) 35%, var(--card-bg-color));
+}
+
+.pad.red.playing {
+  outline-color: var(--red-4);
+}
+
+.pad.red .progress progressbar > trough > progress {
+  background-color: var(--red-4);
+}
+
+.pad.purple {
+  background-color: color-mix(in srgb, var(--purple-3) 35%, var(--card-bg-color));
+}
+
+.pad.purple.playing {
+  outline-color: var(--purple-4);
+}
+
+.pad.purple .progress progressbar > trough > progress {
+  background-color: var(--purple-4);
+}
+
+.pad.brown {
+  background-color: color-mix(in srgb, var(--brown-3) 35%, var(--card-bg-color));
+}
+
+.pad.brown.playing {
+  outline-color: var(--brown-4);
+}
+
+.pad.brown .progress progressbar > trough > progress {
+  background-color: var(--brown-4);
+}
+
+/* The dark style needs the bright end of the palette to stand out. */
+@media (prefers-color-scheme: dark) {
+  .pad.blue.playing {
+    outline-color: var(--blue-1);
+  }
+
+  .pad.blue .progress progressbar > trough > progress {
+    background-color: var(--blue-1);
+  }
+
+  .pad.green.playing {
+    outline-color: var(--green-1);
+  }
+
+  .pad.green .progress progressbar > trough > progress {
+    background-color: var(--green-1);
+  }
+
+  .pad.yellow.playing {
+    outline-color: var(--yellow-1);
+  }
+
+  .pad.yellow .progress progressbar > trough > progress {
+    background-color: var(--yellow-1);
+  }
+
+  .pad.orange.playing {
+    outline-color: var(--orange-1);
+  }
+
+  .pad.orange .progress progressbar > trough > progress {
+    background-color: var(--orange-1);
+  }
+
+  .pad.red.playing {
+    outline-color: var(--red-1);
+  }
+
+  .pad.red .progress progressbar > trough > progress {
+    background-color: var(--red-1);
+  }
+
+  .pad.purple.playing {
+    outline-color: var(--purple-1);
+  }
+
+  .pad.purple .progress progressbar > trough > progress {
+    background-color: var(--purple-1);
+  }
+
+  .pad.brown.playing {
+    outline-color: var(--brown-1);
+  }
+
+  .pad.brown .progress progressbar > trough > progress {
+    background-color: var(--brown-1);
+  }
+}
+
+.playing-counter {
+  padding: 12px 40px 4px 12px;
+}
+
+.playing-dot {
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 4px;
+  background-color: var(--success-bg-color);
+}
+
+/* The colors of the dialog that edits a pad. */
+.swatch {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.swatch image {
+  opacity: 0;
+}
+
+.swatch:checked image {
+  opacity: 1;
+}
+
+.swatch.none {
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+.swatch.blue {
+  background-color: var(--blue-3);
+  color: white;
+}
+
+.swatch.green {
+  background-color: var(--green-3);
+  color: white;
+}
+
+.swatch.yellow {
+  background-color: var(--yellow-3);
+  color: white;
+}
+
+.swatch.orange {
+  background-color: var(--orange-3);
+  color: white;
+}
+
+.swatch.red {
+  background-color: var(--red-3);
+  color: white;
+}
+
+.swatch.purple {
+  background-color: var(--purple-3);
+  color: white;
+}
+
+.swatch.brown {
+  background-color: var(--brown-3);
+  color: white;
+}
+
 .tab-switcher {
   padding: 12px 40px 4px;
 }

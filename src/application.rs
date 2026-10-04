@@ -20,21 +20,30 @@
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::OnceLock;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use glib::subclass::Signal;
 use gtk::{gio, glib};
-use vinheta::audio::{self, AudioEngine, Config, Device, Event, PlaybackId};
+use vinheta::audio::{self, AudioEngine, Config, Device, Event, PlayOptions, PlaybackId};
 use vinheta::devices::{self, Entry};
+use vinheta::pads::{self, PadSettings, PadStore, Trigger, TriggerMode};
 
 use crate::config::VERSION;
 use crate::sound::Sound;
 use crate::ui::preferences_dialog::PreferencesDialog;
 use crate::{VinhetaWindow, APP_ID};
+
+/// How long a stopped sound fades out when "Fade Out on Stop" is on.
+const FADE_OUT: Duration = Duration::from_millis(300);
+/// How often the times of the playing pads are updated.
+const POSITION_INTERVAL: Duration = Duration::from_millis(100);
+/// Changes of the pad settings are written at most this often.
+const SAVE_DELAY: Duration = Duration::from_millis(500);
 
 /// The two device selectors: the settings key of each, and its list.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -57,6 +66,14 @@ fn device_setting(settings: &gio::Settings, key: &str) -> Option<String> {
     Some(settings.string(key).to_string()).filter(|name| !name.is_empty())
 }
 
+fn fade_out(settings: &gio::Settings) -> Duration {
+    if settings.boolean("fade-out-on-stop") {
+        FADE_OUT
+    } else {
+        Duration::ZERO
+    }
+}
+
 mod imp {
     use super::*;
 
@@ -73,6 +90,13 @@ mod imp {
         /// keep naming a chosen device after it is removed.
         pub descriptions: RefCell<HashMap<String, String>>,
         pub preferences: glib::WeakRef<PreferencesDialog>,
+        /// What the user set for each pad, stored in `pads_file`.
+        pub pads: RefCell<PadStore>,
+        pub pads_file: OnceCell<PathBuf>,
+        /// Set while a change of `pads` waits to be written.
+        pub save_timer: RefCell<Option<glib::SourceId>>,
+        /// Only exists while a sound plays.
+        pub position_timer: RefCell<Option<glib::SourceId>>,
     }
 
     #[glib::object_subclass]
@@ -101,11 +125,19 @@ mod imp {
     impl ApplicationImpl for VinhetaApplication {
         fn startup(&self) {
             self.parent_startup();
+            self.obj().load_pads();
             self.obj().start_audio();
         }
 
         // Dropping the engine is what removes the virtual microphone.
         fn shutdown(&self) {
+            if let Some(timer) = self.save_timer.take() {
+                timer.remove();
+                self.obj().save_pads();
+            }
+            if let Some(timer) = self.position_timer.take() {
+                timer.remove();
+            }
             self.playing.borrow_mut().clear();
             self.engine.take();
             self.parent_shutdown();
@@ -164,6 +196,26 @@ impl VinhetaApplication {
                 }
             })
             .build();
+        let sound_action = |name: &str, activate: fn(&Self, &Sound)| {
+            gio::ActionEntry::builder(name)
+                .parameter_type(Some(glib::VariantTy::STRING))
+                .activate(move |app: &Self, _, path| {
+                    let path = path.and_then(|path| path.str());
+                    if let Some(sound) = path.and_then(|path| app.find_sound(path)) {
+                        activate(app, &sound);
+                    }
+                })
+                .build()
+        };
+        let stop_sound_action = sound_action("stop-sound", Self::stop_sound);
+        let toggle_loop_action = sound_action("toggle-loop", |app, sound| {
+            let mut settings = sound.settings();
+            settings.looping = !settings.looping;
+            app.update_sound(sound, settings);
+        });
+        let reset_sound_action = sound_action("reset-sound", |app, sound| {
+            app.update_sound(sound, PadSettings::default());
+        });
         let stop_all_action = gio::ActionEntry::builder("stop-all")
             .activate(move |app: &Self, _, _| app.stop_all())
             .build();
@@ -175,6 +227,9 @@ impl VinhetaApplication {
             about_action,
             preferences_action,
             toggle_sound_action,
+            stop_sound_action,
+            toggle_loop_action,
+            reset_sound_action,
             stop_all_action,
         ]);
         self.update_playing();
@@ -189,6 +244,7 @@ impl VinhetaApplication {
             monitor_volume: audio::slider_gain(settings.double("monitor-volume")),
             send_to_call: settings.boolean("send-sounds-to-call"),
             include_voice: settings.boolean("include-my-voice"),
+            fade_out: fade_out(&settings),
         };
         match AudioEngine::start(config) {
             Ok((engine, events)) => {
@@ -225,6 +281,7 @@ impl VinhetaApplication {
                         }
                         "microphone" => engine.set_microphone(device_setting(settings, key)),
                         "monitor-output" => engine.set_monitor(device_setting(settings, key)),
+                        "fade-out-on-stop" => engine.set_fade_out(fade_out(settings)),
                         _ => {}
                     }
                 }
@@ -254,40 +311,154 @@ impl VinhetaApplication {
         }
     }
 
+    fn load_pads(&self) {
+        let file = glib::user_data_dir().join("vinheta").join("pads.json");
+        match PadStore::load(&file) {
+            Ok(pads) => {
+                self.imp().pads.replace(pads);
+            }
+            // The file is set aside, so that the next save does not destroy it.
+            Err(error) => {
+                let aside = file.with_extension("json.corrupt");
+                glib::g_warning!(
+                    "vinheta",
+                    "{}: {error}; moving it to {}",
+                    file.display(),
+                    aside.display()
+                );
+                if let Err(error) = std::fs::rename(&file, &aside) {
+                    glib::g_warning!("vinheta", "could not move it: {error}");
+                }
+            }
+        }
+        self.imp().pads_file.set(file).unwrap();
+    }
+
+    fn save_pads(&self) {
+        let imp = self.imp();
+        let Some(file) = imp.pads_file.get() else { return };
+        if let Err(error) = imp.pads.borrow().save(file) {
+            glib::g_warning!("vinheta", "could not save {}: {error}", file.display());
+        }
+    }
+
+    fn schedule_save(&self) {
+        let mut timer = self.imp().save_timer.borrow_mut();
+        if timer.is_some() {
+            return;
+        }
+        *timer = Some(glib::timeout_add_local_once(
+            SAVE_DELAY,
+            glib::clone!(
+                #[weak(rename_to = app)]
+                self,
+                move || {
+                    app.imp().save_timer.take();
+                    app.save_pads();
+                }
+            ),
+        ));
+    }
+
+    /// What the user set for the pad of a file.
+    pub fn pad_settings(&self, path: &str) -> PadSettings {
+        self.imp().pads.borrow().get(path)
+    }
+
+    /// The one way to change the settings of a sound: it reaches the pad,
+    /// the file, and the playback of that sound if there is one.
+    pub fn update_sound(&self, sound: &Sound, settings: PadSettings) {
+        let imp = self.imp();
+        let path = sound.path();
+        let settings = {
+            let mut pads = imp.pads.borrow_mut();
+            pads.set(&path, settings);
+            pads.get(&path)
+        };
+        if settings == sound.settings() {
+            return;
+        }
+        if let (Some(engine), Some(id)) = (imp.engine.borrow().as_ref(), self.playback_of(sound)) {
+            engine.set_playback_volume(id, audio::slider_gain(settings.volume));
+            engine.set_playback_loop(id, settings.looping);
+        }
+        sound.set_settings(&settings);
+        self.schedule_save();
+    }
+
+    pub fn find_sound(&self, path: &str) -> Option<Sound> {
+        self.window().and_then(|window| window.find_sound(path))
+    }
+
+    fn playback_of(&self, sound: &Sound) -> Option<PlaybackId> {
+        let playing = self.imp().playing.borrow();
+        let found = playing.iter().find(|(_, playing)| *playing == sound);
+        found.map(|(id, _)| *id)
+    }
+
     fn toggle_sound(&self, path: &str) {
         let imp = self.imp();
-        let Some(sound) = self.window().and_then(|window| window.find_sound(path)) else {
+        let Some(sound) = self.find_sound(path) else {
             return;
         };
         let engine = imp.engine.borrow();
         let Some(engine) = engine.as_ref() else { return };
 
-        let playing = imp
-            .playing
-            .borrow()
-            .iter()
-            .find(|(_, playing)| **playing == sound)
-            .map(|(id, _)| *id);
-        if let Some(id) = playing {
-            engine.stop(id);
-            self.playback_ended(id);
-            return;
+        let mode = TriggerMode::from_name(&imp.settings.get().unwrap().string("trigger-mode"));
+        let playing = self.playback_of(&sound);
+        match (pads::trigger(mode, playing.is_some()), playing) {
+            (Trigger::Stop, Some(id)) => {
+                engine.stop(id);
+                self.playback_ended(id);
+            }
+            (Trigger::Restart, Some(id)) => {
+                engine.restart(id);
+                sound.set_position(None);
+            }
+            (Trigger::StartAlone, _) => {
+                let others: Vec<_> = imp.playing.borrow().keys().copied().collect();
+                for id in others {
+                    engine.stop(id);
+                    self.playback_ended(id);
+                }
+                self.start_sound(engine, &sound);
+            }
+            _ => self.start_sound(engine, &sound),
         }
+    }
 
+    fn start_sound(&self, engine: &AudioEngine, sound: &Sound) {
+        let options = PlayOptions {
+            volume: audio::slider_gain(sound.volume()),
+            looping: sound.looping(),
+        };
         let started = Instant::now();
-        let result = engine.play(sound.path());
-        glib::g_debug!("vinheta", "starting {path} took {:?}", started.elapsed());
+        let result = engine.play(sound.path(), options);
+        glib::g_debug!(
+            "vinheta",
+            "starting {} took {:?}",
+            sound.path(),
+            started.elapsed()
+        );
         match result {
             Ok(id) => {
-                imp.playing.borrow_mut().insert(id, sound.clone());
+                self.imp().playing.borrow_mut().insert(id, sound.clone());
                 sound.set_playing(true);
                 self.update_playing();
             }
             Err(error) => {
                 glib::g_warning!("vinheta", "{error}");
-                self.toast_playback_failure(&sound);
+                self.toast_playback_failure(sound);
             }
         }
+    }
+
+    fn stop_sound(&self, sound: &Sound) {
+        let Some(id) = self.playback_of(sound) else { return };
+        if let Some(engine) = self.imp().engine.borrow().as_ref() {
+            engine.stop(id);
+        }
+        self.playback_ended(id);
     }
 
     fn stop_all(&self) {
@@ -301,6 +472,7 @@ impl VinhetaApplication {
     fn playback_ended(&self, id: PlaybackId) -> Option<Sound> {
         let sound = self.imp().playing.borrow_mut().remove(&id)?;
         sound.set_playing(false);
+        sound.set_position(None);
         self.update_playing();
         Some(sound)
     }
@@ -309,19 +481,63 @@ impl VinhetaApplication {
         let playing = std::mem::take(&mut *self.imp().playing.borrow_mut());
         for sound in playing.values() {
             sound.set_playing(false);
+            sound.set_position(None);
         }
         self.update_playing();
     }
 
     fn update_playing(&self) {
-        let any = !self.imp().playing.borrow().is_empty();
+        let imp = self.imp();
+        let count = imp.playing.borrow().len();
         if let Some(action) = self.lookup_action("stop-all") {
             if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
-                action.set_enabled(any);
+                action.set_enabled(count > 0);
             }
         }
         if let Some(window) = self.window() {
-            window.set_any_playing(any);
+            window.set_playing_count(count);
+        }
+
+        // The timer only exists while a sound plays.
+        let mut timer = imp.position_timer.borrow_mut();
+        if count == 0 {
+            if let Some(timer) = timer.take() {
+                timer.remove();
+            }
+        } else if timer.is_none() {
+            *timer = Some(glib::timeout_add_local(
+                POSITION_INTERVAL,
+                glib::clone!(
+                    #[weak(rename_to = app)]
+                    self,
+                    #[upgrade_or]
+                    glib::ControlFlow::Break,
+                    move || {
+                        app.update_positions();
+                        glib::ControlFlow::Continue
+                    }
+                ),
+            ));
+        }
+    }
+
+    fn update_positions(&self) {
+        let imp = self.imp();
+        let engine = imp.engine.borrow();
+        let Some(engine) = engine.as_ref() else { return };
+        // Notifying may reach back into the application.
+        let playing: Vec<_> = imp
+            .playing
+            .borrow()
+            .iter()
+            .map(|(id, sound)| (*id, sound.clone()))
+            .collect();
+        let millis = |time: Duration| i64::try_from(time.as_millis()).unwrap_or(i64::MAX);
+        for (id, sound) in playing {
+            let position = engine.position(id);
+            sound.set_position(
+                position.map(|position| (millis(position.elapsed), position.duration.map(millis))),
+            );
         }
     }
 
@@ -384,7 +600,7 @@ impl VinhetaApplication {
     fn toast_playback_failure(&self, sound: &Sound) {
         if let Some(window) = self.window() {
             // Translators: {} is the name of a sound.
-            window.toast(&gettext("Could not play “{}”").replace("{}", &sound.name()));
+            window.toast(&gettext("Could not play “{}”").replace("{}", &sound.display_name()));
         }
     }
 

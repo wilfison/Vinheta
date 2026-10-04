@@ -20,7 +20,9 @@
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use gettextrs::gettext;
 use gtk::{gio, glib};
+use vinheta::pads::TriggerMode;
 
 use super::device_selector;
 use crate::application::{DeviceKind, VinhetaApplication};
@@ -40,6 +42,10 @@ mod imp {
         pub send_to_call: TemplateChild<adw::SwitchRow>,
         #[template_child]
         pub include_voice: TemplateChild<adw::SwitchRow>,
+        #[template_child]
+        pub trigger_mode: TemplateChild<adw::ComboRow>,
+        #[template_child]
+        pub fade_out: TemplateChild<adw::SwitchRow>,
     }
 
     #[glib::object_subclass]
@@ -67,6 +73,34 @@ mod imp {
             settings
                 .bind("include-my-voice", &*self.include_voice, "active")
                 .build();
+            settings
+                .bind("fade-out-on-stop", &*self.fade_out, "active")
+                .build();
+
+            // The entries of the row are in the order of `TriggerMode::ALL`.
+            self.trigger_mode.connect_selected_notify(|row| {
+                let mode = TriggerMode::ALL.get(row.selected() as usize);
+                row.set_subtitle(&match mode.copied().unwrap_or_default() {
+                    TriggerMode::Overlap => {
+                        gettext("Sounds play together; a click on a playing pad stops it")
+                    }
+                    TriggerMode::Restart => gettext("A click on a playing pad starts it again"),
+                    TriggerMode::StopOthers => gettext("Starting a pad stops every other sound"),
+                });
+            });
+            settings
+                .bind("trigger-mode", &*self.trigger_mode, "selected")
+                .mapping(|value, _| {
+                    let mode = TriggerMode::from_name(value.str()?);
+                    let position = TriggerMode::ALL.iter().position(|other| *other == mode)?;
+                    Some((position as u32).to_value())
+                })
+                .set_mapping(|value, _| {
+                    let position = value.get::<u32>().ok()? as usize;
+                    Some(TriggerMode::ALL.get(position)?.name().to_variant())
+                })
+                .build();
+            self.trigger_mode.notify("selected");
         }
     }
 

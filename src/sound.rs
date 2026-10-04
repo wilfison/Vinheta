@@ -18,24 +18,66 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::cell::{Cell, OnceCell};
+use std::cell::{Cell, OnceCell, RefCell};
 
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
+use vinheta::pads::{PadColor, PadSettings};
 
 mod imp {
     use super::*;
 
-    #[derive(Default, glib::Properties)]
+    #[derive(glib::Properties)]
     #[properties(wrapper_type = super::Sound)]
     pub struct Sound {
         #[property(get, construct_only)]
         path: OnceCell<String>,
+        /// The name from the file.
         #[property(get, construct_only)]
         name: OnceCell<String>,
         #[property(get, set)]
         playing: Cell<bool>,
+        /// The custom name, or the name from the file.
+        #[property(get = Self::display_name, name = "display-name", type = String)]
+        pub custom_name: RefCell<Option<String>>,
+        /// The palette name, or empty.
+        #[property(get)]
+        pub color: RefCell<String>,
+        /// A slider position, 0 to 1.
+        #[property(get)]
+        pub volume: Cell<f64>,
+        #[property(get)]
+        pub looping: Cell<bool>,
+        /// Milliseconds into the playback, -1 while not known.
+        #[property(get)]
+        pub elapsed: Cell<i64>,
+        /// Milliseconds, -1 while not known.
+        #[property(get)]
+        pub duration: Cell<i64>,
+    }
+
+    impl Default for Sound {
+        fn default() -> Self {
+            Self {
+                path: OnceCell::new(),
+                name: OnceCell::new(),
+                playing: Cell::new(false),
+                custom_name: RefCell::new(None),
+                color: RefCell::default(),
+                volume: Cell::new(1.0),
+                looping: Cell::new(false),
+                elapsed: Cell::new(-1),
+                duration: Cell::new(-1),
+            }
+        }
+    }
+
+    impl Sound {
+        fn display_name(&self) -> String {
+            let custom = self.custom_name.borrow().clone();
+            custom.unwrap_or_else(|| self.name.get().cloned().unwrap_or_default())
+        }
     }
 
     #[glib::object_subclass]
@@ -54,10 +96,54 @@ glib::wrapper! {
 }
 
 impl Sound {
-    pub fn new(path: &str, name: &str) -> Self {
-        glib::Object::builder()
+    pub fn new(path: &str, name: &str, settings: &PadSettings) -> Self {
+        let sound: Self = glib::Object::builder()
             .property("path", path)
             .property("name", name)
-            .build()
+            .build();
+        sound.set_settings(settings);
+        sound
+    }
+
+    /// What the user set for this pad.
+    pub fn settings(&self) -> PadSettings {
+        let imp = self.imp();
+        PadSettings {
+            name: imp.custom_name.borrow().clone(),
+            color: PadColor::from_name(&imp.color.borrow()),
+            volume: imp.volume.get(),
+            looping: imp.looping.get(),
+        }
+    }
+
+    /// Only the application calls this, which also stores the settings.
+    pub fn set_settings(&self, settings: &PadSettings) {
+        let imp = self.imp();
+        let color = settings.color.map(PadColor::name).unwrap_or_default();
+        if imp.custom_name.replace(settings.name.clone()) != settings.name {
+            self.notify_display_name();
+        }
+        if imp.color.replace(color.to_owned()) != color {
+            self.notify_color();
+        }
+        if imp.volume.replace(settings.volume) != settings.volume {
+            self.notify_volume();
+        }
+        if imp.looping.replace(settings.looping) != settings.looping {
+            self.notify_looping();
+        }
+    }
+
+    /// How far along the playback is, or `None` when it is not known.
+    pub fn set_position(&self, position: Option<(i64, Option<i64>)>) {
+        let imp = self.imp();
+        let (elapsed, duration) = position.unwrap_or((-1, None));
+        let duration = duration.unwrap_or(-1);
+        if imp.duration.replace(duration) != duration {
+            self.notify_duration();
+        }
+        if imp.elapsed.replace(elapsed) != elapsed {
+            self.notify_elapsed();
+        }
     }
 }

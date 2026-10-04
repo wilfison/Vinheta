@@ -18,13 +18,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::Path;
+use std::time::Duration;
 
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
-use gtk::glib;
 use gtk::prelude::*;
+use gtk::{gdk, gio, glib};
+use vinheta::pads::{self, PadColor, PadSettings};
 
 use crate::sound::Sound;
 
@@ -36,7 +38,23 @@ mod imp {
     pub struct SoundPad {
         #[template_child]
         pub label: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub loop_icon: TemplateChild<gtk::Image>,
+        #[template_child]
+        pub progress: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub bar: TemplateChild<gtk::ProgressBar>,
+        #[template_child]
+        pub elapsed: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub remaining: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub menu: TemplateChild<gio::MenuModel>,
         pub sound: RefCell<Option<(Sound, glib::SignalHandlerId)>>,
+        pub actions: gio::SimpleActionGroup,
+        pub popover: RefCell<Option<gtk::PopoverMenu>>,
+        /// The second last told to assistive technology, -1 for none.
+        pub described: Cell<i64>,
     }
 
     #[glib::object_subclass]
@@ -54,8 +72,54 @@ mod imp {
         }
     }
 
-    impl ObjectImpl for SoundPad {}
-    impl WidgetImpl for SoundPad {}
+    impl ObjectImpl for SoundPad {
+        fn constructed(&self) {
+            self.parent_constructed();
+            let obj = self.obj();
+            obj.setup_actions();
+
+            // A secondary click does not activate the item of a grid view.
+            let click = gtk::GestureClick::builder()
+                .button(gdk::BUTTON_SECONDARY)
+                .build();
+            click.connect_pressed(glib::clone!(
+                #[weak]
+                obj,
+                move |click, _, x, y| {
+                    click.set_state(gtk::EventSequenceState::Claimed);
+                    obj.open_menu(Some((x, y)));
+                }
+            ));
+            obj.add_controller(click);
+
+            let long_press = gtk::GestureLongPress::builder().touch_only(true).build();
+            long_press.connect_pressed(glib::clone!(
+                #[weak]
+                obj,
+                move |long_press, x, y| {
+                    long_press.set_state(gtk::EventSequenceState::Claimed);
+                    obj.open_menu(Some((x, y)));
+                }
+            ));
+            obj.add_controller(long_press);
+        }
+
+        fn dispose(&self) {
+            if let Some(popover) = self.popover.take() {
+                popover.unparent();
+            }
+        }
+    }
+
+    impl WidgetImpl for SoundPad {
+        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+            self.parent_size_allocate(width, height, baseline);
+            if let Some(popover) = self.popover.borrow().as_ref() {
+                popover.present();
+            }
+        }
+    }
+
     impl BinImpl for SoundPad {}
 }
 
@@ -72,36 +136,196 @@ impl Default for SoundPad {
 }
 
 impl SoundPad {
-    /// Shows the given sound and follows its playing state, or lets go of the
-    /// current one.
+    /// Shows the given sound and follows its properties, or lets go of the
+    /// current one. Pads are recycled, so nothing of the old sound may stay.
     pub fn set_sound(&self, sound: Option<&Sound>) {
-        if let Some((old, handler)) = self.imp().sound.take() {
+        let imp = self.imp();
+        if let Some((old, handler)) = imp.sound.take() {
             old.disconnect(handler);
         }
+        if let Some(popover) = imp.popover.borrow().as_ref() {
+            popover.popdown();
+        }
         let Some(sound) = sound else { return };
+        imp.described.set(i64::MIN);
 
-        self.imp().label.set_label(&sound.name());
         let file_name = Path::new(&sound.path())
             .file_name()
             .map(|name| name.to_string_lossy().into_owned());
         self.set_tooltip_text(file_name.as_deref());
 
-        let handler = sound.connect_playing_notify(glib::clone!(
-            #[weak(rename_to = pad)]
-            self,
-            move |sound| pad.show_playing(sound.playing())
-        ));
-        self.show_playing(sound.playing());
-        self.imp().sound.replace(Some((sound.clone(), handler)));
+        let handler = sound.connect_notify_local(
+            None,
+            glib::clone!(
+                #[weak(rename_to = pad)]
+                self,
+                move |sound, property| match property.name() {
+                    "elapsed" | "duration" => pad.show_position(sound),
+                    _ => pad.show_sound(sound),
+                }
+            ),
+        );
+        self.show_sound(sound);
+        imp.sound.replace(Some((sound.clone(), handler)));
     }
 
-    fn show_playing(&self, playing: bool) {
-        if playing {
+    fn sound(&self) -> Option<Sound> {
+        let sound = self.imp().sound.borrow();
+        sound.as_ref().map(|(sound, _)| sound.clone())
+    }
+
+    fn show_sound(&self, sound: &Sound) {
+        let imp = self.imp();
+        imp.label.set_label(&sound.display_name());
+        imp.loop_icon.set_visible(sound.looping());
+        let color = sound.color();
+        for other in PadColor::ALL {
+            if other.name() == color {
+                self.add_css_class(other.name());
+            } else {
+                self.remove_css_class(other.name());
+            }
+        }
+        if sound.playing() {
             self.add_css_class("playing");
-            self.update_property(&[gtk::accessible::Property::Description(&gettext("Playing"))]);
         } else {
             self.remove_css_class("playing");
-            self.reset_property(gtk::AccessibleProperty::Description);
         }
+        self.show_position(sound);
+
+        let set = |name: &str, enabled: bool| {
+            if let Some(action) = imp.actions.lookup_action(name).and_downcast::<gio::SimpleAction>() {
+                action.set_enabled(enabled);
+            }
+        };
+        set("stop", sound.playing());
+        set("reset", sound.settings() != PadSettings::default());
+        imp.actions
+            .change_action_state("loop", &sound.looping().to_variant());
+    }
+
+    /// The times and the bar only exist while the sound plays. Without a
+    /// duration there is only the elapsed time.
+    fn show_position(&self, sound: &Sound) {
+        let imp = self.imp();
+        let time = |millis: i64| Duration::from_millis(millis.max(0).unsigned_abs());
+        let (elapsed, duration) = (sound.elapsed(), sound.duration());
+        let known = sound.playing() && elapsed >= 0;
+        imp.progress.set_visible(known);
+        if known {
+            imp.elapsed.set_label(&pads::format_time(time(elapsed)));
+            imp.bar.set_opacity(if duration > 0 { 1.0 } else { 0.0 });
+            if duration > 0 {
+                let left = time(duration.saturating_sub(elapsed));
+                imp.remaining.set_label(&pads::format_remaining(left));
+                imp.bar
+                    .set_fraction((elapsed as f64 / duration as f64).clamp(0.0, 1.0));
+            } else {
+                imp.remaining.set_label("");
+            }
+        }
+
+        // Assistive technology is told once per second at most.
+        let second = match (sound.playing(), known) {
+            (false, _) => -2,
+            (true, false) => -1,
+            (true, true) => elapsed / 1000,
+        };
+        if imp.described.replace(second) == second {
+            return;
+        }
+        if !sound.playing() {
+            self.reset_property(gtk::AccessibleProperty::Description);
+            return;
+        }
+        let description = if !known {
+            gettext("Playing")
+        } else if duration > 0 {
+            // Translators: the first {} is the elapsed time of a sound, the
+            // second {} is its duration, as in "Playing, 00:23 of 01:35".
+            gettext("Playing, {} of {}")
+                .replacen("{}", &pads::format_time(time(elapsed)), 1)
+                .replacen("{}", &pads::format_time(time(duration)), 1)
+        } else {
+            // Translators: {} is the elapsed time of a sound, as in "Playing, 00:23".
+            gettext("Playing, {}").replace("{}", &pads::format_time(time(elapsed)))
+        };
+        self.update_property(&[gtk::accessible::Property::Description(&description)]);
+    }
+
+    /// The actions of the context menu. They go through the application and
+    /// the window, which is where anything else changes a sound.
+    fn setup_actions(&self) {
+        let forward = |name: &'static str, target: &'static str| {
+            gio::ActionEntry::builder(name)
+                .activate(glib::clone!(
+                    #[weak(rename_to = pad)]
+                    self,
+                    move |_: &gio::SimpleActionGroup, _, _| {
+                        if let Some(sound) = pad.sound() {
+                            let _ = pad.activate_action(target, Some(&sound.path().to_variant()));
+                        }
+                    }
+                ))
+                .build()
+        };
+        let looping = gio::ActionEntry::builder("loop")
+            .state(false.to_variant())
+            .activate(glib::clone!(
+                #[weak(rename_to = pad)]
+                self,
+                move |_: &gio::SimpleActionGroup, _, _| {
+                    if let Some(sound) = pad.sound() {
+                        let path = sound.path().to_variant();
+                        let _ = pad.activate_action("app.toggle-loop", Some(&path));
+                    }
+                }
+            ))
+            .build();
+        let actions = &self.imp().actions;
+        actions.add_action_entries([
+            forward("edit", "win.edit-sound"),
+            forward("stop", "app.stop-sound"),
+            forward("reset", "app.reset-sound"),
+            looping,
+        ]);
+        self.insert_action_group("pad", Some(actions));
+    }
+
+    /// Opens the context menu at a position of the pad, or at the pad itself.
+    pub fn open_menu(&self, at: Option<(f64, f64)>) {
+        let imp = self.imp();
+        if self.sound().is_none() {
+            return;
+        }
+        if let Some(old) = imp.popover.take() {
+            old.unparent();
+        }
+        let popover = gtk::PopoverMenu::from_model(Some(&*imp.menu));
+        popover.set_parent(self);
+        if let Some((x, y)) = at {
+            popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+            popover.set_has_arrow(false);
+            popover.set_halign(gtk::Align::Start);
+        }
+        // The item that was chosen still needs the popover for a moment.
+        popover.connect_closed(glib::clone!(
+            #[weak(rename_to = pad)]
+            self,
+            move |popover| {
+                let popover = popover.clone();
+                glib::idle_add_local_once(move || {
+                    let current = pad.imp().popover.borrow().clone();
+                    if current.as_ref() == Some(&popover) {
+                        pad.imp().popover.take();
+                    }
+                    if popover.parent().is_some() {
+                        popover.unparent();
+                    }
+                });
+            }
+        ));
+        imp.popover.replace(Some(popover.clone()));
+        popover.popup();
     }
 }

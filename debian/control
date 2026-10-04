@@ -10,7 +10,7 @@ Build-Depends:
  rustc,
  pkgconf,
  gettext,
- libgtk-4-dev (>= 4.16),
+ libgtk-4-dev (>= 4.20),
  libadwaita-1-dev (>= 1.8),
  libpipewire-0.3-dev,
  libgstreamer1.0-dev,

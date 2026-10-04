@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="VinhetaSoundDialog" parent="AdwDialog">
+    <property name="title" translatable="yes">Edit Sound</property>
+    <property name="content-width">460</property>
+    <property name="child">
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar">
+            <property name="title-widget">
+              <object class="AdwWindowTitle" id="title">
+                <property name="title" translatable="yes">Edit Sound</property>
+              </object>
+            </property>
+          </object>
+        </child>
+        <property name="content">
+          <object class="AdwPreferencesPage">
+            <child>
+              <object class="AdwPreferencesGroup">
+                <child>
+                  <object class="AdwEntryRow" id="name">
+                    <property name="title" translatable="yes">Name</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title" translatable="yes">Color</property>
+                    <child type="suffix">
+                      <object class="GtkBox" id="swatches">
+                        <property name="spacing">6</property>
+                        <property name="valign">center</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title" translatable="yes">Volume</property>
+                    <child type="suffix">
+                      <object class="GtkScale" id="volume_scale">
+                        <property name="width-request">200</property>
+                        <property name="valign">center</property>
+                        <property name="adjustment">
+                          <object class="GtkAdjustment" id="volume">
+                            <property name="lower">0</property>
+                            <property name="upper">1</property>
+                            <property name="value">1</property>
+                            <property name="step-increment">0.05</property>
+                            <property name="page-increment">0.1</property>
+                          </object>
+                        </property>
+                        <accessibility>
+                          <property name="label" translatable="yes">Volume</property>
+                        </accessibility>
+                      </object>
+                    </child>
+                    <child type="suffix">
+                      <object class="GtkLabel" id="volume_percent">
+                        <property name="xalign">1</property>
+                        <style>
+                          <class name="numeric"/>
+                          <class name="volume-percent"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSwitchRow" id="looping">
+                    <property name="title" translatable="yes">Loop</property>
+                    <property name="subtitle" translatable="yes">Play again and again until stopped</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+</interface>

@@ -11,14 +11,90 @@
       <class name="activatable"/>
     </style>
     <property name="child">
-      <object class="GtkLabel" id="label">
-        <property name="ellipsize">end</property>
-        <property name="lines">2</property>
-        <property name="wrap">True</property>
-        <property name="wrap-mode">word-char</property>
-        <property name="justify">center</property>
-        <property name="max-width-chars">14</property>
+      <!-- The mark and the progress lie over the name, so the name stays
+           centered and does not move when the playback starts. -->
+      <object class="GtkOverlay">
+        <property name="child">
+          <object class="GtkLabel" id="label">
+            <property name="ellipsize">end</property>
+            <property name="lines">2</property>
+            <property name="wrap">True</property>
+            <property name="wrap-mode">word-char</property>
+            <property name="justify">center</property>
+            <property name="max-width-chars">14</property>
+          </object>
+        </property>
+        <child type="overlay">
+          <object class="GtkImage" id="loop_icon">
+            <property name="icon-name">media-playlist-repeat-symbolic</property>
+            <property name="halign">end</property>
+            <property name="valign">start</property>
+            <property name="visible">False</property>
+            <accessibility>
+              <property name="label" translatable="yes">Loops</property>
+            </accessibility>
+            <style>
+              <class name="loop-mark"/>
+            </style>
+          </object>
+        </child>
+        <child type="overlay">
+          <object class="GtkBox" id="progress">
+            <property name="orientation">vertical</property>
+            <property name="spacing">4</property>
+            <property name="valign">end</property>
+            <property name="visible">False</property>
+            <property name="can-target">False</property>
+            <style>
+              <class name="progress"/>
+            </style>
+            <child>
+              <object class="GtkProgressBar" id="bar">
+                <accessibility>
+                  <property name="label" translatable="yes">Progress</property>
+                </accessibility>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox">
+                <child>
+                  <object class="GtkLabel" id="elapsed">
+                    <property name="halign">start</property>
+                    <property name="hexpand">True</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="remaining">
+                    <property name="halign">end</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
       </object>
     </property>
   </template>
+  <menu id="menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">_Edit…</attribute>
+        <attribute name="action">pad.edit</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Loop</attribute>
+        <attribute name="action">pad.loop</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Stop</attribute>
+        <attribute name="action">pad.stop</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">_Reset</attribute>
+        <attribute name="action">pad.reset</attribute>
+      </item>
+    </section>
+  </menu>
 </interface>
