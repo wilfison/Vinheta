@@ -25,8 +25,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gettextrs::gettext;
-use gtk::gio;
 use gtk::prelude::*;
+use gtk::{gio, glib};
 
 use crate::application::{DeviceKind, VinhetaApplication};
 use crate::APP_ID;
@@ -96,8 +96,10 @@ pub fn bind(selector: &impl IsA<gtk::Widget>, app: &VinhetaApplication, kind: De
     settings.connect_changed(None, {
         let refresh = refresh.clone();
         move |_, key| {
+            // Not at once: the key may be changing from inside the activation
+            // of an entry, and the list must outlive it.
             if key == kind.key() || key == "include-my-voice" {
-                refresh();
+                glib::idle_add_local_once(refresh.clone());
             }
         }
     });
