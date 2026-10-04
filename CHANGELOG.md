@@ -13,6 +13,9 @@ The first public release.
 - A virtual microphone named "Vinheta" that carries your voice together with the sounds you play. Choose it as the microphone in your call app.
 - One tab per folder of sounds, kept in sync with the folder while the app runs. Loose files can be added with "Add Sounds…" or dropped on the window.
 - Pads with a name, a color, a volume, a loop, and a key (a letter or a digit) that plays them from any tab.
+- A readable pad name made from the file name, and a border on a playing pad that gets shorter until the sound ends.
+- "Open in Audio Editor" in the menu of a pad, with the editor chosen in the preferences.
+- A context menu on each folder tab to rename, move, or remove it.
 - Favorites in a tab of their own, a search across every folder, and sorting by name or by most recent file.
 - Separate volumes for your headphones and for the call, a microphone selector, and the "Send sounds to call" and "Include my voice" switches.
 - Trigger modes (overlap, restart, stop the others) and a fade out when a sound is stopped.
