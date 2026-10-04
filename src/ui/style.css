@@ -12,15 +12,17 @@ gridview.pads > child {
 .pad {
   min-width: 144px;
   min-height: 96px;
-  padding: 12px;
   font-size: 15px;
   font-weight: bold;
 }
 
-/* An outline is drawn inside the pad, so pads do not move when they start. */
-.pad.playing {
-  outline: 3px solid var(--accent-color);
-  outline-offset: -3px;
+.pad .content {
+  padding: 12px;
+}
+
+/* The border of a pad that plays, which gets shorter as the sound goes on. */
+.pad ring {
+  color: var(--accent-color);
 }
 
 /* Without audio a pad cannot play, but its menu still works. */
@@ -47,162 +49,98 @@ gridview.pads > child {
   color: var(--yellow-4);
 }
 
-.pad .progress {
+.pad .times {
   font-size: 11px;
   font-weight: normal;
   font-variant-numeric: tabular-nums;
 }
 
-.pad .progress progressbar > trough,
-.pad .progress progressbar > trough > progress {
-  min-width: 16px;
-  min-height: 4px;
-  border-radius: 2px;
-}
-
 /* The palette: the color mixed into the card, and a stronger step of it for
-   the border and the bar while the pad plays (the dark style picks a bright step
-   below). */
+   the border while the pad plays (the dark style picks a bright step below). */
 .pad.blue {
   background-color: color-mix(in srgb, var(--blue-3) 35%, var(--card-bg-color));
 }
 
-.pad.blue.playing {
-  outline-color: var(--blue-4);
-}
-
-.pad.blue .progress progressbar > trough > progress {
-  background-color: var(--blue-4);
+.pad.blue ring {
+  color: var(--blue-4);
 }
 
 .pad.green {
   background-color: color-mix(in srgb, var(--green-3) 35%, var(--card-bg-color));
 }
 
-.pad.green.playing {
-  outline-color: var(--green-4);
-}
-
-.pad.green .progress progressbar > trough > progress {
-  background-color: var(--green-4);
+.pad.green ring {
+  color: var(--green-4);
 }
 
 .pad.yellow {
   background-color: color-mix(in srgb, var(--yellow-3) 35%, var(--card-bg-color));
 }
 
-.pad.yellow.playing {
-  outline-color: var(--yellow-4);
-}
-
-.pad.yellow .progress progressbar > trough > progress {
-  background-color: var(--yellow-4);
+.pad.yellow ring {
+  color: var(--yellow-4);
 }
 
 .pad.orange {
   background-color: color-mix(in srgb, var(--orange-3) 35%, var(--card-bg-color));
 }
 
-.pad.orange.playing {
-  outline-color: var(--orange-4);
-}
-
-.pad.orange .progress progressbar > trough > progress {
-  background-color: var(--orange-4);
+.pad.orange ring {
+  color: var(--orange-4);
 }
 
 .pad.red {
   background-color: color-mix(in srgb, var(--red-3) 35%, var(--card-bg-color));
 }
 
-.pad.red.playing {
-  outline-color: var(--red-4);
-}
-
-.pad.red .progress progressbar > trough > progress {
-  background-color: var(--red-4);
+.pad.red ring {
+  color: var(--red-4);
 }
 
 .pad.purple {
   background-color: color-mix(in srgb, var(--purple-3) 35%, var(--card-bg-color));
 }
 
-.pad.purple.playing {
-  outline-color: var(--purple-4);
-}
-
-.pad.purple .progress progressbar > trough > progress {
-  background-color: var(--purple-4);
+.pad.purple ring {
+  color: var(--purple-4);
 }
 
 .pad.brown {
   background-color: color-mix(in srgb, var(--brown-3) 35%, var(--card-bg-color));
 }
 
-.pad.brown.playing {
-  outline-color: var(--brown-4);
-}
-
-.pad.brown .progress progressbar > trough > progress {
-  background-color: var(--brown-4);
+.pad.brown ring {
+  color: var(--brown-4);
 }
 
 /* The dark style needs the bright end of the palette to stand out. */
 @media (prefers-color-scheme: dark) {
-  .pad.blue.playing {
-    outline-color: var(--blue-1);
+  .pad.blue ring {
+    color: var(--blue-1);
   }
 
-  .pad.blue .progress progressbar > trough > progress {
-    background-color: var(--blue-1);
+  .pad.green ring {
+    color: var(--green-1);
   }
 
-  .pad.green.playing {
-    outline-color: var(--green-1);
+  .pad.yellow ring {
+    color: var(--yellow-1);
   }
 
-  .pad.green .progress progressbar > trough > progress {
-    background-color: var(--green-1);
+  .pad.orange ring {
+    color: var(--orange-1);
   }
 
-  .pad.yellow.playing {
-    outline-color: var(--yellow-1);
+  .pad.red ring {
+    color: var(--red-1);
   }
 
-  .pad.yellow .progress progressbar > trough > progress {
-    background-color: var(--yellow-1);
+  .pad.purple ring {
+    color: var(--purple-1);
   }
 
-  .pad.orange.playing {
-    outline-color: var(--orange-1);
-  }
-
-  .pad.orange .progress progressbar > trough > progress {
-    background-color: var(--orange-1);
-  }
-
-  .pad.red.playing {
-    outline-color: var(--red-1);
-  }
-
-  .pad.red .progress progressbar > trough > progress {
-    background-color: var(--red-1);
-  }
-
-  .pad.purple.playing {
-    outline-color: var(--purple-1);
-  }
-
-  .pad.purple .progress progressbar > trough > progress {
-    background-color: var(--purple-1);
-  }
-
-  .pad.brown.playing {
-    outline-color: var(--brown-1);
-  }
-
-  .pad.brown .progress progressbar > trough > progress {
-    background-color: var(--brown-1);
+  .pad.brown ring {
+    color: var(--brown-1);
   }
 }
 

@@ -29,6 +29,7 @@ use vinheta::pads::{self, PadColor, PadSettings};
 
 use crate::application::VinhetaApplication;
 use crate::sound::Sound;
+use crate::ui::pad_ring::PadRing;
 
 /// How long the highlight of a located pad stays, the length of its animation.
 const BLINK: Duration = Duration::from_millis(1200);
@@ -48,9 +49,9 @@ mod imp {
         #[template_child]
         pub shortcut: TemplateChild<gtk::Label>,
         #[template_child]
-        pub progress: TemplateChild<gtk::Box>,
+        pub times: TemplateChild<gtk::Box>,
         #[template_child]
-        pub bar: TemplateChild<gtk::ProgressBar>,
+        pub ring: TemplateChild<PadRing>,
         #[template_child]
         pub elapsed: TemplateChild<gtk::Label>,
         #[template_child]
@@ -73,6 +74,7 @@ mod imp {
         type ParentType = adw::Bin;
 
         fn class_init(klass: &mut Self::Class) {
+            PadRing::ensure_type();
             klass.bind_template();
         }
 
@@ -159,7 +161,10 @@ impl SoundPad {
             popover.popdown();
         }
         self.end_blink();
-        let Some(sound) = sound else { return };
+        let Some(sound) = sound else {
+            imp.ring.set_position(None);
+            return;
+        };
         imp.described.set(i64::MIN);
 
         let handler = sound.connect_notify_local(
@@ -259,22 +264,21 @@ impl SoundPad {
             .change_action_state("favorite", &sound.favorite().to_variant());
     }
 
-    /// The times and the bar only exist while the sound plays. Without a
-    /// duration there is only the elapsed time.
+    /// The times and the border only exist while the sound plays. Without a
+    /// duration there is only the elapsed time, and the border stays whole.
     fn show_position(&self, sound: &Sound) {
         let imp = self.imp();
         let time = |millis: i64| Duration::from_millis(millis.max(0).unsigned_abs());
         let (elapsed, duration) = (sound.elapsed(), sound.duration());
         let known = sound.playing() && elapsed >= 0;
-        imp.progress.set_visible(known);
+        imp.ring
+            .set_position(sound.playing().then_some((elapsed, duration)));
+        imp.times.set_visible(known);
         if known {
             imp.elapsed.set_label(&pads::format_time(time(elapsed)));
-            imp.bar.set_opacity(if duration > 0 { 1.0 } else { 0.0 });
             if duration > 0 {
                 let left = time(duration.saturating_sub(elapsed));
                 imp.remaining.set_label(&pads::format_remaining(left));
-                imp.bar
-                    .set_fraction((elapsed as f64 / duration as f64).clamp(0.0, 1.0));
             } else {
                 imp.remaining.set_label("");
             }

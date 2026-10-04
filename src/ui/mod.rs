@@ -23,6 +23,7 @@
 pub mod call_guide_dialog;
 pub mod device_selector;
 pub mod folder_page;
+pub mod pad_ring;
 pub mod preferences_dialog;
 pub mod sound_dialog;
 pub mod sound_grid;

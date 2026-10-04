@@ -11,82 +11,76 @@
       <class name="activatable"/>
     </style>
     <property name="child">
-      <!-- The mark and the progress lie over the name, so the name stays
-           centered and does not move when the playback starts. -->
+      <!-- The ring is the border of the pad, so it lies over the padding
+           that the content has. -->
       <object class="GtkOverlay">
         <property name="child">
-          <object class="GtkLabel" id="label">
-            <property name="ellipsize">end</property>
-            <property name="lines">2</property>
-            <property name="wrap">True</property>
-            <property name="wrap-mode">word-char</property>
-            <property name="justify">center</property>
-            <property name="max-width-chars">14</property>
-          </object>
-        </property>
-        <child type="overlay">
-          <object class="GtkLabel" id="shortcut">
-            <property name="halign">start</property>
-            <property name="valign">start</property>
-            <property name="visible">False</property>
-            <property name="can-target">False</property>
-            <property name="accessible-role">presentation</property>
+          <object class="GtkOverlay">
             <style>
-              <class name="keycap"/>
+              <class name="content"/>
             </style>
-          </object>
-        </child>
-        <child type="overlay">
-          <object class="GtkBox">
-            <property name="spacing">6</property>
-            <property name="halign">end</property>
-            <property name="valign">start</property>
-            <property name="can-target">False</property>
-            <child>
-              <object class="GtkImage" id="favorite_icon">
-                <property name="icon-name">starred-symbolic</property>
+            <property name="child">
+              <object class="GtkLabel" id="label">
+                <property name="ellipsize">end</property>
+                <property name="lines">2</property>
+                <property name="wrap">True</property>
+                <property name="wrap-mode">word-char</property>
+                <property name="justify">center</property>
+                <property name="max-width-chars">14</property>
+              </object>
+            </property>
+            <child type="overlay">
+              <object class="GtkLabel" id="shortcut">
+                <property name="halign">start</property>
+                <property name="valign">start</property>
                 <property name="visible">False</property>
-                <accessibility>
-                  <property name="label" translatable="yes">Favorite</property>
-                </accessibility>
+                <property name="can-target">False</property>
+                <property name="accessible-role">presentation</property>
                 <style>
-                  <class name="favorite-mark"/>
+                  <class name="keycap"/>
                 </style>
               </object>
             </child>
-            <child>
-              <object class="GtkImage" id="loop_icon">
-                <property name="icon-name">media-playlist-repeat-symbolic</property>
-                <property name="visible">False</property>
-                <accessibility>
-                  <property name="label" translatable="yes">Loops</property>
-                </accessibility>
-                <style>
-                  <class name="loop-mark"/>
-                </style>
-              </object>
-            </child>
-          </object>
-        </child>
-        <child type="overlay">
-          <object class="GtkBox" id="progress">
-            <property name="orientation">vertical</property>
-            <property name="spacing">4</property>
-            <property name="valign">end</property>
-            <property name="visible">False</property>
-            <property name="can-target">False</property>
-            <style>
-              <class name="progress"/>
-            </style>
-            <child>
-              <object class="GtkProgressBar" id="bar">
-                <accessibility>
-                  <property name="label" translatable="yes">Progress</property>
-                </accessibility>
-              </object>
-            </child>
-            <child>
+            <child type="overlay">
               <object class="GtkBox">
+                <property name="spacing">6</property>
+                <property name="halign">end</property>
+                <property name="valign">start</property>
+                <property name="can-target">False</property>
+                <child>
+                  <object class="GtkImage" id="favorite_icon">
+                    <property name="icon-name">starred-symbolic</property>
+                    <property name="visible">False</property>
+                    <accessibility>
+                      <property name="label" translatable="yes">Favorite</property>
+                    </accessibility>
+                    <style>
+                      <class name="favorite-mark"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkImage" id="loop_icon">
+                    <property name="icon-name">media-playlist-repeat-symbolic</property>
+                    <property name="visible">False</property>
+                    <accessibility>
+                      <property name="label" translatable="yes">Loops</property>
+                    </accessibility>
+                    <style>
+                      <class name="loop-mark"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="overlay">
+              <object class="GtkBox" id="times">
+                <property name="valign">end</property>
+                <property name="visible">False</property>
+                <property name="can-target">False</property>
+                <style>
+                  <class name="times"/>
+                </style>
                 <child>
                   <object class="GtkLabel" id="elapsed">
                     <property name="halign">start</property>
@@ -100,6 +94,12 @@
                 </child>
               </object>
             </child>
+          </object>
+        </property>
+        <child type="overlay">
+          <object class="VinhetaPadRing" id="ring">
+            <property name="can-target">False</property>
+            <property name="accessible-role">presentation</property>
           </object>
         </child>
       </object>

@@ -8,7 +8,7 @@ The hard part of the app is the audio, not the interface: see [audio.md](audio.m
 
 - The window shows one tab per folder, with a grid of pads. A click plays a sound and a second click stops it, through the audio engine (`src/audio/`).
 - A sound plays on the headphones and into the "Vinheta" virtual microphone, which also carries the voice of the user. "Send sounds to call" and "Include my voice" turn each part off.
-- A pad has a name, a color, a volume, a loop option, and a key, edited from its context menu and its dialog and stored in `pads.json`. While it plays it shows its times, a progress bar, and a border, and the tab row shows how many sounds are playing.
+- A pad has a name, a color, a volume, a loop option, and a key, edited from its context menu and its dialog and stored in `pads.json`. While it plays it shows its times and a border that gets shorter as the sound goes on, and the tab row shows how many sounds are playing.
 - The library follows its folders while the app runs (files added, removed, renamed). Loose files are added with "Add Sounds…" or dropped on the window: they are copied into the sounds folder, which is a tab.
 - Pads can be favorites (a star, and a "Favorites" tab), a search finds sounds in every folder and locates them, the pads are sorted by name or by most recent file, and tabs can be renamed and moved.
 - The bottom bar has "Stop all", the "Headphones" and "Call" volume sliders, the microphone selector, and the "Send sounds to call" switch. Below 780 pixels of width it is stacked in rows and the pads get narrower; the window works down to 360 pixels.

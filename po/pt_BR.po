@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-04 00:51-0300\n"
+"POT-Creation-Date: 2026-10-04 12:18-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -32,63 +32,6 @@ msgid "soundboard;sounds;effects;jingle;microphone;call;meeting;stream;"
 msgstr ""
 "soundboard;sons;efeitos;vinheta;efeitos "
 "sonoros;microfone;chamada;reunião;live;"
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:10
-msgid ""
-"Vinheta is a soundboard. Add your folders of sounds, and each one becomes a "
-"tab with a pad per sound: click a pad, or press its key, to play it. Pads "
-"can have a name, a color, a volume, and a loop, and your favorites are kept "
-"in a tab of their own."
-msgstr ""
-"O Vinheta é um soundboard. Adicione suas pastas de sons e cada uma vira uma "
-"aba com um pad por som: clique em um pad, ou pressione a tecla dele, para "
-"tocá-lo. Os pads podem ter nome, cor, volume e repetição, e os seus "
-"favoritos ficam em uma aba própria."
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:11
-msgid ""
-"While it runs, Vinheta provides a virtual microphone named “Vinheta” that "
-"carries your voice together with the sounds you play. Choose it as the "
-"microphone in your call app, and the other side hears both. You hear the "
-"sounds on your own headphones, with a separate volume."
-msgstr ""
-"Enquanto está aberto, o Vinheta oferece um microfone virtual chamado "
-"“Vinheta”, que leva a sua voz junto com os sons que você toca. Escolha-o "
-"como microfone no seu aplicativo de chamadas e o outro lado ouve os dois. "
-"Você ouve os sons nos seus fones, com um volume separado."
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:12
-msgid ""
-"For a call, turn off the noise suppression of the call app (it treats sounds "
-"as noise) and use headphones. Sending sounds to the call can be switched off "
-"at any time, leaving only your own output."
-msgstr ""
-"Para uma chamada, desative a supressão de ruído do aplicativo de chamadas "
-"(ele trata os sons como ruído) e use fones de ouvido. O envio dos sons para "
-"a chamada pode ser desligado a qualquer momento, deixando apenas a sua saída "
-"de áudio."
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:35
-msgid "Pads with colors, keys, and a sound playing"
-msgstr "Pads com cores, teclas e um som tocando"
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:39
-msgid "Audio and playback preferences"
-msgstr "Preferências de áudio e de reprodução"
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:43
-msgid "The call setup guide"
-msgstr "O guia de configuração de chamada"
-
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
-msgid ""
-"The first release: folders as tabs, pads with a name, a color, a volume, a "
-"loop and a key, favorites, search, and a virtual microphone that sends the "
-"sounds to your calls."
-msgstr ""
-"A primeira versão: pastas como abas, pads com nome, cor, volume, repetição e "
-"tecla, favoritos, pesquisa e um microfone virtual que envia os sons para as "
-"suas chamadas."
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:6
 msgid "Sound folders"
@@ -235,6 +178,63 @@ msgstr ""
 "Se o guia de configuração de chamada foi mostrado na primeira execução. "
 "Enquanto for falso, o guia abre sozinho quando o aplicativo inicia com o "
 "áudio funcionando."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:10
+msgid ""
+"Vinheta is a soundboard. Add your folders of sounds, and each one becomes a "
+"tab with a pad per sound: click a pad, or press its key, to play it. Pads "
+"can have a name, a color, a volume, and a loop, and your favorites are kept "
+"in a tab of their own."
+msgstr ""
+"O Vinheta é um soundboard. Adicione suas pastas de sons e cada uma vira uma "
+"aba com um pad por som: clique em um pad, ou pressione a tecla dele, para "
+"tocá-lo. Os pads podem ter nome, cor, volume e repetição, e os seus "
+"favoritos ficam em uma aba própria."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:11
+msgid ""
+"While it runs, Vinheta provides a virtual microphone named “Vinheta” that "
+"carries your voice together with the sounds you play. Choose it as the "
+"microphone in your call app, and the other side hears both. You hear the "
+"sounds on your own headphones, with a separate volume."
+msgstr ""
+"Enquanto está aberto, o Vinheta oferece um microfone virtual chamado "
+"“Vinheta”, que leva a sua voz junto com os sons que você toca. Escolha-o "
+"como microfone no seu aplicativo de chamadas e o outro lado ouve os dois. "
+"Você ouve os sons nos seus fones, com um volume separado."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:12
+msgid ""
+"For a call, turn off the noise suppression of the call app (it treats sounds "
+"as noise) and use headphones. Sending sounds to the call can be switched off "
+"at any time, leaving only your own output."
+msgstr ""
+"Para uma chamada, desative a supressão de ruído do aplicativo de chamadas "
+"(ele trata os sons como ruído) e use fones de ouvido. O envio dos sons para "
+"a chamada pode ser desligado a qualquer momento, deixando apenas a sua saída "
+"de áudio."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:35
+msgid "Pads with colors, keys, and a sound playing"
+msgstr "Pads com cores, teclas e um som tocando"
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:39
+msgid "Audio and playback preferences"
+msgstr "Preferências de áudio e de reprodução"
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:43
+msgid "The call setup guide"
+msgstr "O guia de configuração de chamada"
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
+msgid ""
+"The first release: folders as tabs, pads with a name, a color, a volume, a "
+"loop and a key, favorites, search, and a virtual microphone that sends the "
+"sounds to your calls."
+msgstr ""
+"A primeira versão: pastas como abas, pads com nome, cor, volume, repetição e "
+"tecla, favoritos, pesquisa e um microfone virtual que envia os sons para as "
+"suas chamadas."
 
 #: src/application.rs:476
 msgid "No microphone found. Your voice is not sent to the call."
@@ -595,17 +595,13 @@ msgstr "Atalho"
 msgid "Remove Shortcut"
 msgstr "Remover atalho"
 
-#: src/ui/sound-pad.ui:50
+#: src/ui/sound-pad.ui:55
 msgid "Favorite"
 msgstr "Favorito"
 
-#: src/ui/sound-pad.ui:62
+#: src/ui/sound-pad.ui:67
 msgid "Loops"
 msgstr "Repete"
-
-#: src/ui/sound-pad.ui:84
-msgid "Progress"
-msgstr "Progresso"
 
 #: src/ui/sound-pad.ui:111
 msgid "_Edit…"
@@ -699,27 +695,27 @@ msgstr "Toca este pad enquanto a janela está em foco"
 
 #. Translators: the first {} is the file name of a sound, the
 #. second {} is the key that plays it, as in "Applause.wav, key Q".
-#: src/ui/sound_pad.rs:222
+#: src/ui/sound_pad.rs:227
 msgid "{}, key {}"
 msgstr "{}, tecla {}"
 
 #. Translators: {} is the key that plays a sound, as in "Key Q".
-#: src/ui/sound_pad.rs:294
+#: src/ui/sound_pad.rs:298
 msgid "Key {}"
 msgstr "Tecla {}"
 
-#: src/ui/sound_pad.rs:304
+#: src/ui/sound_pad.rs:308
 msgid "Playing"
 msgstr "Tocando"
 
 #. Translators: the first {} is the elapsed time of a sound, the
 #. second {} is its duration, as in "Playing, 00:23 of 01:35".
-#: src/ui/sound_pad.rs:308
+#: src/ui/sound_pad.rs:312
 msgid "Playing, {} of {}"
 msgstr "Tocando, {} de {}"
 
 #. Translators: {} is the elapsed time of a sound, as in "Playing, 00:23".
-#: src/ui/sound_pad.rs:313
+#: src/ui/sound_pad.rs:317
 msgid "Playing, {}"
 msgstr "Tocando, {}"
 
