@@ -18,6 +18,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use std::path::Path;
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
@@ -46,6 +48,12 @@ mod imp {
         pub trigger_mode: TemplateChild<adw::ComboRow>,
         #[template_child]
         pub fade_out: TemplateChild<adw::SwitchRow>,
+        #[template_child]
+        pub sounds_folder: TemplateChild<adw::ActionRow>,
+        #[template_child]
+        pub open_folder: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub choose_folder: TemplateChild<gtk::Button>,
     }
 
     #[glib::object_subclass]
@@ -120,6 +128,90 @@ impl PreferencesDialog {
         let imp = dialog.imp();
         device_selector::bind(&*imp.microphone, app, DeviceKind::Microphone);
         device_selector::bind(&*imp.monitor_output, app, DeviceKind::Output);
+
+        // The row follows the key while the dialog is open.
+        let settings = gio::Settings::new(APP_ID);
+        settings.connect_changed(
+            Some("sounds-folder"),
+            glib::clone!(
+                #[weak]
+                dialog,
+                #[weak]
+                app,
+                move |_, _| dialog.show_sounds_folder(&app)
+            ),
+        );
+        dialog.show_sounds_folder(app);
+        imp.open_folder.connect_clicked(glib::clone!(
+            #[weak]
+            dialog,
+            #[weak]
+            app,
+            move |_| {
+                glib::spawn_future_local(async move { dialog.open_sounds_folder(&app).await });
+            }
+        ));
+        imp.choose_folder.connect_clicked(glib::clone!(
+            #[weak]
+            dialog,
+            move |_| {
+                let settings = settings.clone();
+                glib::spawn_future_local(async move {
+                    dialog.choose_sounds_folder(&settings).await;
+                });
+            }
+        ));
         dialog
+    }
+
+    /// The path, with the home directory as `~`.
+    fn show_sounds_folder(&self, app: &VinhetaApplication) {
+        let folder = app.sounds_folder();
+        let text = match folder.strip_prefix(glib::home_dir()) {
+            Ok(rest) => Path::new("~").join(rest),
+            Err(_) => folder,
+        };
+        self.imp()
+            .sounds_folder
+            .set_subtitle(&glib::markup_escape_text(&text.to_string_lossy()));
+    }
+
+    fn window(&self) -> Option<gtk::Window> {
+        self.root().and_downcast()
+    }
+
+    /// Shows the folder in the file manager. It only exists after the first
+    /// import, so it is created here when needed.
+    async fn open_sounds_folder(&self, app: &VinhetaApplication) {
+        let folder = app.sounds_folder();
+        let result = match std::fs::create_dir_all(&folder) {
+            Ok(()) => {
+                let launcher = gtk::FileLauncher::new(Some(&gio::File::for_path(&folder)));
+                let launched = launcher.launch_future(self.window().as_ref()).await;
+                launched.map_err(|error| error.to_string())
+            }
+            Err(error) => Err(error.to_string()),
+        };
+        if let Err(error) = result {
+            glib::g_warning!("vinheta", "could not open {}: {error}", folder.display());
+            self.add_toast(adw::Toast::new(&gettext("Could not open the folder")));
+        }
+    }
+
+    /// Only changes where the next imports go: nothing is moved.
+    async fn choose_sounds_folder(&self, settings: &gio::Settings) {
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Sounds Folder"))
+            .modal(true)
+            .build();
+        let Ok(folder) = chooser.select_folder_future(self.window().as_ref()).await else {
+            return;
+        };
+        let path = folder.path();
+        if let Some(path) = path.as_deref().and_then(|path| path.to_str()) {
+            if let Err(error) = settings.set_string("sounds-folder", path) {
+                glib::g_warning!("vinheta", "could not save the sounds folder: {error}");
+            }
+        }
     }
 }

@@ -8,6 +8,7 @@ src/ui/device_selector.rs
 src/ui/folder-page.ui
 src/ui/preferences-dialog.ui
 src/ui/preferences_dialog.rs
+src/ui/rename-dialog.ui
 src/ui/shortcuts-dialog.ui
 src/ui/sound-dialog.ui
 src/ui/sound-pad.ui

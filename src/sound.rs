@@ -19,6 +19,8 @@
  */
 
 use std::cell::{Cell, OnceCell, RefCell};
+use std::path::Path;
+use std::time::{Duration, SystemTime};
 
 use gtk::glib;
 use gtk::prelude::*;
@@ -49,6 +51,11 @@ mod imp {
         pub volume: Cell<f64>,
         #[property(get)]
         pub looping: Cell<bool>,
+        #[property(get)]
+        pub favorite: Cell<bool>,
+        /// When the file was last modified, in seconds since the epoch.
+        #[property(get, construct_only)]
+        modified: Cell<i64>,
         /// Milliseconds into the playback, -1 while not known.
         #[property(get)]
         pub elapsed: Cell<i64>,
@@ -67,6 +74,8 @@ mod imp {
                 color: RefCell::default(),
                 volume: Cell::new(1.0),
                 looping: Cell::new(false),
+                favorite: Cell::new(false),
+                modified: Cell::new(0),
                 elapsed: Cell::new(-1),
                 duration: Cell::new(-1),
             }
@@ -96,13 +105,28 @@ glib::wrapper! {
 }
 
 impl Sound {
-    pub fn new(path: &str, name: &str, settings: &PadSettings) -> Self {
+    pub fn new(path: &str, name: &str, modified: SystemTime, settings: &PadSettings) -> Self {
+        let modified = modified
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |time| i64::try_from(time.as_secs()).unwrap_or(i64::MAX));
         let sound: Self = glib::Object::builder()
             .property("path", path)
             .property("name", name)
+            .property("modified", modified)
             .build();
         sound.set_settings(settings);
         sound
+    }
+
+    pub fn file_name(&self) -> String {
+        Path::new(&self.path())
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    }
+
+    pub fn modified_time(&self) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(self.modified().max(0).unsigned_abs())
     }
 
     /// What the user set for this pad.
@@ -113,6 +137,7 @@ impl Sound {
             color: PadColor::from_name(&imp.color.borrow()),
             volume: imp.volume.get(),
             looping: imp.looping.get(),
+            favorite: imp.favorite.get(),
         }
     }
 
@@ -131,6 +156,9 @@ impl Sound {
         }
         if imp.looping.replace(settings.looping) != settings.looping {
             self.notify_looping();
+        }
+        if imp.favorite.replace(settings.favorite) != settings.favorite {
+            self.notify_favorite();
         }
     }
 

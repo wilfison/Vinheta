@@ -3,7 +3,8 @@
 # microphone, playing and stopping through actions and through real clicks, the
 # "Send sounds to call" switch and the call volume measured on a recording, the
 # voice switch, the monitor output, the pad settings (volume, loop), the
-# trigger modes, and the cleanup on exit.
+# trigger modes, files removed and renamed while the app runs, and the cleanup
+# on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
 # output for a few seconds, and the real microphone is linked as usual.
 set -uo pipefail
@@ -25,10 +26,15 @@ quiet="$work/Tones/tone-quiet.wav"
 looped="$work/Tones/tone-loop.wav"
 cp "$tone" "$quiet"
 tone_sound "$looped" 2 || exit 1
+# One that is deleted while it plays, and one that is renamed.
+gone="$work/Tones/tone-gone.wav"
+kept="$work/Tones/tone-kept.wav"
+moved="$work/Tones/tone-moved.wav"
+cp "$tone" "$kept"
 pads="$work/config/data/vinheta/pads.json"
 mkdir -p "$(dirname "$pads")"
 cat >"$pads" <<JSON
-{"version": 1, "pads": {"$quiet": {"volume": 0.5}, "$looped": {"loop": true}}}
+{"version": 1, "pads": {"$quiet": {"volume": 0.5}, "$looped": {"loop": true}, "$kept": {"color": "red"}}}
 JSON
 test_sink=vinheta-app-test-sink
 
@@ -61,6 +67,7 @@ print("no entry" if pad is None else json.dumps(pad.get(sys.argv[3])))' "$pads" 
 }
 loop_saved() { [ "$(pad_field "$tone" loop)" = true ]; }
 entry_removed() { [ "$(pad_field "$quiet" volume)" = "no entry" ]; }
+settings_moved() { [ "$(pad_field "$moved" color)" = '"red"' ] && [ "$(pad_field "$kept" color)" = "no entry" ]; }
 
 # Level of the 1000 Hz tone on the virtual microphone, in dBFS, over 2 seconds.
 call_level() {
@@ -201,6 +208,18 @@ session() {
     gsettings set "$app_id" trigger-mode "'overlap'"
     sleep 1
 
+    # The folder is watched: the new file is known without a restart.
+    echo "== files that go away"
+    cp "$tone" "$gone"
+    sleep 1
+    activate toggle-sound "'$gone'"
+    sleep 1
+    check "a file added while the app runs plays" call_linked
+    rm "$gone"
+    check "removed file stops" within 2 not call_linked
+    mv "$kept" "$moved"
+    sleep 1
+
     # Written when the app quits, checked below.
     activate toggle-loop "'$tone'"
     activate reset-sound "'$quiet'"
@@ -221,15 +240,16 @@ session() {
     check "the folders were saved" grep -q "directories=.*Tones" "$work/config/glib-2.0/settings/keyfile"
     check "a loop set through an action was saved" loop_saved
     check "a reset pad has no entry in the file" entry_removed
+    check "moved settings" settings_moved
 }
 
 {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-poc-common.sh'"
-    declare -p work tone quiet looped pads test_sink
+    declare -p work tone quiet looped gone kept moved pads test_sink
     declare -f check node_exists call_linked not call_level at_least voice_links no_voice_links \
         monitor_on monitor_linked falls_by call_streams one_call_stream within pad_field \
-        loop_saved entry_removed session
+        loop_saved entry_removed settings_moved session
     echo session
 } >"$work/session.sh"
 

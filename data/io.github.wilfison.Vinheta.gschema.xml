@@ -53,5 +53,24 @@
 			<summary>Fade out on stop</summary>
 			<description>Whether a stopped sound fades out instead of being cut.</description>
 		</key>
+		<key name="sort-order" type="s">
+			<choices>
+				<choice value="name"/>
+				<choice value="recent"/>
+			</choices>
+			<default>'name'</default>
+			<summary>Sort order</summary>
+			<description>The order of the pads in every view: "name" sorts by the shown name, "recent" puts the most recently modified files first.</description>
+		</key>
+		<key name="folder-names" type="a{ss}">
+			<default>{}</default>
+			<summary>Tab names</summary>
+			<description>The label of a tab, by the absolute path of its folder. A folder without an entry shows its own name.</description>
+		</key>
+		<key name="sounds-folder" type="s">
+			<default>''</default>
+			<summary>Sounds folder</summary>
+			<description>Absolute path of the folder that receives the copies of loose files. Empty means "sounds" inside the data directory of the app.</description>
+		</key>
 	</schema>
 </schemalist>

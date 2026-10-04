@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <object class="AdwAlertDialog" id="dialog">
+    <property name="heading" translatable="yes">Rename Tab</property>
+    <property name="body" translatable="yes">The folder on disk keeps its name</property>
+    <property name="default-response">rename</property>
+    <property name="close-response">cancel</property>
+    <property name="extra-child">
+      <object class="GtkEntry" id="entry">
+        <property name="activates-default">True</property>
+        <accessibility>
+          <property name="label" translatable="yes">Tab name</property>
+        </accessibility>
+      </object>
+    </property>
+    <responses>
+      <response id="cancel" translatable="yes">_Cancel</response>
+      <response id="rename" translatable="yes" appearance="suggested">_Rename</response>
+    </responses>
+  </object>
+</interface>

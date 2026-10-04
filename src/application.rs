@@ -20,7 +20,7 @@
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
@@ -113,6 +113,9 @@ mod imp {
             obj.setup_gactions();
             obj.set_accels_for_action("app.quit", &["<control>q"]);
             obj.set_accels_for_action("app.preferences", &["<control>comma"]);
+            obj.set_accels_for_action("win.search-mode", &["<control>f"]);
+            obj.set_accels_for_action("win.move-folder-left", &["<control><shift>Page_Up"]);
+            obj.set_accels_for_action("win.move-folder-right", &["<control><shift>Page_Down"]);
         }
 
         fn signals() -> &'static [Signal] {
@@ -188,14 +191,6 @@ impl VinhetaApplication {
             .activate(move |app: &Self, _, _| app.show_about())
             .build();
         // The parameter is the absolute path of a sound of the library.
-        let toggle_sound_action = gio::ActionEntry::builder("toggle-sound")
-            .parameter_type(Some(glib::VariantTy::STRING))
-            .activate(move |app: &Self, _, path| {
-                if let Some(path) = path.and_then(|path| path.str()) {
-                    app.toggle_sound(path);
-                }
-            })
-            .build();
         let sound_action = |name: &str, activate: fn(&Self, &Sound)| {
             gio::ActionEntry::builder(name)
                 .parameter_type(Some(glib::VariantTy::STRING))
@@ -207,7 +202,23 @@ impl VinhetaApplication {
                 })
                 .build()
         };
+        let toggle_sound_action = sound_action("toggle-sound", |app, sound| {
+            let mode = app.trigger_mode();
+            app.trigger_sound(sound, pads::trigger(mode, sound.playing()));
+        });
+        // What the search uses: it never stops a sound.
+        let play_sound_action = sound_action("play-sound", |app, sound| {
+            if let Some(trigger) = pads::play(app.trigger_mode(), sound.playing()) {
+                app.trigger_sound(sound, trigger);
+            }
+        });
         let stop_sound_action = sound_action("stop-sound", Self::stop_sound);
+        let toggle_favorite_action = sound_action("toggle-favorite", |app, sound| {
+            let mut settings = sound.settings();
+            settings.favorite = !settings.favorite;
+            app.update_sound(sound, settings);
+        });
+        let trash_sound_action = sound_action("trash-sound", Self::trash_sound);
         let toggle_loop_action = sound_action("toggle-loop", |app, sound| {
             let mut settings = sound.settings();
             settings.looping = !settings.looping;
@@ -227,8 +238,11 @@ impl VinhetaApplication {
             about_action,
             preferences_action,
             toggle_sound_action,
+            play_sound_action,
             stop_sound_action,
             toggle_loop_action,
+            toggle_favorite_action,
+            trash_sound_action,
             reset_sound_action,
             stop_all_action,
         ]);
@@ -379,7 +393,8 @@ impl VinhetaApplication {
             pads.set(&path, settings);
             pads.get(&path)
         };
-        if settings == sound.settings() {
+        let old = sound.settings();
+        if settings == old {
             return;
         }
         if let (Some(engine), Some(id)) = (imp.engine.borrow().as_ref(), self.playback_of(sound)) {
@@ -388,6 +403,68 @@ impl VinhetaApplication {
         }
         sound.set_settings(&settings);
         self.schedule_save();
+        // The sorted and filtered views do not watch the sounds themselves.
+        if let Some(window) = self.window() {
+            window.sound_changed(old.name != settings.name, old.favorite != settings.favorite);
+        }
+    }
+
+    /// Moves the settings of a file that was renamed or moved.
+    pub fn move_pad_settings(&self, from: &str, to: &str) {
+        if self.imp().pads.borrow_mut().rename(from, to) {
+            self.schedule_save();
+        }
+    }
+
+    /// For a sound whose file went away: it stops and leaves the dialog that
+    /// edits it. Its settings are kept, the file may come back.
+    pub fn forget_sound(&self, sound: &Sound) {
+        self.stop_sound(sound);
+        if let Some(window) = self.window() {
+            window.sound_gone(sound);
+        }
+    }
+
+    /// The folder that receives the copies of loose files.
+    pub fn sounds_folder(&self) -> PathBuf {
+        let chosen = self
+            .imp()
+            .settings
+            .get()
+            .map(|settings| settings.string("sounds-folder"));
+        match chosen.filter(|folder| !folder.is_empty()) {
+            Some(folder) => PathBuf::from(folder.as_str()),
+            None => glib::user_data_dir().join("vinheta").join("sounds"),
+        }
+    }
+
+    /// Whether the file is a copy made by the app, which it may trash.
+    pub fn is_imported(&self, path: &str) -> bool {
+        Path::new(path).parent() == Some(self.sounds_folder().as_path())
+    }
+
+    fn trash_sound(&self, sound: &Sound) {
+        let path = sound.path();
+        if !self.is_imported(&path) {
+            return;
+        }
+        self.forget_sound(sound);
+        let message = match gio::File::for_path(&path).trash(gio::Cancellable::NONE) {
+            // Translators: {} is the name of a sound.
+            Ok(()) => gettext("Moved “{}” to the trash"),
+            Err(error) => {
+                glib::g_warning!("vinheta", "could not trash {path}: {error}");
+                // Translators: {} is the name of a sound.
+                gettext("Could not move “{}” to the trash")
+            }
+        };
+        if let Some(window) = self.window() {
+            window.toast(&message.replace("{}", &sound.display_name()));
+        }
+    }
+
+    fn trigger_mode(&self) -> TriggerMode {
+        TriggerMode::from_name(&self.imp().settings.get().unwrap().string("trigger-mode"))
     }
 
     pub fn find_sound(&self, path: &str) -> Option<Sound> {
@@ -400,19 +477,13 @@ impl VinhetaApplication {
         found.map(|(id, _)| *id)
     }
 
-    fn toggle_sound(&self, path: &str) {
+    fn trigger_sound(&self, sound: &Sound, trigger: Trigger) {
         let imp = self.imp();
-        let Some(sound) = self.find_sound(path) else {
-            return;
-        };
         let engine = imp.engine.borrow();
         let Some(engine) = engine.as_ref() else {
             return;
         };
-
-        let mode = TriggerMode::from_name(&imp.settings.get().unwrap().string("trigger-mode"));
-        let playing = self.playback_of(&sound);
-        match (pads::trigger(mode, playing.is_some()), playing) {
+        match (trigger, self.playback_of(sound)) {
             (Trigger::Stop, Some(id)) => {
                 engine.stop(id);
                 self.playback_ended(id);
@@ -427,9 +498,9 @@ impl VinhetaApplication {
                     engine.stop(id);
                     self.playback_ended(id);
                 }
-                self.start_sound(engine, &sound);
+                self.start_sound(engine, sound);
             }
-            _ => self.start_sound(engine, &sound),
+            _ => self.start_sound(engine, sound),
         }
     }
 

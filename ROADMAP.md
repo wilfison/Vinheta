@@ -18,10 +18,10 @@ The node is created by the app's connection and disappears when the app closes, 
 ## Library model
 
 - The user adds **directories**; each directory becomes a **tab**.
-- Every audio file in the directory is shown as a pad. Nothing is copied: the app reads the files where they are.
-- The list of directories (and the tab order) is stored in GSettings.
-- Per-pad metadata (name, color, volume, loop, shortcut) is stored as JSON in `~/.local/share/vinheta`, keyed by file path.
-- Loose files (dropped, or picked through "Add Sounds…") are copied into the **default sounds folder** ("Sounds folder" in the preferences), which is itself a library directory and therefore a tab.
+- Every audio file in the directory is shown as a pad. Nothing is copied: the app reads the files where they are, and follows the directory while it runs.
+- The list of directories (and the tab order) is stored in GSettings, and so are the labels the user gave to tabs.
+- Per-pad metadata (name, color, volume, loop, favorite, shortcut) is stored as JSON in `~/.local/share/vinheta`, keyed by file path. It follows a file renamed inside a library directory or moved between two of them.
+- Loose files (dropped, or picked through "Add Sounds…") are always copied into the **sounds folder** ("Sounds Folder" in the preferences, `~/.local/share/vinheta/sounds` by default), which is itself a library directory and therefore a tab. Only these copies can be moved to the trash from the app.
 
 ## Phases
 
@@ -161,13 +161,39 @@ Notes for the next phases:
 - Typing a name, clicking a swatch, dragging the pad volume while the sound plays, the long press, the Menu key, and picking an entry of the trigger mode row were not exercised by the scripted checks; test them by hand.
 - The real call test of Phase 0 is still pending. Loops and long background sounds make its noise suppression part more relevant.
 
-### Phase 4: organization
+### Phase 4: organization ✅
 
-- ⬜ Watch the directories with `gio::FileMonitor` to reflect new, removed, and renamed files.
-- ⬜ Drag and drop of files and "Add Sounds…", copying into the default sounds folder.
-- ⬜ Search, favorites, and sorting (`GtkFilterListModel`, `GtkSortListModel`).
-- ⬜ Reorder and rename tabs.
-- ⬜ Adaptive layout with `AdwBreakpoint`.
+- ✅ Watch the directories with `gio::FileMonitor` to reflect new, removed, and renamed files.
+- ✅ Drag and drop of files and "Add Sounds…", copying into the default sounds folder.
+- ✅ Search, favorites, and sorting (`GtkFilterListModel`, `GtkSortListModel`).
+- ✅ Reorder and rename tabs.
+- ✅ Adaptive layout with `AdwBreakpoint`.
+
+What changed from the original plan:
+
+- Loose files are always copied into the sounds folder; the "Copy Imported Sounds" switch of the mockup does not exist. A dropped folder is added as a library folder, not copied.
+- The "All" tab, the "Add sound" tile, and durations on idle pads of the mockup were dropped.
+- Favorites are a star on the pad (flipped from its context menu) and a "Favorites" tab, last in the row and hidden while there is no favorite.
+- The search covers every folder and replaces the tabs with one grid of results. Activating a result plays the sound, never stops it, closes the search, shows the tab of the sound, scrolls to its pad, and blinks it twice.
+- Sorting is one global setting with two orders, "Name" (the shown name) and "Recently Added" (the modification time of the file).
+- Tabs are moved with actions in the primary menu (Ctrl+Shift+Page Up and Page Down), not dragged. A tab name is a label; the folder on disk keeps its name.
+- The monitor events are not trusted as a complete log: any event schedules a rescan of the folder (200 ms later) and a diff. A rename is shown as a removed pad and a new one with the same settings.
+- A file that goes away while it plays is stopped.
+- Below 780 pixels the bottom bar is stacked in rows and the pads are narrower (136 pixels instead of 168), so that two columns fit at 360 pixels. The minimum size is 360 by 294, and 360 by 382 in the narrow layout.
+- "Move to Trash" in the context menu, only for the copies in the sounds folder. No confirmation and no undo in the app: the system trash is the undo.
+- The "Sounds Folder" row of the preferences has two buttons: one opens the folder, one chooses another.
+- Tooling: `scripts/fixtures.sh` gained the `Many` and `Effects` folders and `favorites.json`; `scripts/verify-app.sh` checks that a removed file stops and that a renamed file keeps its settings.
+
+Notes for the next phases:
+
+- Phase 5: the search does not capture plain keys (no type-to-search), so they are free for the pad shortcuts. The tab moves, `win.search-mode`, `win.search`, and `app.play-sound` are actions that shortcuts can bind.
+- Only the copies in the sounds folder can be trashed from the app. Changing the sounds folder moves nothing: the old folder stays as a normal tab.
+- A file moved to a folder that is not in the library loses the link to its settings (they stay under the old path and are used again if the file comes back). The same holds for a trashed file.
+- Tab names are keyed by the path of the folder: a folder moved on disk starts again without a name.
+- A file copied by a file manager becomes a pad before the copy is complete; triggering it too early can fail with the "Could not play" toast. The app's own imports use a hidden temporary name.
+- On the virtual display the content of the window is 10 pixels narrower than its X window, and a dialog needs a content of exactly 360 pixels: the narrow checks use `--size 370,700`.
+- A window with an `AdwBreakpoint` does not know its application while it is being built; `window.rs` uses the default application.
+- Not exercised by the scripted checks, test them by hand: the file chooser of "Add Sounds…", dropping files and folders and the drop highlight, typing in the search and pressing Enter, typing a tab name, both buttons of "Sounds Folder", the controls of the narrow bottom bar, the "Undo" of a removed tab, and the blink with animations turned off in the system.
 
 ### Phase 5: shortcuts
 

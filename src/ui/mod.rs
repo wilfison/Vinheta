@@ -24,5 +24,6 @@ pub mod device_selector;
 pub mod folder_page;
 pub mod preferences_dialog;
 pub mod sound_dialog;
+pub mod sound_grid;
 pub mod sound_pad;
 pub mod window;

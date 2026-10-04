@@ -32,6 +32,10 @@ gridview.pads > child {
   opacity: 0.7;
 }
 
+.pad .favorite-mark {
+  color: var(--yellow-4);
+}
+
 .pad .progress {
   font-size: 11px;
   font-weight: normal;
@@ -191,6 +195,25 @@ gridview.pads > child {
   }
 }
 
+/* A located pad pulses twice in the text color, which stands out on every
+   palette color. More specific than the playing border, so a playing pad
+   blinks too. Without animations it is a steady outline. */
+@keyframes located {
+  0%, 50%, 100% {
+    outline-color: transparent;
+  }
+
+  25%, 75% {
+    outline-color: var(--window-fg-color);
+  }
+}
+
+gridview.pads > child > .pad.located {
+  outline: 3px solid var(--window-fg-color);
+  outline-offset: -3px;
+  animation: located 1.2s ease-in-out 1;
+}
+
 .playing-counter {
   padding: 12px 40px 4px 12px;
 }
@@ -279,4 +302,33 @@ gridview.pads > child {
 
 .bottom-bar .microphone {
   min-width: 220px;
+}
+
+.drop-hint {
+  margin: 12px;
+  border: 2px dashed var(--accent-color);
+  border-radius: 18px;
+  background-color: color-mix(in srgb, var(--window-bg-color) 85%, transparent);
+}
+
+/* The narrow window: two columns of pads fit in 360 pixels. */
+.narrow gridview.pads {
+  padding: 8px 16px 24px;
+}
+
+.narrow .pad {
+  min-width: 112px;
+}
+
+.narrow .tab-switcher {
+  padding: 12px 16px 4px;
+}
+
+.narrow .playing-counter {
+  padding: 12px 16px 4px 12px;
+}
+
+/* Both the bar of the toolbar view and its content have this class. */
+.narrow .bottom-bar {
+  padding: 6px 8px;
 }

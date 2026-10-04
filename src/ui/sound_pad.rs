@@ -19,7 +19,6 @@
  */
 
 use std::cell::{Cell, RefCell};
-use std::path::Path;
 use std::time::Duration;
 
 use adw::subclass::prelude::*;
@@ -28,7 +27,11 @@ use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
 use vinheta::pads::{self, PadColor, PadSettings};
 
+use crate::application::VinhetaApplication;
 use crate::sound::Sound;
+
+/// How long the highlight of a located pad stays, the length of its animation.
+const BLINK: Duration = Duration::from_millis(1200);
 
 mod imp {
     use super::*;
@@ -40,6 +43,8 @@ mod imp {
         pub label: TemplateChild<gtk::Label>,
         #[template_child]
         pub loop_icon: TemplateChild<gtk::Image>,
+        #[template_child]
+        pub favorite_icon: TemplateChild<gtk::Image>,
         #[template_child]
         pub progress: TemplateChild<gtk::Box>,
         #[template_child]
@@ -53,6 +58,8 @@ mod imp {
         pub sound: RefCell<Option<(Sound, glib::SignalHandlerId)>>,
         pub actions: gio::SimpleActionGroup,
         pub popover: RefCell<Option<gtk::PopoverMenu>>,
+        /// Set while the pad is highlighted by `blink`.
+        pub blink: RefCell<Option<glib::SourceId>>,
         /// The second last told to assistive technology, -1 for none.
         pub described: Cell<i64>,
     }
@@ -105,6 +112,9 @@ mod imp {
         }
 
         fn dispose(&self) {
+            if let Some(timer) = self.blink.take() {
+                timer.remove();
+            }
             if let Some(popover) = self.popover.take() {
                 popover.unparent();
             }
@@ -146,13 +156,10 @@ impl SoundPad {
         if let Some(popover) = imp.popover.borrow().as_ref() {
             popover.popdown();
         }
+        self.end_blink();
         let Some(sound) = sound else { return };
         imp.described.set(i64::MIN);
-
-        let file_name = Path::new(&sound.path())
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned());
-        self.set_tooltip_text(file_name.as_deref());
+        self.set_tooltip_text(Some(&sound.file_name()));
 
         let handler = sound.connect_notify_local(
             None,
@@ -169,15 +176,42 @@ impl SoundPad {
         imp.sound.replace(Some((sound.clone(), handler)));
     }
 
-    fn sound(&self) -> Option<Sound> {
+    pub fn sound(&self) -> Option<Sound> {
         let sound = self.imp().sound.borrow();
         sound.as_ref().map(|(sound, _)| sound.clone())
+    }
+
+    /// Highlights the pad for a moment, to show where a sound is. The style
+    /// pulses the outline twice.
+    pub fn blink(&self) {
+        self.end_blink();
+        self.add_css_class("located");
+        let timer = glib::timeout_add_local_once(
+            BLINK,
+            glib::clone!(
+                #[weak(rename_to = pad)]
+                self,
+                move || {
+                    pad.imp().blink.take();
+                    pad.remove_css_class("located");
+                }
+            ),
+        );
+        self.imp().blink.replace(Some(timer));
+    }
+
+    fn end_blink(&self) {
+        if let Some(timer) = self.imp().blink.take() {
+            timer.remove();
+        }
+        self.remove_css_class("located");
     }
 
     fn show_sound(&self, sound: &Sound) {
         let imp = self.imp();
         imp.label.set_label(&sound.display_name());
         imp.loop_icon.set_visible(sound.looping());
+        imp.favorite_icon.set_visible(sound.favorite());
         let color = sound.color();
         for other in PadColor::ALL {
             if other.name() == color {
@@ -206,6 +240,8 @@ impl SoundPad {
         set("reset", sound.settings() != PadSettings::default());
         imp.actions
             .change_action_state("loop", &sound.looping().to_variant());
+        imp.actions
+            .change_action_state("favorite", &sound.favorite().to_variant());
     }
 
     /// The times and the bar only exist while the sound plays. Without a
@@ -273,25 +309,29 @@ impl SoundPad {
                 ))
                 .build()
         };
-        let looping = gio::ActionEntry::builder("loop")
-            .state(false.to_variant())
-            .activate(glib::clone!(
-                #[weak(rename_to = pad)]
-                self,
-                move |_: &gio::SimpleActionGroup, _, _| {
-                    if let Some(sound) = pad.sound() {
-                        let path = sound.path().to_variant();
-                        let _ = pad.activate_action("app.toggle-loop", Some(&path));
+        // Check items: the state follows the sound, in `show_sound`.
+        let check = |name: &'static str, target: &'static str| {
+            gio::ActionEntry::builder(name)
+                .state(false.to_variant())
+                .activate(glib::clone!(
+                    #[weak(rename_to = pad)]
+                    self,
+                    move |_: &gio::SimpleActionGroup, _, _| {
+                        if let Some(sound) = pad.sound() {
+                            let _ = pad.activate_action(target, Some(&sound.path().to_variant()));
+                        }
                     }
-                }
-            ))
-            .build();
+                ))
+                .build()
+        };
         let actions = &self.imp().actions;
         actions.add_action_entries([
             forward("edit", "win.edit-sound"),
             forward("stop", "app.stop-sound"),
             forward("reset", "app.reset-sound"),
-            looping,
+            forward("trash", "app.trash-sound"),
+            check("loop", "app.toggle-loop"),
+            check("favorite", "app.toggle-favorite"),
         ]);
         self.insert_action_group("pad", Some(actions));
     }
@@ -299,8 +339,16 @@ impl SoundPad {
     /// Opens the context menu at a position of the pad, or at the pad itself.
     pub fn open_menu(&self, at: Option<(f64, f64)>) {
         let imp = self.imp();
-        if self.sound().is_none() {
+        let Some(sound) = self.sound() else {
             return;
+        };
+        // Only the copies in the sounds folder can be trashed.
+        let app = gio::Application::default().and_downcast::<VinhetaApplication>();
+        let imported = app.is_some_and(|app| app.is_imported(&sound.path()));
+        if let Some(action) = imp.actions.lookup_action("trash") {
+            if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
+                action.set_enabled(imported);
+            }
         }
         if let Some(old) = imp.popover.take() {
             old.unparent();

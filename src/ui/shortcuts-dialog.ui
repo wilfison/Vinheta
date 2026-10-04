@@ -12,6 +12,24 @@
         </child>
         <child>
           <object class="AdwShortcutsItem">
+            <property name="title" translatable="yes" context="shortcut window">Search</property>
+            <property name="action-name">win.search-mode</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title" translatable="yes" context="shortcut window">Move Tab Left</property>
+            <property name="action-name">win.move-folder-left</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title" translatable="yes" context="shortcut window">Move Tab Right</property>
+            <property name="action-name">win.move-folder-right</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
             <property name="title" translatable="yes" context="shortcut window">Preferences</property>
             <property name="action-name">app.preferences</property>
           </object>

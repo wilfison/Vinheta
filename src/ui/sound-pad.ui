@@ -25,17 +25,35 @@
           </object>
         </property>
         <child type="overlay">
-          <object class="GtkImage" id="loop_icon">
-            <property name="icon-name">media-playlist-repeat-symbolic</property>
+          <object class="GtkBox">
+            <property name="spacing">6</property>
             <property name="halign">end</property>
             <property name="valign">start</property>
-            <property name="visible">False</property>
-            <accessibility>
-              <property name="label" translatable="yes">Loops</property>
-            </accessibility>
-            <style>
-              <class name="loop-mark"/>
-            </style>
+            <property name="can-target">False</property>
+            <child>
+              <object class="GtkImage" id="favorite_icon">
+                <property name="icon-name">starred-symbolic</property>
+                <property name="visible">False</property>
+                <accessibility>
+                  <property name="label" translatable="yes">Favorite</property>
+                </accessibility>
+                <style>
+                  <class name="favorite-mark"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkImage" id="loop_icon">
+                <property name="icon-name">media-playlist-repeat-symbolic</property>
+                <property name="visible">False</property>
+                <accessibility>
+                  <property name="label" translatable="yes">Loops</property>
+                </accessibility>
+                <style>
+                  <class name="loop-mark"/>
+                </style>
+              </object>
+            </child>
           </object>
         </child>
         <child type="overlay">
@@ -86,6 +104,10 @@
         <attribute name="action">pad.loop</attribute>
       </item>
       <item>
+        <attribute name="label" translatable="yes">_Favorite</attribute>
+        <attribute name="action">pad.favorite</attribute>
+      </item>
+      <item>
         <attribute name="label" translatable="yes">_Stop</attribute>
         <attribute name="action">pad.stop</attribute>
       </item>
@@ -94,6 +116,11 @@
       <item>
         <attribute name="label" translatable="yes">_Reset</attribute>
         <attribute name="action">pad.reset</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Move to _Trash</attribute>
+        <attribute name="action">pad.trash</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
       </item>
     </section>
   </menu>

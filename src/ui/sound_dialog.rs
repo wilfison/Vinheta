@@ -191,6 +191,11 @@ impl SoundDialog {
         dialog
     }
 
+    pub fn sound(&self) -> Option<Sound> {
+        let sound = self.imp().sound.borrow();
+        sound.as_ref().map(|(sound, _)| sound.clone())
+    }
+
     fn fill(&self, settings: &PadSettings) {
         let imp = self.imp();
         imp.filling.set(true);

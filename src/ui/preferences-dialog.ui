@@ -60,6 +60,43 @@
             </child>
           </object>
         </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Library</property>
+            <child>
+              <object class="AdwActionRow" id="sounds_folder">
+                <property name="title" translatable="yes">Sounds Folder</property>
+                <property name="subtitle-lines">2</property>
+                <child type="suffix">
+                  <object class="GtkButton" id="open_folder">
+                    <property name="icon-name">folder-open-symbolic</property>
+                    <property name="tooltip-text" translatable="yes">Open Folder</property>
+                    <property name="valign">center</property>
+                    <accessibility>
+                      <property name="label" translatable="yes">Open Folder</property>
+                    </accessibility>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <child type="suffix">
+                  <object class="GtkButton" id="choose_folder">
+                    <property name="icon-name">folder-symbolic</property>
+                    <property name="tooltip-text" translatable="yes">Choose Folder…</property>
+                    <property name="valign">center</property>
+                    <accessibility>
+                      <property name="label" translatable="yes">Choose Folder…</property>
+                    </accessibility>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
       </object>
     </child>
   </template>

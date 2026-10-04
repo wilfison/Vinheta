@@ -21,10 +21,11 @@
 //! What the user set for each pad, the file that stores it, the trigger
 //! rule, and the time format of a playing pad. No GTK types.
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -96,6 +97,8 @@ pub struct PadSettings {
     pub volume: f64,
     #[serde(rename = "loop", skip_serializing_if = "is_false")]
     pub looping: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub favorite: bool,
 }
 
 impl Default for PadSettings {
@@ -105,6 +108,7 @@ impl Default for PadSettings {
             color: None,
             volume: 1.0,
             looping: false,
+            favorite: false,
         }
     }
 }
@@ -135,6 +139,10 @@ impl PadSettings {
                 .and_then(PadColor::from_name),
             volume: value.get("volume").and_then(Value::as_f64).unwrap_or(1.0),
             looping: value.get("loop").and_then(Value::as_bool).unwrap_or(false),
+            favorite: value
+                .get("favorite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         }
         .normalized()
     }
@@ -185,6 +193,18 @@ impl PadStore {
             self.pads.remove(path);
         } else {
             self.pads.insert(path.to_owned(), settings);
+        }
+    }
+
+    /// Moves the settings of a file that was renamed, replacing what `to`
+    /// had. Returns whether anything changed.
+    pub fn rename(&mut self, from: &str, to: &str) -> bool {
+        match self.pads.remove(from) {
+            Some(settings) => {
+                self.pads.insert(to.to_owned(), settings);
+                true
+            }
+            None => false,
         }
     }
 
@@ -288,6 +308,74 @@ pub fn trigger(mode: TriggerMode, playing: bool) -> Trigger {
     }
 }
 
+/// What "make sure this sound plays" does, for the search: like `trigger`,
+/// but a playing sound is never stopped.
+pub fn play(mode: TriggerMode, playing: bool) -> Option<Trigger> {
+    match trigger(mode, playing) {
+        Trigger::Stop => None,
+        other => Some(other),
+    }
+}
+
+/// Whether every word of `query` is in the shown name or in the file name,
+/// ignoring case. An empty query matches nothing.
+pub fn matches(query: &str, display_name: &str, file_name: &str) -> bool {
+    let (display_name, file_name) = (display_name.to_lowercase(), file_name.to_lowercase());
+    let query = query.to_lowercase();
+    let mut words = query.split_whitespace().peekable();
+    words.peek().is_some()
+        && words.all(|word| display_name.contains(word) || file_name.contains(word))
+}
+
+/// The order of the pads, a global setting.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SortOrder {
+    #[default]
+    Name,
+    /// The newest file first.
+    Recent,
+}
+
+impl SortOrder {
+    /// Anything unknown is `Name`.
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "recent" => Self::Recent,
+            _ => Self::Name,
+        }
+    }
+
+    /// The value of the `sort-order` setting.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Name => "name",
+            Self::Recent => "recent",
+        }
+    }
+}
+
+/// What the order of a pad depends on.
+#[derive(Debug, Clone, Copy)]
+pub struct SortKey<'a> {
+    pub display_name: &'a str,
+    pub file_name: &'a str,
+    pub modified: SystemTime,
+}
+
+pub fn compare(order: SortOrder, a: SortKey, b: SortKey) -> Ordering {
+    let by_name = || {
+        let names = a
+            .display_name
+            .to_lowercase()
+            .cmp(&b.display_name.to_lowercase());
+        names.then_with(|| a.file_name.cmp(b.file_name))
+    };
+    match order {
+        SortOrder::Name => by_name(),
+        SortOrder::Recent => b.modified.cmp(&a.modified).then_with(by_name),
+    }
+}
+
 /// `00:23`, `01:12`, or `1:02:03` from one hour up, rounded down.
 pub fn format_time(time: Duration) -> String {
     let seconds = time.as_secs();
@@ -352,8 +440,59 @@ mod tests {
                 color: Some(PadColor::Purple),
                 volume: 0.8,
                 looping: true,
+                favorite: false,
             }
         );
+    }
+
+    #[test]
+    fn the_favorite_is_read_and_left_out_when_false() {
+        assert!(pad(r#""favorite": true"#).favorite);
+        assert!(!pad(r#""loop": true"#).favorite);
+        assert!(!pad(r#""favorite": "yes", "loop": true"#).favorite);
+        let mut store = PadStore::default();
+        let favorite = PadSettings {
+            favorite: true,
+            ..Default::default()
+        };
+        store.set("/a.wav", favorite.clone());
+        let looping = PadSettings {
+            looping: true,
+            ..Default::default()
+        };
+        store.set("/b.wav", looping);
+        let text = serde_json::to_string(&File {
+            version: VERSION,
+            pads: &store.pads,
+        })
+        .unwrap();
+        assert_eq!(text.matches("\"favorite\":true").count(), 1);
+        assert_eq!(parse(&text).get("/a.wav"), favorite);
+    }
+
+    #[test]
+    fn rename_moves_the_settings() {
+        let looping = PadSettings {
+            looping: true,
+            ..Default::default()
+        };
+        let favorite = PadSettings {
+            favorite: true,
+            ..Default::default()
+        };
+        let mut store = PadStore::default();
+        assert!(!store.rename("/a.wav", "/b.wav"));
+        assert!(store.is_empty());
+
+        store.set("/a.wav", looping.clone());
+        assert!(store.rename("/a.wav", "/b.wav"));
+        assert_eq!(store.get("/a.wav"), PadSettings::default());
+        assert_eq!(store.get("/b.wav"), looping);
+
+        store.set("/c.wav", favorite);
+        assert!(store.rename("/b.wav", "/c.wav"));
+        assert_eq!(store.get("/c.wav"), looping);
+        assert_eq!(store.pads.len(), 1);
     }
 
     #[test]
@@ -420,6 +559,7 @@ mod tests {
                 color: Some(PadColor::Brown),
                 volume: 0.25,
                 looping: true,
+                favorite: true,
             },
         );
         store.set(
@@ -470,6 +610,86 @@ mod tests {
         assert_eq!(trigger(TriggerMode::Restart, false), Trigger::Start);
         assert_eq!(trigger(TriggerMode::StopOthers, true), Trigger::Stop);
         assert_eq!(trigger(TriggerMode::StopOthers, false), Trigger::StartAlone);
+    }
+
+    #[test]
+    fn play_rule_never_stops() {
+        assert_eq!(play(TriggerMode::Overlap, true), None);
+        assert_eq!(play(TriggerMode::Overlap, false), Some(Trigger::Start));
+        assert_eq!(play(TriggerMode::Restart, true), Some(Trigger::Restart));
+        assert_eq!(play(TriggerMode::Restart, false), Some(Trigger::Start));
+        assert_eq!(play(TriggerMode::StopOthers, true), None);
+        assert_eq!(
+            play(TriggerMode::StopOthers, false),
+            Some(Trigger::StartAlone)
+        );
+    }
+
+    #[test]
+    fn search_match() {
+        assert!(matches("horn", "Air Horn", "Air Horn.wav"));
+        assert!(matches("horn air", "Air Horn", "Air Horn.wav"));
+        assert!(matches("  AIR   hOrN ", "Air Horn", "Air Horn.wav"));
+        // Only the file name has it.
+        assert!(matches("crick", "Zebra", "Crickets.wav"));
+        // One word in each.
+        assert!(matches("zeb crick", "Zebra", "Crickets.wav"));
+        assert!(matches("é", "CAFÉ", "x.wav"));
+        assert!(matches("CAFÉ", "café", "x.wav"));
+        assert!(!matches("bell", "Air Horn", "Air Horn.wav"));
+        assert!(!matches("air bell", "Air Horn", "Air Horn.wav"));
+        assert!(!matches("", "Air Horn", "Air Horn.wav"));
+        assert!(!matches("   ", "Air Horn", "Air Horn.wav"));
+    }
+
+    #[test]
+    fn sort_order_names() {
+        assert_eq!(SortOrder::from_name("name"), SortOrder::Name);
+        assert_eq!(SortOrder::from_name("recent"), SortOrder::Recent);
+        assert_eq!(SortOrder::from_name("bogus"), SortOrder::Name);
+        assert_eq!(SortOrder::Recent.name(), "recent");
+    }
+
+    fn key<'a>(display_name: &'a str, file_name: &'a str, seconds: u64) -> SortKey<'a> {
+        SortKey {
+            display_name,
+            file_name,
+            modified: SystemTime::UNIX_EPOCH + Duration::from_secs(seconds),
+        }
+    }
+
+    #[test]
+    fn sort_by_name() {
+        let order = SortOrder::Name;
+        let less = |a, b| compare(order, a, b) == Ordering::Less;
+        assert!(less(
+            key("apple", "apple.wav", 1),
+            key("Bell", "Bell.wav", 9)
+        ));
+        assert!(less(key("Bell", "Bell.ogg", 1), key("bell", "bell.mp3", 1)));
+        assert_eq!(
+            compare(order, key("a", "a.wav", 1), key("a", "a.wav", 2)),
+            Ordering::Equal
+        );
+        // A custom name moves the pad.
+        assert!(less(
+            key("Air Horn", "Air Horn.wav", 1),
+            key("Crickets", "Crickets.wav", 1)
+        ));
+        assert!(less(
+            key("Crickets", "Crickets.wav", 1),
+            key("Zulu", "Air Horn.wav", 1)
+        ));
+    }
+
+    #[test]
+    fn sort_by_recent() {
+        let order = SortOrder::Recent;
+        let less = |a, b| compare(order, a, b) == Ordering::Less;
+        assert!(less(key("z", "z.wav", 9), key("a", "a.wav", 1)));
+        // The same time falls back to the name, then to the file name.
+        assert!(less(key("a", "z.wav", 5), key("b", "a.wav", 5)));
+        assert!(less(key("a", "a.ogg", 5), key("a", "a.wav", 5)));
     }
 
     #[test]
