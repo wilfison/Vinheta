@@ -8,9 +8,9 @@ usage() {
     cat >&2 <<'USAGE'
 usage: check.sh [--audio] [--app] [--deb] [--all]
 
-Always: clippy without warnings, a single glib version, no em dash, and
-meson test (desktop file, metainfo, schema, Rust tests).
---audio  also runs scripts/verify-audio-poc.sh rust (fake devices, about 1 minute)
+Always: rustfmt, clippy without warnings, a single glib version, no em dash,
+and meson test (desktop file, metainfo, schema, Rust tests).
+--audio  also runs scripts/verify-audio-poc.sh rust (fake devices, about 4 minutes)
 --app    also installs the app and runs scripts/verify-app.sh (real PipeWire,
          plays a quiet tone)
 --deb    also builds the package with scripts/build-deb.sh (several minutes)
@@ -48,6 +48,7 @@ run() {
     fi
 }
 
+formatted() { cargo fmt --check; }
 clippy() { cargo clippy --all-targets --features audio-poc -- -D warnings; }
 one_glib() { [ "$(cargo tree -i glib --depth 0 | grep -c '^glib ')" -eq 1 ]; }
 # The mockups are drawings, not text of the project.
@@ -60,6 +61,7 @@ untracked_em_dash() {
     [ -z "$found" ] || { echo "$found"; return 1; }
 }
 
+run "rustfmt has nothing to change" formatted
 run "clippy without warnings" clippy
 run "a single glib version" one_glib
 run "no em dash in tracked files" no_em_dash

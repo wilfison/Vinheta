@@ -91,7 +91,8 @@ mod imp {
             self.grid.connect_activate(|grid, position| {
                 let sound = grid.model().and_then(|model| model.item(position));
                 if let Some(sound) = sound.and_downcast::<Sound>() {
-                    let _ = grid.activate_action("app.toggle-sound", Some(&sound.path().to_variant()));
+                    let _ =
+                        grid.activate_action("app.toggle-sound", Some(&sound.path().to_variant()));
                 }
             });
             self.sounds.set(sounds).unwrap();
@@ -159,7 +160,11 @@ impl FolderPage {
 
     pub fn sounds(&self) -> impl Iterator<Item = Sound> {
         let sounds = self.imp().sounds.get().unwrap();
-        sounds.iter::<Sound>().flatten().collect::<Vec<_>>().into_iter()
+        sounds
+            .iter::<Sound>()
+            .flatten()
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn load(&self) {

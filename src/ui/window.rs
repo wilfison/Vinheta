@@ -100,7 +100,11 @@ mod imp {
                 .get_only()
                 .build();
             for (key, volume, percent) in [
-                ("monitor-volume", &self.monitor_volume, &self.monitor_percent),
+                (
+                    "monitor-volume",
+                    &self.monitor_volume,
+                    &self.monitor_percent,
+                ),
                 ("call-volume", &self.call_volume, &self.call_percent),
             ] {
                 let percent = percent.get();

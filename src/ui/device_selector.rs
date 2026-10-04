@@ -25,8 +25,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gettextrs::gettext;
-use gtk::prelude::*;
 use gtk::gio;
+use gtk::prelude::*;
 
 use crate::application::{DeviceKind, VinhetaApplication};
 use crate::APP_ID;

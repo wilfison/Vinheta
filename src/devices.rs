@@ -69,12 +69,15 @@ mod tests {
     use super::*;
 
     fn devices() -> Vec<Device> {
-        [("usb", "USB Microphone"), ("internal", "Internal Microphone")]
-            .map(|(name, description)| Device {
-                name: name.into(),
-                description: description.into(),
-            })
-            .to_vec()
+        [
+            ("usb", "USB Microphone"),
+            ("internal", "Internal Microphone"),
+        ]
+        .map(|(name, description)| Device {
+            name: name.into(),
+            description: description.into(),
+        })
+        .to_vec()
     }
 
     fn names(entries: &[Entry]) -> Vec<&str> {

@@ -272,7 +272,9 @@ impl Poc {
                     position.elapsed.as_millis(),
                     position
                         .duration
-                        .map_or("unknown".into(), |duration| duration.as_millis().to_string())
+                        .map_or("unknown".into(), |duration| duration
+                            .as_millis()
+                            .to_string())
                 ),
                 None => println!("position none"),
             }

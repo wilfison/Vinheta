@@ -269,7 +269,9 @@ impl VinhetaApplication {
                 self,
                 move |settings, key| {
                     let engine = app.imp().engine.borrow();
-                    let Some(engine) = engine.as_ref() else { return };
+                    let Some(engine) = engine.as_ref() else {
+                        return;
+                    };
                     match key {
                         "send-sounds-to-call" => engine.set_send_to_call(settings.boolean(key)),
                         "include-my-voice" => engine.set_include_voice(settings.boolean(key)),
@@ -336,7 +338,9 @@ impl VinhetaApplication {
 
     fn save_pads(&self) {
         let imp = self.imp();
-        let Some(file) = imp.pads_file.get() else { return };
+        let Some(file) = imp.pads_file.get() else {
+            return;
+        };
         if let Err(error) = imp.pads.borrow().save(file) {
             glib::g_warning!("vinheta", "could not save {}: {error}", file.display());
         }
@@ -402,7 +406,9 @@ impl VinhetaApplication {
             return;
         };
         let engine = imp.engine.borrow();
-        let Some(engine) = engine.as_ref() else { return };
+        let Some(engine) = engine.as_ref() else {
+            return;
+        };
 
         let mode = TriggerMode::from_name(&imp.settings.get().unwrap().string("trigger-mode"));
         let playing = self.playback_of(&sound);
@@ -454,7 +460,9 @@ impl VinhetaApplication {
     }
 
     fn stop_sound(&self, sound: &Sound) {
-        let Some(id) = self.playback_of(sound) else { return };
+        let Some(id) = self.playback_of(sound) else {
+            return;
+        };
         if let Some(engine) = self.imp().engine.borrow().as_ref() {
             engine.stop(id);
         }
@@ -524,7 +532,9 @@ impl VinhetaApplication {
     fn update_positions(&self) {
         let imp = self.imp();
         let engine = imp.engine.borrow();
-        let Some(engine) = engine.as_ref() else { return };
+        let Some(engine) = engine.as_ref() else {
+            return;
+        };
         // Notifying may reach back into the application.
         let playing: Vec<_> = imp
             .playing
@@ -605,7 +615,9 @@ impl VinhetaApplication {
     }
 
     fn window(&self) -> Option<VinhetaWindow> {
-        self.windows().into_iter().find_map(|window| window.downcast().ok())
+        self.windows()
+            .into_iter()
+            .find_map(|window| window.downcast().ok())
     }
 
     fn show_about(&self) {

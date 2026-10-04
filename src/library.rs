@@ -43,7 +43,9 @@ pub fn scan(folder: &Path) -> io::Result<Vec<SoundFile>> {
         if !is_sound(&path) || !path.is_file() {
             continue;
         }
-        let Some(name) = path.file_stem() else { continue };
+        let Some(name) = path.file_stem() else {
+            continue;
+        };
         sounds.push(SoundFile {
             name: name.to_string_lossy().into_owned(),
             path,

@@ -18,7 +18,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-
 //! What the user set for each pad, the file that stores it, the trigger
 //! rule, and the time format of a playing pad. No GTK types.
 
@@ -314,7 +313,10 @@ mod tests {
     }
 
     fn pad(fields: &str) -> PadSettings {
-        parse(&format!(r#"{{"version": 1, "pads": {{"/a.wav": {{{fields}}}}}}}"#)).get("/a.wav")
+        parse(&format!(
+            r#"{{"version": 1, "pads": {{"/a.wav": {{{fields}}}}}}}"#
+        ))
+        .get("/a.wav")
     }
 
     #[test]
@@ -362,7 +364,9 @@ mod tests {
 
     #[test]
     fn unknown_fields_are_ignored() {
-        let store = parse(r#"{"version": 1, "later": 1, "pads": {"/a.wav": {"loop": true, "hotkey": "F1"}}}"#);
+        let store = parse(
+            r#"{"version": 1, "later": 1, "pads": {"/a.wav": {"loop": true, "hotkey": "F1"}}}"#,
+        );
         assert!(store.get("/a.wav").looping);
     }
 
@@ -451,7 +455,10 @@ mod tests {
     fn trigger_mode_names() {
         assert_eq!(TriggerMode::from_name("overlap"), TriggerMode::Overlap);
         assert_eq!(TriggerMode::from_name("restart"), TriggerMode::Restart);
-        assert_eq!(TriggerMode::from_name("stop-others"), TriggerMode::StopOthers);
+        assert_eq!(
+            TriggerMode::from_name("stop-others"),
+            TriggerMode::StopOthers
+        );
         assert_eq!(TriggerMode::from_name("bogus"), TriggerMode::Overlap);
     }
 

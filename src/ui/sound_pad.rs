@@ -194,7 +194,11 @@ impl SoundPad {
         self.show_position(sound);
 
         let set = |name: &str, enabled: bool| {
-            if let Some(action) = imp.actions.lookup_action(name).and_downcast::<gio::SimpleAction>() {
+            if let Some(action) = imp
+                .actions
+                .lookup_action(name)
+                .and_downcast::<gio::SimpleAction>()
+            {
                 action.set_enabled(enabled);
             }
         };

@@ -267,7 +267,9 @@ impl Player {
         // pipeline, so every action is queued.
         bus.set_sync_handler(move |_, message| {
             let queue = |action: fn(&gst::Pipeline, &Control)| {
-                let Some(pipeline) = weak.upgrade() else { return };
+                let Some(pipeline) = weak.upgrade() else {
+                    return;
+                };
                 let control = control.clone();
                 pipeline.call_async(move |pipeline| {
                     let retired = control.retired.lock().unwrap();
@@ -482,7 +484,9 @@ impl Finisher {
         };
         // This runs on a streaming thread, which cannot stop its own pipeline.
         let control = playback.control;
-        playback.pipeline.call_async(move |pipeline| control.retire(pipeline));
+        playback
+            .pipeline
+            .call_async(move |pipeline| control.retire(pipeline));
         let event = match error {
             None => Event::PlaybackFinished {
                 id: self.id,

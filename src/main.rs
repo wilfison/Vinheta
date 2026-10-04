@@ -28,8 +28,8 @@ use self::ui::window::VinhetaWindow;
 
 use config::{GETTEXT_PACKAGE, LOCALEDIR, PKGDATADIR};
 use gettextrs::{bind_textdomain_codeset, bindtextdomain, textdomain};
-use gtk::{gio, glib};
 use gtk::prelude::*;
+use gtk::{gio, glib};
 
 pub const APP_ID: &str = "io.github.wilfison.Vinheta";
 
