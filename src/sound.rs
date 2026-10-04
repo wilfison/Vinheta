@@ -35,7 +35,7 @@ mod imp {
     pub struct Sound {
         #[property(get, construct_only)]
         path: OnceCell<String>,
-        /// The name from the file.
+        /// The name from the file, made readable (`library::humanize`).
         #[property(get, construct_only)]
         name: OnceCell<String>,
         #[property(get, set)]

@@ -244,7 +244,8 @@ impl FolderPage {
                 let path = file.path.to_str()?;
                 let settings = app.as_ref().map(|app| app.pad_settings(path));
                 let settings = settings.unwrap_or_default();
-                Some(Sound::new(path, &file.name, file.modified, &settings))
+                let name = library::humanize(&file.name);
+                Some(Sound::new(path, &name, file.modified, &settings))
             })
             .collect();
         store.extend_from_slice(&added);

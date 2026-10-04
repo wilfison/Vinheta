@@ -75,6 +75,34 @@ pub fn is_sound(path: &Path) -> bool {
     supported && !hidden
 }
 
+/// The name a pad shows for a file name without its extension: `_`, `-`, and
+/// `.` become spaces (a dot between digits stays), spaces are collapsed, and
+/// the first letter is uppercase. A name with nothing else is kept as it is.
+pub fn humanize(name: &str) -> String {
+    let chars: Vec<char> = name.chars().collect();
+    let is_digit = |index: Option<usize>| {
+        index
+            .and_then(|index| chars.get(index))
+            .is_some_and(char::is_ascii_digit)
+    };
+    let spaced: String = chars
+        .iter()
+        .enumerate()
+        .map(|(index, &char)| match char {
+            '_' | '-' => ' ',
+            '.' if !(is_digit(index.checked_sub(1)) && is_digit(Some(index + 1))) => ' ',
+            other => other,
+        })
+        .collect();
+    let words: Vec<_> = spaced.split_whitespace().collect();
+    let joined = words.join(" ");
+    let mut rest = joined.chars();
+    match rest.next() {
+        Some(first) => first.to_uppercase().chain(rest).collect(),
+        None => name.to_owned(),
+    }
+}
+
 /// What a new scan of a folder changed.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Diff {
@@ -250,6 +278,24 @@ mod tests {
         assert_eq!(sounds[0].name, "Air Horn");
         assert_eq!(sounds[0].path, fixture.0.join("Air Horn.mp3"));
         assert_eq!(sounds[1].name, "ta.da");
+    }
+
+    #[test]
+    fn humanize_turns_separators_into_spaces_and_capitalizes() {
+        assert_eq!(humanize("air_horn"), "Air horn");
+        assert_eq!(humanize("sad-trombone"), "Sad trombone");
+        assert_eq!(humanize("ta.da"), "Ta da");
+        assert_eq!(humanize("  drum__roll - final "), "Drum roll final");
+        assert_eq!(humanize("água_viva"), "Água viva");
+    }
+
+    #[test]
+    fn humanize_keeps_what_is_already_readable() {
+        assert_eq!(humanize("Air Horn"), "Air Horn");
+        assert_eq!(humanize("BGM loop"), "BGM loop");
+        assert_eq!(humanize("intro_v1.2"), "Intro v1.2");
+        assert_eq!(humanize("2_fast"), "2 fast");
+        assert_eq!(humanize("___"), "___");
     }
 
     #[test]
