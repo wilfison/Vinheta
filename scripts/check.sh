@@ -15,7 +15,8 @@ schema, Rust tests).
 --audio  also runs scripts/verify-audio.sh (fake devices, about 4 minutes)
 --app    also installs the app and runs scripts/verify-app.sh (real PipeWire,
          plays a quiet tone)
---deb    also builds the package with scripts/build-deb.sh (several minutes)
+--deb    also builds the package with scripts/build-deb.sh, in the background
+         while the other checks run
 --all    all of the above
 USAGE
     exit 2
@@ -36,19 +37,48 @@ cd "$root" || exit 1
 mkdir -p tmp/check
 failures=0
 
-# run LABEL COMMAND...: the output is kept in tmp/check and shown on failure.
-run() {
-    local label=$1 log
-    shift
-    log="tmp/check/$(echo "$label" | tr -c 'a-z0-9\n' '-').log"
-    if "$@" >"$log" 2>&1; then
-        echo "PASS $label"
+log_of() { echo "tmp/check/$(echo "$1" | tr -c 'a-z0-9\n' '-').log"; }
+
+# report LABEL STATUS
+report() {
+    if [ "$2" -eq 0 ]; then
+        echo "PASS $1"
     else
-        echo "FAIL $label (see $log)"
-        tail -n 15 "$log" | sed 's/^/    /'
+        echo "FAIL $1 (see $(log_of "$1"))"
+        tail -n 15 "$(log_of "$1")" | sed 's/^/    /'
         failures=$((failures + 1))
     fi
 }
+
+# run LABEL COMMAND...: the output is kept in tmp/check and shown on failure.
+run() {
+    local label=$1
+    shift
+    "$@" >"$(log_of "$label")" 2>&1
+    report "$label" $?
+}
+
+# start LABEL COMMAND...: like run, in the background; finish LABEL reports it.
+# A background job ignores Ctrl-C, so it gets a process group to be killed
+# with when the script ends early.
+declare -A started
+start() {
+    local label=$1
+    shift
+    setsid "$@" >"$(log_of "$label")" 2>&1 &
+    started[$label]=$!
+}
+finish() {
+    wait "${started[$1]}"
+    report "$1" $?
+    unset "started[$1]"
+}
+stop_started() {
+    local pid
+    for pid in "${started[@]}"; do kill -- "-$pid" 2>/dev/null; done
+}
+trap stop_started EXIT
+trap 'exit 130' INT TERM
 
 formatted() { cargo fmt --check; }
 clippy() { cargo clippy --all-targets --features audio-test -- -D warnings; }
@@ -63,6 +93,10 @@ untracked_em_dash() {
     [ -z "$found" ] || { echo "$found"; return 1; }
 }
 
+# The package builds from its own copy and plays nothing, so it overlaps the
+# rest. At the lowest priority, so it does not disturb the timed audio checks.
+[ -n "$deb" ] && start "debian package" nice -n 19 scripts/build-deb.sh
+
 run "rustfmt has nothing to change" formatted
 run "clippy without warnings" clippy
 run "a single glib version" one_glib
@@ -76,7 +110,7 @@ if [ -n "$app" ]; then
     run "install into the local prefix" install_app
     run "app end to end" scripts/verify-app.sh
 fi
-[ -n "$deb" ] && run "debian package" scripts/build-deb.sh
+[ -n "$deb" ] && finish "debian package"
 
 if [ "$failures" -eq 0 ]; then
     echo "ALL CHECKS PASSED"

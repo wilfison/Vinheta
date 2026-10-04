@@ -42,7 +42,7 @@ scripts/screenshot.sh NAME …  # the installed app on a virtual display, captur
 Before committing:
 
 - Run `scripts/check.sh`. After changing audio code, also run all of `scripts/verify-audio.sh`; after changing what the app does with sounds, all of `scripts/verify-app.sh`. `--only REGEX` is for the work in between.
-- `scripts/check.sh --all` takes more than 10 minutes: run it in the background and read `tmp/check/` or its output when it ends.
+- `scripts/check.sh --all` takes about 6 minutes: run it in the background and read `tmp/check/` or its output when it ends.
 - Never run `scripts/ci.sh` on a developer machine (it installs packages); `scripts/ci-container.sh` rehearses it.
 - Screenshots are temporary: read them, then delete them (`scripts/screenshot.sh --clean`).
 

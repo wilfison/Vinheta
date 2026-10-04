@@ -134,7 +134,7 @@ The CI runs neither the audio harness nor the app check, so the full run happens
 here, on the exact tree that will be tagged:
 
 ```bash
-scripts/check.sh --all      # more than 10 minutes: run it in the background
+scripts/check.sh --all      # about 6 minutes: run it in the background
 ```
 
 Read its output (or `tmp/check/`) when it ends. When the packaging changed since
