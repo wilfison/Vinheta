@@ -43,6 +43,11 @@ Steps run in the given order once the window is up, before the capture:
 --crop WxH+X+Y crops the captures that follow (--crop full undoes it)
 --restart      quits the app and starts it again with the same settings and
                pad settings, to check what is restored
+--expect-setting 'KEY VALUE'  fails the run unless the key of the app's
+               settings has that value, as "gsettings get" prints it (false,
+               0.5, 'text'); it waits up to 2 seconds for it
+--expect-playing N  fails the run unless N sounds are playing (the call
+               streams of the app in PipeWire); it waits up to 2 seconds
 --exec COMMAND runs a shell command; a status other than 0 is reported as a
                failed step (end it with "|| true" when that is expected)
 
@@ -81,7 +86,7 @@ while [ $# -gt 0 ]; do
             fake_names+=("${2%% *}")
             shift
             ;;
-        --action | --click | --right-click | --key | --size | --wait | --exec | --plug-mic | --plug-sink | --unplug | --capture | --crop)
+        --action | --click | --right-click | --key | --size | --wait | --exec | --expect-setting | --expect-playing | --plug-mic | --plug-sink | --unplug | --capture | --crop)
             [ $# -ge 2 ] || usage
             steps+=("${1#--} $2")
             case $1 in
@@ -126,6 +131,22 @@ fake_device() {
     local class=Audio/Sink positions="FL FR"
     [ "$1" = mic ] && class=Audio/Source/Virtual positions=MONO
     create_node "$2" "$3" "$class" "$positions" >/dev/null
+}
+
+# How many sounds play: each has one stream into the virtual microphone.
+playing_count() { pw-dump | grep -c '"node.name": "vinheta-call-'; }
+
+# expect WHAT VALUE COMMAND...: the command prints VALUE within 2 seconds.
+expect() {
+    local what=$1 value=$2 got i
+    shift 2
+    for i in $(seq 20); do
+        got=$("$@")
+        [ "$got" = "$value" ] && return 0
+        sleep 0.1
+    done
+    echo "expected $what to be $value, it is $got" >&2
+    return 1
 }
 
 unplug() {
@@ -178,6 +199,8 @@ session() {
             size) resize_window "${value%,*}" "${value#*,}" ;;
             wait) sleep "$value" ;;
             exec) bash -c "$value" ;;
+            expect-setting) expect "setting ${value%% *}" "${value#* }" gsettings get "$app_id" "${value%% *}" ;;
+            expect-playing) expect "sounds playing" "$value" playing_count ;;
             plug-mic) fake_device mic "${value%% *}" "${value#* }" ;;
             plug-sink) fake_device sink "${value%% *}" "${value#* }" ;;
             unplug) unplug "$value" ;;
@@ -199,7 +222,7 @@ session() {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-poc-common.sh'"
     declare -p directories shots name settings steps
-    declare -f fake_device unplug session
+    declare -f fake_device unplug playing_count expect session
     echo session
 } >"$config/session.sh"
 
@@ -222,7 +245,8 @@ if [ -n "$sheet" ] && [ "$status" -eq 0 ]; then
     for capture in "${captures[@]}"; do files+=("$shots/$capture.png"); done
     convert "${files[@]}" -append "$shots/$name-sheet.png" && echo "$shots/$name-sheet.png"
 fi
-grep -E "^step failed" "$log" >&2
+grep -E "^(expected|step failed)" "$log" >&2
+grep -q "^step failed: expect-" "$log" && status=1
 # What the app itself complained about (and its debug lines with --debug).
 grep -E "^\(vinheta:[0-9]+\): .*-(WARNING|CRITICAL)${debug:+|^\(vinheta:[0-9]+\): vinheta-DEBUG}" "$log" >&2
 exit "$status"

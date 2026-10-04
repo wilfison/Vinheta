@@ -55,6 +55,10 @@ Every technical claim in the PRD must have been checked, not remembered. Use `Ba
 - For a PipeWire or WirePlumber behavior, try it with the command line tools before designing on top of it: a silent file played with `gst-launch-1.0 ... ! pipewiresink`, a fake device from `create_node` in `scripts/audio-poc-common.sh`, then `pw-link -l`, `pw-metadata`, and `pw-cli destroy`. Name the test nodes without the `vinheta` prefix, and destroy them. `docs/audio-poc.md` has the findings so far; read it first.
 - A claim about a crate API that the design depends on is worth a throwaway program in the scratchpad when reading the source is not enough.
 
+- A claim about how the desktop sees the app (a portal, the app ID, a D-Bus service of the session, autostart) is tested the way a user runs it, never from the terminal of the agent alone: start the test with `systemd-run --user --scope`, because a terminal started by the desktop has an app scope that a portal takes for the app. Test with the files the app really installs (its own desktop file, from the local prefix and as the package installs it), not with a probe made for the test: in Phase 5 a probe with a valid `Exec` passed while the desktop file of the local prefix (`Exec=vinheta`, not in `PATH`) was refused, and three stories were built on it.
+- Do not cut the output of a monitor (`dbus-monitor`, `pw-mon`) with `head` before looking for an error reply: filter by the sender of the app instead.
+- When the core of a feature cannot be scripted (a real key press on Wayland, a system dialog, a real call), its manual check is the first story of the PRD, done by the user before anything is built on it. A measurement by proxy does not replace it.
+
 What could not be verified goes into the PRD as a target or an assumption, with a criterion in the story that measures it. Never as a fact.
 
 ## Step 4: PRD structure
@@ -109,12 +113,13 @@ There is no browser and no Playwright here. Every story ends with the criterion 
 | Engine (`src/audio/`) | `scripts/check.sh --audio` passes, and the harness `scripts/verify-audio-poc.sh` gains a check for each new engine operation, exposed through an option of `vinheta-audio-poc` |
 | Logic without interface | Rust unit tests in the module itself, run by `cargo test --lib` |
 | Interface (`src/ui/`) | "Screenshot check": `scripts/screenshot.sh NAME ...` in the described state, read and compared with the mockup and with the criteria; in the dark and `--light` styles when the story creates a new screen |
-| Interface wired to the engine | `scripts/verify-app.sh` passes, with a new check when the story changes what reaches the virtual microphone |
+| Interface wired to the engine | `scripts/verify-app.sh` passes, with a new section (self-contained, runnable alone with `--only`) when the story changes what reaches the virtual microphone |
 | Packaging or dependencies | `scripts/build-deb.sh` succeeds, and `debian/control` declares what changed |
 
 When writing a "Screenshot check", say how the state is reached. The tools of `scripts/screenshot.sh`:
 
 - `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--pads FILE` gives the app a `pads.json` (the pad settings) to start with; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--right-click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, `--restart` (quits and starts the app again, to check what is restored), and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
+- `--expect-setting 'KEY VALUE'` and `--expect-playing N` check a value instead of showing it, and fail the run. Write a criterion on a value with them ("`--key q --expect-playing 1`"), and keep the pictures for what only a picture shows.
 - `--capture NAME` takes a picture in the middle of the sequence and `--crop WxH+X+Y` crops the ones that follow, so one run can check several states; `--sheet` stacks them in one picture.
 - `scripts/fixtures.sh` creates the sound folders and pad settings for these checks in `tmp/fixtures`. Name its paths in the criteria instead of describing a fixture to build. Besides `Fixture`, `Palette`, and `Loop` it has `Many` (60 pads, enough to scroll), `Effects` (a second folder for the search), `favorites.json` (two favorites and a custom name), and `shortcuts.json` (pad keys on three pads of two folders).
 - A check that creates, renames, or deletes files works on a copy of a fixture made by the check itself (for example `cp -r tmp/fixtures/Fixture tmp/monitor-test/Fixture`), never in `tmp/fixtures`, and removes it at the end.
