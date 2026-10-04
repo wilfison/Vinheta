@@ -1,5 +1,11 @@
 # Helpers shared by the development scripts (run-dev, check, screenshot,
-# verify-app). Meant to be sourced.
+# verify-app, fixtures). Meant to be sourced, from bash.
+
+# Another shell has no BASH_SOURCE, and the root below would be wrong.
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "scripts/dev-common.sh must be sourced from bash" >&2
+    return 1 2>/dev/null || exit 1
+fi
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 prefix="$root/build/install"

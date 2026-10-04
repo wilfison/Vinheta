@@ -8,7 +8,8 @@ usage() {
     cat >&2 <<'USAGE'
 usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [--pads FILE]
                      [--fake-mic 'NODE DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
-                     [STEP]... [--no-audio] [--light]
+                     [STEP]... [--no-audio] [--light] [--debug] [--sheet]
+       screenshot.sh --clean
 
 Writes tmp/screenshots/NAME.png from the app installed in build/install.
 --folder DIR   adds DIR to the library before the app starts
@@ -22,6 +23,10 @@ Writes tmp/screenshots/NAME.png from the app installed in build/install.
                in the device lists (use the node name prefix vinheta-shot-)
 --no-audio     makes PipeWire unreachable, to capture the audio failure state
 --light        uses the light style instead of the dark one
+--debug        prints the app's debug messages (playback start times) at the end
+--sheet        also writes tmp/screenshots/NAME-sheet.png, every capture of
+               the run stacked in one picture, to review them in one look
+--clean        removes every picture of tmp/screenshots and exits
 
 Steps run in the given order once the window is up, before the capture:
 --action 'ACTION [PARAMETER]'  activates app.NAME (or NAME) or win.NAME;
@@ -36,7 +41,12 @@ Steps run in the given order once the window is up, before the capture:
 --unplug NODE  destroys a fake device
 --capture NAME writes tmp/screenshots/NAME.png at this point of the sequence
 --crop WxH+X+Y crops the captures that follow (--crop full undoes it)
---exec COMMAND runs a shell command
+--restart      quits the app and starts it again with the same settings and
+               pad settings, to check what is restored
+--exec COMMAND runs a shell command; a status other than 0 is reported as a
+               failed step (end it with "|| true" when that is expected)
+
+Warnings and criticals logged by the app are printed at the end.
 
 Fake devices are destroyed when the script ends, whatever happens.
 USAGE
@@ -58,6 +68,8 @@ captures=()
 scheme=prefer-dark
 no_audio=
 pads=
+debug=
+sheet=
 while [ $# -gt 0 ]; do
     case $1 in
         --folder) [ $# -ge 2 ] || usage; folders+=("$(realpath "$2")"); shift ;;
@@ -78,6 +90,13 @@ while [ $# -gt 0 ]; do
             esac
             shift
             ;;
+        --restart) steps+=("restart -") ;;
+        --debug) debug=1 ;;
+        --sheet) sheet=1 ;;
+        --clean)
+            find "$(dirname "$0")/../tmp/screenshots" -maxdepth 1 -name '*.png' -delete 2>/dev/null
+            exit 0
+            ;;
         --no-audio) no_audio=1 ;;
         --light) scheme=prefer-light ;;
         -*) usage ;;
@@ -87,7 +106,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$name" ] || usage
 
-require_tools xvfb-run dbus-run-session import mogrify gapplication gdbus gsettings xdotool pw-cli pw-dump python3
+require_tools xvfb-run dbus-run-session import mogrify convert gapplication gdbus gsettings xdotool pw-cli pw-dump python3
 require_app
 captures+=("$name")
 
@@ -163,6 +182,7 @@ session() {
             plug-sink) fake_device sink "${value%% *}" "${value#* }" ;;
             unplug) unplug "$value" ;;
             capture) capture "$value" ;;
+            restart) quit_app; start_app ;;
             crop) crop=$value; [ "$crop" != full ] || crop= ;;
         esac || echo "step failed: $step" >&2
         sleep 0.5
@@ -185,6 +205,7 @@ session() {
 
 export ADW_DEBUG_COLOR_SCHEME=$scheme
 [ -n "$no_audio" ] && export PIPEWIRE_REMOTE=vinheta-screenshot-no-audio
+[ -n "$debug" ] && export G_MESSAGES_DEBUG=vinheta
 virtual_session "$config" bash "$config/session.sh" >"$log" 2>&1
 
 status=0
@@ -196,5 +217,12 @@ for capture in "${captures[@]}"; do
         status=1
     fi
 done
+if [ -n "$sheet" ] && [ "$status" -eq 0 ]; then
+    files=()
+    for capture in "${captures[@]}"; do files+=("$shots/$capture.png"); done
+    convert "${files[@]}" -append "$shots/$name-sheet.png" && echo "$shots/$name-sheet.png"
+fi
 grep -E "^step failed" "$log" >&2
+# What the app itself complained about (and its debug lines with --debug).
+grep -E "^\(vinheta:[0-9]+\): .*-(WARNING|CRITICAL)${debug:+|^\(vinheta:[0-9]+\): vinheta-DEBUG}" "$log" >&2
 exit "$status"
