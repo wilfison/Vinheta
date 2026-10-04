@@ -343,3 +343,13 @@ gridview.pads > child > .pad.located {
 .narrow .bottom-bar {
   padding: 6px 8px;
 }
+
+/* The number of a step of the call setup guide. */
+.step-number {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 9999px;
+  font-weight: bold;
+  color: var(--accent-fg-color);
+  background-color: var(--accent-bg-color);
+}

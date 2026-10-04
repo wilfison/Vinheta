@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag to build (e.g. v1.0.0)"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04
+    env:
+      TAG: ${{ inputs.ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          # The earlier tags, for the "Full diff" link of the notes.
+          fetch-depth: 0
+
+      - name: The tag matches the version
+        run: scripts/version.sh "$TAG"
+
+      # The full CI gate again, so a tag never ships what main would reject.
+      - name: Checks and package (scripts/check.sh --deb)
+        run: scripts/ci.sh
+
+      - name: Create or update the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/publish-release.sh "$TAG"

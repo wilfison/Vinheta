@@ -1,6 +1,6 @@
 /* window.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ use super::device_selector;
 use super::folder_page::FolderPage;
 use super::sound_dialog::SoundDialog;
 use super::sound_grid::SoundGrid;
-use crate::application::{DeviceKind, VinhetaApplication};
+use crate::application::{AudioFailure, DeviceKind, Notice, VinhetaApplication};
 use crate::sound::Sound;
 use crate::APP_ID;
 
@@ -90,6 +90,8 @@ mod imp {
         pub call_volume_row: TemplateChild<gtk::Box>,
         #[template_child]
         pub microphone: TemplateChild<gtk::DropDown>,
+        #[template_child]
+        pub microphone_icon: TemplateChild<gtk::Image>,
         pub settings: OnceCell<gio::Settings>,
         pub sound_dialog: glib::WeakRef<SoundDialog>,
         /// The order of the pads in every view.
@@ -156,7 +158,30 @@ mod imp {
             }
             if let Some(app) = app() {
                 device_selector::bind(&*self.microphone, &app, DeviceKind::Microphone);
+                // Never disconnected: the window lives as long as the app.
+                app.connect_local(
+                    "devices-changed",
+                    false,
+                    glib::clone!(
+                        #[weak]
+                        obj,
+                        #[upgrade_or]
+                        None,
+                        move |_| {
+                            obj.update_microphone_mark();
+                            None
+                        }
+                    ),
+                );
+                obj.update_microphone_mark();
             }
+            self.banner.connect_button_clicked(glib::clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    let _ = WidgetExt::activate_action(&obj, "app.retry-audio", None);
+                }
+            ));
             let directories = settings.strv("directories");
             self.settings.set(settings).unwrap();
 
@@ -237,16 +262,25 @@ impl VinhetaWindow {
 
     /// Shows or hides the banner that says audio does not work, and dims the
     /// pads along with it (the application ignores the triggers).
-    pub fn set_audio_error(&self, message: Option<&str>) {
+    pub fn set_audio_error(&self, failure: Option<AudioFailure>) {
         let imp = self.imp();
-        if let Some(message) = message {
-            // Translators: {} is the reason reported by the audio system.
-            let title = gettext("Audio is unavailable: {}").replace("{}", message);
-            imp.banner.set_title(&title);
+        if let Some(failure) = failure {
+            imp.banner.set_title(&match failure {
+                AudioFailure::Unreachable => {
+                    gettext("Audio is unavailable: PipeWire is not running")
+                }
+                AudioFailure::ConnectionLost => {
+                    gettext("Audio stopped: the connection to PipeWire was lost")
+                }
+                AudioFailure::NodeExists => gettext(
+                    "Audio is unavailable: another program already has a “Vinheta” microphone",
+                ),
+                AudioFailure::Other => gettext("Audio is unavailable"),
+            });
         }
-        imp.banner.set_revealed(message.is_some());
+        imp.banner.set_revealed(failure.is_some());
         // The pads stay reachable: their settings can still be edited.
-        if message.is_some() {
+        if failure.is_some() {
             imp.views.add_css_class("no-audio");
         } else {
             imp.views.remove_css_class("no-audio");
@@ -270,6 +304,32 @@ impl VinhetaWindow {
 
     pub fn toast(&self, message: &str) {
         self.imp().toasts.add_toast(adw::Toast::new(message));
+    }
+
+    pub fn notice(&self, notice: &Notice) {
+        let toast = adw::Toast::new(&notice.message);
+        if notice.sticky {
+            toast.set_timeout(0);
+            toast.set_priority(adw::ToastPriority::High);
+        }
+        self.imp().toasts.add_toast(toast);
+    }
+
+    /// The mark that stays after the toast about a missing microphone.
+    fn update_microphone_mark(&self) {
+        let imp = self.imp();
+        let missing = app().is_some_and(|app| app.device_missing(DeviceKind::Microphone));
+        if missing {
+            imp.microphone_icon.add_css_class("warning");
+            let tooltip = gettext("Not connected. Using the system default.");
+            imp.microphone.set_tooltip_text(Some(&tooltip));
+            imp.microphone_icon.set_tooltip_text(Some(&tooltip));
+        } else {
+            imp.microphone_icon.remove_css_class("warning");
+            imp.microphone
+                .set_tooltip_text(Some(&gettext("Microphone")));
+            imp.microphone_icon.set_tooltip_text(None);
+        }
     }
 
     /// The sorted and filtered views do not watch their sounds: the
@@ -552,6 +612,15 @@ impl VinhetaWindow {
         let remove_folder = gio::ActionEntry::builder("remove-folder")
             .activate(|window: &Self, _, _| window.remove_folder())
             .build();
+        let find_folder = gio::ActionEntry::builder("find-folder")
+            .activate(|window: &Self, _, _| {
+                glib::spawn_future_local(glib::clone!(
+                    #[weak]
+                    window,
+                    async move { window.find_folder().await }
+                ));
+            })
+            .build();
         let rename_folder = gio::ActionEntry::builder("rename-folder")
             .activate(|window: &Self, _, _| {
                 glib::spawn_future_local(glib::clone!(
@@ -567,8 +636,8 @@ impl VinhetaWindow {
         let move_right = gio::ActionEntry::builder("move-folder-right")
             .activate(|window: &Self, _, _| window.move_folder(true))
             .build();
-        // The parameter of the next three is the absolute path of a sound of
-        // the library.
+        // The parameter of these is a text: the absolute path of a sound of
+        // the library, of a folder, or what to search for.
         let path_action = |name: &str, activate: fn(&Self, &str)| {
             gio::ActionEntry::builder(name)
                 .parameter_type(Some(glib::VariantTy::STRING))
@@ -586,6 +655,8 @@ impl VinhetaWindow {
             add_sounds,
             import_files,
             remove_folder,
+            find_folder,
+            path_action("relocate-folder", Self::relocate_folder),
             rename_folder,
             move_left,
             move_right,
@@ -857,6 +928,66 @@ impl VinhetaWindow {
         tabs.set_visible_child(page);
     }
 
+    /// Asks where the folder of the tab being shown is now.
+    async fn find_folder(&self) {
+        let dialog = gtk::FileDialog::builder()
+            .title(gettext("Locate Folder"))
+            .modal(true)
+            .build();
+        let Ok(folder) = dialog.select_folder_future(Some(self)).await else {
+            return;
+        };
+        match folder.path().as_deref().and_then(|path| path.to_str()) {
+            Some(path) => self.relocate_folder(path),
+            None => self.toast(&gettext("This folder cannot be added")),
+        }
+    }
+
+    /// Points the tab being shown at another folder. The tab keeps its
+    /// place and its name, and the pads keep their settings.
+    fn relocate_folder(&self, path: &str) {
+        let tabs = &self.imp().tabs;
+        let page = tabs.visible_child().and_downcast::<FolderPage>();
+        let Some(page) = page.filter(|_| !self.searching()) else {
+            return;
+        };
+        let path = path.trim_end_matches('/');
+        if path == page.path() {
+            return;
+        }
+        if tabs.child_by_name(path).is_some() {
+            self.toast(&gettext("This folder is already in the library"));
+            return;
+        }
+        if path.is_empty() || !Path::new(path).is_dir() {
+            self.toast(&gettext("This folder cannot be added"));
+            return;
+        }
+        for sound in page.sounds().filter(Sound::playing) {
+            let sound = sound.path().to_variant();
+            let _ = WidgetExt::activate_action(self, "app.stop-sound", Some(&sound));
+        }
+        if let Some(app) = app() {
+            app.move_folder_settings(page.path(), path);
+        }
+        let mut names = self.folder_names();
+        if let Some(name) = names.remove(page.path()) {
+            names.insert(path.to_owned(), name);
+            let settings = self.imp().settings.get().unwrap();
+            if let Err(error) = settings.set("folder-names", names) {
+                glib::g_warning!("vinheta", "could not save the tab names: {error}");
+            }
+        }
+        let mut pages = self.pages();
+        let Some(position) = pages.iter().position(|other| *other == page) else {
+            return;
+        };
+        let new = self.new_page(path);
+        pages[position] = new.clone();
+        self.set_pages(&pages);
+        tabs.set_visible_child(&new);
+    }
+
     /// Moves the tab being shown one place. The pages are the same objects,
     /// so nothing is scanned again and nothing stops.
     fn move_folder(&self, right: bool) {
@@ -977,6 +1108,8 @@ impl VinhetaWindow {
             }
         };
         set("remove-folder", position.is_some());
+        set("find-folder", position.is_some());
+        set("relocate-folder", position.is_some());
         set("rename-folder", position.is_some());
         set(
             "move-folder-left",

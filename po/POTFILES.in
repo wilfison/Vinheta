@@ -1,9 +1,10 @@
 # List of source files containing translatable strings.
 # Please keep this file sorted alphabetically.
 data/io.github.wilfison.Vinheta.desktop.in
-data/io.github.wilfison.Vinheta.metainfo.xml.in
 data/io.github.wilfison.Vinheta.gschema.xml
+data/io.github.wilfison.Vinheta.metainfo.xml.in
 src/application.rs
+src/ui/call-guide-dialog.ui
 src/ui/device_selector.rs
 src/ui/folder-page.ui
 src/ui/preferences-dialog.ui

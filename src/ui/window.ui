@@ -62,7 +62,9 @@
               </object>
             </child>
             <child type="top">
-              <object class="AdwBanner" id="banner"/>
+              <object class="AdwBanner" id="banner">
+                <property name="button-label" translatable="yes">Try Again</property>
+              </object>
             </child>
             <property name="content">
               <object class="GtkOverlay">
@@ -121,14 +123,32 @@
                               </object>
                             </child>
                             <child>
-                              <object class="GtkLabel">
-                                <property name="label" translatable="yes">Tip: to be heard in a call, choose “Vinheta” as the microphone in your call app</property>
-                                <property name="wrap">True</property>
-                                <property name="justify">center</property>
-                                <style>
-                                  <class name="dimmed"/>
-                                  <class name="caption"/>
-                                </style>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">6</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label" translatable="yes">Tip: to be heard in a call, choose “Vinheta” as the microphone in your call app</property>
+                                    <property name="wrap">True</property>
+                                    <property name="justify">center</property>
+                                    <style>
+                                      <class name="dimmed"/>
+                                      <class name="caption"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkButton">
+                                    <property name="label" translatable="yes">Call Setup Guide</property>
+                                    <property name="halign">center</property>
+                                    <property name="action-name">app.call-guide</property>
+                                    <style>
+                                      <class name="flat"/>
+                                      <class name="caption"/>
+                                      <class name="link-button"/>
+                                    </style>
+                                  </object>
+                                </child>
                               </object>
                             </child>
                           </object>
@@ -426,7 +446,7 @@
                   <object class="GtkBox">
                     <property name="spacing">8</property>
                     <child>
-                      <object class="GtkImage">
+                      <object class="GtkImage" id="microphone_icon">
                         <property name="icon-name">audio-input-microphone-symbolic</property>
                       </object>
                     </child>
@@ -434,6 +454,31 @@
                       <object class="GtkDropDown" id="microphone">
                         <property name="hexpand">True</property>
                         <property name="tooltip-text" translatable="yes">Microphone</property>
+                        <!-- The default factory does not ellipsize, and a long
+                             device name would make the window wider. -->
+                        <property name="factory">
+                          <object class="GtkBuilderListItemFactory">
+                            <property name="bytes"><![CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <template class="GtkListItem">
+    <property name="child">
+      <object class="GtkLabel">
+        <property name="xalign">0</property>
+        <property name="ellipsize">end</property>
+        <property name="width-chars">8</property>
+        <binding name="label">
+          <lookup name="string" type="GtkStringObject">
+            <lookup name="item">GtkListItem</lookup>
+          </lookup>
+        </binding>
+      </object>
+    </property>
+  </template>
+</interface>
+]]></property>
+                          </object>
+                        </property>
                         <accessibility>
                           <property name="label" translatable="yes">Microphone</property>
                         </accessibility>
@@ -518,6 +563,10 @@
       <item>
         <attribute name="label" translatable="yes">_Preferences</attribute>
         <attribute name="action">app.preferences</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Call Setup Guide</attribute>
+        <attribute name="action">app.call-guide</attribute>
       </item>
       <item>
         <attribute name="label" translatable="yes">_Keyboard Shortcuts</attribute>

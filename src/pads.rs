@@ -1,6 +1,6 @@
 /* pads.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -230,6 +230,26 @@ impl PadStore {
             }
             None => false,
         }
+    }
+
+    /// Moves the settings of every file inside the folder `from` to the same
+    /// relative path inside `to`, replacing what was there. Returns how many
+    /// entries moved.
+    pub fn move_folder(&mut self, from: &str, to: &str) -> usize {
+        let from = format!("{}/", from.trim_end_matches('/'));
+        let to = format!("{}/", to.trim_end_matches('/'));
+        if from == to {
+            return 0;
+        }
+        let paths = self.pads.keys().filter(|path| path.starts_with(&from));
+        let paths: Vec<String> = paths.cloned().collect();
+        for path in &paths {
+            if let Some(settings) = self.pads.remove(path) {
+                self.pads
+                    .insert(format!("{to}{}", &path[from.len()..]), settings);
+            }
+        }
+        paths.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -538,6 +558,54 @@ mod tests {
         assert_eq!(text.matches("\"shortcut\":\"q\"").count(), 1);
         assert_eq!(text.matches("shortcut").count(), 1);
         assert_eq!(parse(&text).get("/a.wav"), keyed);
+    }
+
+    fn folder_store() -> PadStore {
+        parse(
+            r#"{"version": 1, "pads": {
+                "/a/F/one.wav": {"color": "red", "shortcut": "q"},
+                "/a/F/sub/two.wav": {"name": "Two"},
+                "/a/Fx/three.wav": {"shortcut": "w"},
+                "/b/G/one.wav": {"shortcut": "e", "loop": true}
+            }}"#,
+        )
+    }
+
+    #[test]
+    fn move_folder_moves_the_entries_inside_it() {
+        let mut store = folder_store();
+        assert_eq!(store.move_folder("/a/F", "/c/New"), 2);
+        assert_eq!(store.get("/a/F/one.wav"), PadSettings::default());
+        let one = store.get("/c/New/one.wav");
+        assert_eq!(one.color, Some(PadColor::Red));
+        assert_eq!(one.shortcut, Some('q'));
+        assert_eq!(store.get("/c/New/sub/two.wav").name.as_deref(), Some("Two"));
+    }
+
+    #[test]
+    fn move_folder_respects_the_path_boundary() {
+        let mut store = folder_store();
+        store.move_folder("/a/F/", "/c/New");
+        assert_eq!(store.get("/a/Fx/three.wav").shortcut, Some('w'));
+        assert_eq!(store.shortcut_owner('w'), Some("/a/Fx/three.wav"));
+    }
+
+    #[test]
+    fn move_folder_replaces_the_destination_and_keeps_keys_unique() {
+        let mut store = folder_store();
+        assert_eq!(store.move_folder("/a/F", "/b/G"), 2);
+        let one = store.get("/b/G/one.wav");
+        assert_eq!(one.shortcut, Some('q'));
+        assert!(!one.looping);
+        assert_eq!(store.shortcut_owner('e'), None);
+        assert_eq!(store.shortcut_owner('q'), Some("/b/G/one.wav"));
+    }
+
+    #[test]
+    fn move_folder_to_itself_changes_nothing() {
+        let mut store = folder_store();
+        assert_eq!(store.move_folder("/a/F", "/a/F/"), 0);
+        assert_eq!(store, folder_store());
     }
 
     #[test]

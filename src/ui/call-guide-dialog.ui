@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="VinhetaCallGuideDialog" parent="AdwDialog">
+    <property name="title" translatable="yes">Use Vinheta in a Call</property>
+    <property name="content-width">480</property>
+    <property name="default-widget">got_it</property>
+    <property name="focus-widget">got_it</property>
+    <property name="child">
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar"/>
+        </child>
+        <property name="content">
+          <object class="GtkScrolledWindow">
+            <property name="hscrollbar-policy">never</property>
+            <property name="propagate-natural-height">True</property>
+            <property name="child">
+              <object class="AdwClamp">
+                <property name="maximum-size">480</property>
+                <property name="child">
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">18</property>
+                    <property name="margin-top">6</property>
+                    <property name="margin-bottom">24</property>
+                    <property name="margin-start">12</property>
+                    <property name="margin-end">12</property>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label" translatable="yes">Vinheta creates a virtual microphone that carries your voice and your sounds. For the other side of a call to hear them:</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkListBox">
+                        <property name="selection-mode">none</property>
+                        <style>
+                          <class name="boxed-list"/>
+                        </style>
+                        <child>
+                          <object class="AdwActionRow">
+                            <property name="activatable">False</property>
+                            <property name="title" translatable="yes">Choose “Vinheta” as the microphone</property>
+                            <property name="subtitle" translatable="yes">In the audio settings of your call app, select “Vinheta” as the microphone (input device). Your voice and your sounds go through it.</property>
+                            <child type="prefix">
+                              <object class="GtkLabel">
+                                <property name="label">1</property>
+                                <property name="valign">center</property>
+                                <accessibility>
+                                  <property name="label" translatable="yes">Step 1</property>
+                                </accessibility>
+                                <style>
+                                  <class name="step-number"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="AdwActionRow">
+                            <property name="activatable">False</property>
+                            <property name="title" translatable="yes">Turn off noise suppression</property>
+                            <property name="subtitle" translatable="yes">Call apps treat sounds as noise and cut them out. Turn off noise suppression or noise cancellation in the call app.</property>
+                            <child type="prefix">
+                              <object class="GtkLabel">
+                                <property name="label">2</property>
+                                <property name="valign">center</property>
+                                <accessibility>
+                                  <property name="label" translatable="yes">Step 2</property>
+                                </accessibility>
+                                <style>
+                                  <class name="step-number"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="AdwActionRow">
+                            <property name="activatable">False</property>
+                            <property name="title" translatable="yes">Use headphones</property>
+                            <property name="subtitle" translatable="yes">With speakers, your microphone picks the sounds up again and the call hears them twice.</property>
+                            <child type="prefix">
+                              <object class="GtkLabel">
+                                <property name="label">3</property>
+                                <property name="valign">center</property>
+                                <accessibility>
+                                  <property name="label" translatable="yes">Step 3</property>
+                                </accessibility>
+                                <style>
+                                  <class name="step-number"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="AdwActionRow">
+                            <property name="activatable">False</property>
+                            <property name="title" translatable="yes">Keep Vinheta open</property>
+                            <property name="subtitle" translatable="yes">The “Vinheta” microphone exists only while the app is running.</property>
+                            <child type="prefix">
+                              <object class="GtkLabel">
+                                <property name="label">4</property>
+                                <property name="valign">center</property>
+                                <accessibility>
+                                  <property name="label" translatable="yes">Step 4</property>
+                                </accessibility>
+                                <style>
+                                  <class name="step-number"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="got_it">
+                        <property name="label" translatable="yes">Got It</property>
+                        <property name="halign">center</property>
+                        <style>
+                          <class name="pill"/>
+                          <class name="suggested-action"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </property>
+              </object>
+            </property>
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+</interface>

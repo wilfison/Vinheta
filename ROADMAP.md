@@ -29,7 +29,7 @@ The node is created by the app's connection and disappears when the app closes, 
 
 The biggest risk in the project. No interface here.
 
-**Done.** The findings, the scripts, and how to re-run the checks are in [docs/audio-poc.md](docs/audio-poc.md).
+**Done.** The findings, the scripts, and how to re-run the checks are in [docs/audio.md](docs/audio.md).
 
 First on the command line, without writing any Rust:
 
@@ -48,7 +48,7 @@ Done when: someone on a call hears your voice and the sound together, and the no
 
 - ✅ Voice and sound arrive together on both channels of the virtual microphone. Checked by `scripts/verify-audio-poc.sh` with a fake microphone and a recording, not by a person on a call.
 - ✅ The node and its links disappear after a normal exit, Ctrl+C, and `kill -9`.
-- ⬜ Test on a real call (Discord, Google Meet), including noise suppression and echo. The steps are in the manual call checklist of `docs/audio-poc.md`.
+- ⬜ Test on a real call (Discord, Google Meet), including noise suppression and echo. The steps are in the manual call checklist of `docs/audio.md`.
 
 What changed from the original plan:
 
@@ -217,17 +217,38 @@ Notes for the next phases:
 
 ### Phase 6: polish and release
 
-- ⬜ First-run screen explaining how to pick "Vinheta" in the call app and how to turn off its noise suppression. This is where most users get stuck.
-- ⬜ Error handling: PipeWire missing, corrupted file, directory removed, microphone removed. The engine already reports the first two and a missing microphone as `Error` values; the interface has to show them.
-- ⬜ Icon, metainfo, screenshots, and translations (gettext; `po/LINGUAS` is still empty).
-- ⬜ Publishing the `.deb` (GitHub releases or a PPA).
-- ⬜ Before the release, remove `vinheta-audio-poc`, the `audio-poc` cargo feature, and the `rust` mode of `scripts/verify-audio-poc.sh`.
+- ✅ First-run screen explaining how to pick "Vinheta" in the call app and how to turn off its noise suppression: the call setup guide, a dialog shown on the first run and from the primary menu.
+- ✅ Error handling: PipeWire missing, corrupted file, directory removed, microphone removed. Audio that is unavailable says why and has "Try Again"; a chosen device that is not connected, a missing microphone, a damaged or unwritable pad file, and a missing folder are told to the user.
+- ✅ Icon, metainfo, screenshots, and translations (Brazilian Portuguese).
+- 🟨 Publishing the `.deb`: the CI and release workflows exist and were rehearsed in a container; the repository, the first push, and the tag `v1.0.0` wait for the go-ahead of the user.
+- ✅ The diagnostic binary was kept as a test tool and renamed (see below), instead of removed.
+- ⬜ The manual call test (`docs/audio.md`, "Manual call checklist") was not done: it needs a person on a real call. The guide ships with generic advice.
+
+What changed from the original plan:
+
+- The diagnostic binary was renamed and kept, not removed: `vinheta-audio-test` (cargo feature `audio-test`), checked by `scripts/verify-audio.sh`. The shell proof of concept (`scripts/audio-poc.sh` and the `shell` mode of the harness) was removed, and `docs/audio-poc.md` became `docs/audio.md`.
+- The engine tells its failures apart (`Unreachable`, `ConnectionLost`, `NodeExists`) and can be started again in the same process, which is what "Try Again" does. There is no automatic reconnection.
+- The release is built by GitHub Actions from a `v*` tag (`.github/workflows/release.yml`, on the `ubuntu-26.04` runner), not by hand, and there is no PPA.
+- The Flatpak manifest of the GNOME Builder template was removed.
+- The first public version is 1.0.0, and the developer name is "wilfison" everywhere.
+- One language besides English: Brazilian Portuguese. `scripts/check.sh` fails on an incomplete translation.
+- "Locate Folder…" on the "Folder Not Found" page moves a tab, its name, and its pad settings to another folder.
+- Tooling: `scripts/screenshot.sh` gained `--first-run`, `--lang`, and `--private-pipewire` (with `--stop-pipewire` and `--start-pipewire`); `scripts/fixtures.sh` gained `Broken` and `corrupt-pads.json`; new scripts `version.sh`, `check-translations.sh`, `ci.sh`, `ci-container.sh`, `release-notes.sh`, `publish-release.sh`, and `metainfo-screenshots.sh`.
+
+Left for later:
+
+- The manual call test, and what it may change in the guide (the place of the noise suppression setting in each call app).
+- Showing the real device behind "System Default" (it needs a new engine event for the default output).
+- An automatic reconnection to PipeWire.
+- A PPA or another channel with updates, package signing, and other distributions.
+- More languages.
+- The folder chooser of "Locate Folder…" and the gestures listed under Phase 5 are only tested by hand.
 
 ## Risks to check early
 
 - **Playback into an `Audio/Source/Virtual` node**: settled in Phase 0. `target-object` does not work (WirePlumber sends the stream to the default sink), so the engine always uses `node.autoconnect=false` and creates the links itself, whatever the WirePlumber version.
-- **Noise suppression in call apps**: Discord (Krisp), Meet, and similar apps may cut the sounds out as if they were noise. Not tested yet: run the manual call checklist in `docs/audio-poc.md`; the result feeds the first-run screen of Phase 6.
-- **Echo**: if the local monitor leaks into the real microphone, the call hears the sound twice. Recommend headphones. Not tested yet (same checklist).
+- **Noise suppression in call apps**: Discord (Krisp), Meet, and similar apps may cut the sounds out as if they were noise. Still not tested after Phase 6: the manual call checklist in `docs/audio.md` needs a person on a real call. The call setup guide tells the user to turn noise suppression off, as generic advice.
+- **Echo**: if the local monitor leaks into the real microphone, the call hears the sound twice. The call setup guide recommends headphones. Not tested yet (same checklist).
 - **Mono microphone into a stereo node**: settled in Phase 0. A source with a single port is linked to both channels; the same rule covers mono sound files.
 - **Latency and sync** between the two `tee` branches: settled in Phase 0. Each branch has a `queue`, and the measured offset is at most one PipeWire cycle (about 21 ms).
 - **Threads**: settled in Phase 0 for the engine. The PipeWire loop runs on its own thread, with a `pipewire::channel` for commands and `async-channel` for events. Still to do in Phase 1: consume the events from the GTK thread with `glib::spawn_future_local`.

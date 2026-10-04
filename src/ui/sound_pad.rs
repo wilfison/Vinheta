@@ -1,6 +1,6 @@
 /* sound_pad.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

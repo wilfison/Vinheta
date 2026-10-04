@@ -3,14 +3,14 @@
 # microphone, playing and stopping through actions and through real clicks, the
 # "Send sounds to call" switch and the call volume measured on a recording, the
 # voice switch, the monitor output, the pad settings (volume, loop), the
-# trigger modes, files removed and renamed while the app runs, a pad key, and
-# the cleanup on exit.
+# trigger modes, files removed and renamed while the app runs, a pad key,
+# audio coming back after "Try Again", and the cleanup on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
 # output for a few seconds, and the real microphone is linked as usual.
 set -uo pipefail
 
 . "$(dirname "$0")/dev-common.sh"
-. "$root/scripts/audio-poc-common.sh"
+. "$root/scripts/audio-common.sh"
 
 # --only REGEX runs the sections whose title matches (the start and the exit
 # of the app are always checked); --list prints the titles.
@@ -125,6 +125,8 @@ voice_on() { gsettings set "$app_id" include-my-voice true; }
 session() {
     local on off back half full sink had_voice saved=
     gsettings set "$app_id" directories "$(gvariant_strv "$work/Tones")" || return 1
+    # The checks are not a first run: the call setup guide would be in the way.
+    gsettings set "$app_id" call-guide-shown true || return 1
     start_app || { echo "FAIL the app starts"; return 1; }
     check "the virtual microphone exists while the app runs" node_exists
 
@@ -301,6 +303,29 @@ session() {
         check "a pad key starts and stops a sound ($on dBFS, then $off dBFS)" at_least "$on" "$off" 20
     fi
 
+    # The app starts while another node has the name of the virtual
+    # microphone, so without audio, and gets it back with "Try Again".
+    if section "audio returns after a retry"; then
+        quit_app
+        within 2 not node_exists
+        taken=$(create_node vinheta "Vinheta app test other" Audio/Sink "FL FR")
+        start_app || echo "FAIL the app starts while the name is taken"
+        check "no call stream can start without audio" not call_linked
+        pw-cli destroy "$taken" >/dev/null
+        within 2 not node_exists
+        activate retry-audio
+        check "the virtual microphone exists after the retry" within 3 node_exists
+        voice_off
+        activate toggle-sound "'$tone'"
+        sleep 1
+        on=$(call_level retry-on)
+        activate stop-all
+        sleep 1
+        off=$(call_level retry-off)
+        voice_on
+        check "a pad plays into the call after the retry ($on dBFS, then $off dBFS)" at_least "$on" "$off" 20
+    fi
+
     echo "== exit"
     quit_app
     sleep 0.5
@@ -315,7 +340,7 @@ session() {
 
 {
     echo ". '$root/scripts/dev-common.sh'"
-    echo ". '$root/scripts/audio-poc-common.sh'"
+    echo ". '$root/scripts/audio-common.sh'"
     declare -p work tone quiet looped gone kept moved pads test_sink only
     declare -f check node_exists call_linked not call_level at_least voice_links no_voice_links \
         monitor_on monitor_linked falls_by call_streams one_call_stream within pad_field \
@@ -327,9 +352,12 @@ session() {
 virtual_session "$work/config" bash "$work/session.sh" 2>"$work/session.log" |
     grep --line-buffered -E "^(PASS|FAIL|==)" | tee "$work/result.txt"
 
-# In case the session ended before it removed its fake sink.
-leftover=$(node_id "$test_sink")
-[ -n "$leftover" ] && pw-cli destroy "$leftover" >/dev/null
+# In case the session ended before it removed its fake devices. The app is
+# gone by now, so a node named "vinheta" can only be the fake one.
+for node in "$test_sink" vinheta; do
+    leftover=$(node_id "$node")
+    [ -n "$leftover" ] && pw-cli destroy "$leftover" >/dev/null
+done
 
 if grep -q "^FAIL" "$work/result.txt" || ! grep -q "^PASS nothing is left" "$work/result.txt"; then
     echo "CHECKS FAILED, see $work/session.log"

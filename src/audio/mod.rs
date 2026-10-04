@@ -1,6 +1,6 @@
 /* mod.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -132,6 +132,11 @@ pub enum Event {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
+    /// PipeWire could not be reached when the engine started.
+    Unreachable(String),
+    /// The connection was lost while the engine ran. The engine is of no
+    /// use afterwards: drop it and start another one.
+    ConnectionLost(String),
     PipeWire(String),
     GStreamer(String),
     NodeExists,
@@ -148,6 +153,10 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Unreachable(message) => write!(f, "PipeWire cannot be reached: {message}"),
+            Self::ConnectionLost(message) => {
+                write!(f, "the connection to PipeWire was lost: {message}")
+            }
             Self::PipeWire(message) => write!(f, "PipeWire error: {message}"),
             Self::GStreamer(message) => write!(f, "GStreamer error: {message}"),
             Self::NodeExists => write!(f, "a node named \"{}\" already exists", graph::NODE_NAME),
@@ -157,6 +166,23 @@ impl fmt::Display for Error {
             Self::Playback { path, message, .. } => {
                 write!(f, "could not play {}: {message}", path.display())
             }
+        }
+    }
+}
+
+impl Error {
+    /// A stable name of the variant, for logs and scripts.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Unreachable(_) => "unreachable",
+            Self::ConnectionLost(_) => "connection-lost",
+            Self::PipeWire(_) => "pipewire",
+            Self::GStreamer(_) => "gstreamer",
+            Self::NodeExists => "node-exists",
+            Self::MicNotFound(_) => "mic-not-found",
+            Self::NoMicrophone => "no-microphone",
+            Self::FileNotFound(_) => "file-not-found",
+            Self::Playback { .. } => "playback",
         }
     }
 }

@@ -1,10 +1,11 @@
 [Desktop Entry]
 Name=Vinheta
+Comment=Play sounds into your calls
 Exec=vinheta
 Icon=io.github.wilfison.Vinheta
 Terminal=false
 Type=Application
-Categories=Utility;
-Keywords=GTK;
+Categories=AudioVideo;Audio;
+Keywords=soundboard;sounds;effects;jingle;microphone;call;meeting;stream;
 StartupNotify=true
 DBusActivatable=true

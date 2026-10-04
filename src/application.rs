@@ -1,6 +1,6 @@
 /* application.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -35,6 +35,7 @@ use vinheta::pads::{self, PadSettings, PadStore, Trigger, TriggerMode};
 
 use crate::config::VERSION;
 use crate::sound::Sound;
+use crate::ui::call_guide_dialog::CallGuideDialog;
 use crate::ui::preferences_dialog::PreferencesDialog;
 use crate::{VinhetaWindow, APP_ID};
 
@@ -61,6 +62,47 @@ impl DeviceKind {
     }
 }
 
+/// Why audio is unavailable, as the banner tells it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AudioFailure {
+    /// PipeWire could not be reached when the engine started.
+    Unreachable,
+    ConnectionLost,
+    /// Another program has a node with the name of the virtual microphone.
+    NodeExists,
+    Other,
+}
+
+impl From<&audio::Error> for AudioFailure {
+    fn from(error: &audio::Error) -> Self {
+        match error {
+            audio::Error::Unreachable(_) => Self::Unreachable,
+            audio::Error::ConnectionLost(_) => Self::ConnectionLost,
+            audio::Error::NodeExists => Self::NodeExists,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// Something the user is told with a toast. It waits for the window when
+/// there is none yet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Notice {
+    pub message: String,
+    /// Stays until it is dismissed, ahead of the other toasts.
+    pub sticky: bool,
+}
+
+/// A device name short enough for a toast, which does not wrap.
+fn short_name(name: &str) -> String {
+    const LIMIT: usize = 32;
+    if name.chars().count() <= LIMIT {
+        return name.to_owned();
+    }
+    let cut: String = name.chars().take(LIMIT - 1).collect();
+    format!("{}…", cut.trim_end())
+}
+
 /// The engine takes `None` for the system default, the settings store "".
 fn device_setting(settings: &gio::Settings, key: &str) -> Option<String> {
     Some(settings.string(key).to_string()).filter(|name| !name.is_empty())
@@ -82,7 +124,22 @@ mod imp {
         ///  when the engine could not start or lost PipeWire.
         pub engine: RefCell<Option<AudioEngine>>,
         pub playing: RefCell<HashMap<PlaybackId, Sound>>,
-        pub audio_error: RefCell<Option<String>>,
+        pub audio_error: Cell<Option<AudioFailure>>,
+        /// Counts the engines started, so that what an old one still reports
+        /// is ignored.
+        pub generation: Cell<u32>,
+        /// False until the engine in use listed its devices.
+        pub devices_known: Cell<bool>,
+        /// Whether the chosen microphone and the chosen output are missing.
+        pub missing: Cell<(bool, bool)>,
+        /// Set once the user was told there is no microphone at all.
+        pub no_microphone: Cell<bool>,
+        pub notices: RefCell<Vec<Notice>>,
+        pub call_guide: glib::WeakRef<CallGuideDialog>,
+        /// Set when a damaged pad file could not be set aside: nothing is
+        /// saved, so that it is never overwritten.
+        pub pads_read_only: Cell<bool>,
+        pub save_failed: Cell<bool>,
         pub settings: OnceCell<gio::Settings>,
         pub microphones: RefCell<Vec<Device>>,
         pub outputs: RefCell<Vec<Device>>,
@@ -132,6 +189,7 @@ mod imp {
         fn startup(&self) {
             self.parent_startup();
             self.obj().load_pads();
+            self.obj().setup_settings();
             self.obj().start_audio();
         }
 
@@ -158,12 +216,14 @@ mod imp {
             // Get the current window or create one if necessary
             let window = application.active_window().unwrap_or_else(|| {
                 let window = VinhetaWindow::new(&*application);
-                window.set_audio_error(self.audio_error.borrow().as_deref());
+                window.set_audio_error(self.audio_error.get());
                 window.upcast()
             });
 
             // Ask the window manager/compositor to present the window
             window.present();
+            application.show_notices();
+            application.first_run();
         }
     }
 
@@ -257,10 +317,19 @@ impl VinhetaApplication {
         let preferences_action = gio::ActionEntry::builder("preferences")
             .activate(move |app: &Self, _, _| app.show_preferences())
             .build();
+        let call_guide_action = gio::ActionEntry::builder("call-guide")
+            .activate(move |app: &Self, _, _| app.show_call_guide())
+            .build();
+        // Only enabled while audio is unavailable.
+        let retry_audio_action = gio::ActionEntry::builder("retry-audio")
+            .activate(move |app: &Self, _, _| app.retry_audio())
+            .build();
         self.add_action_entries([
             quit_action,
             about_action,
             preferences_action,
+            call_guide_action,
+            retry_audio_action,
             toggle_sound_action,
             play_sound_action,
             stop_sound_action,
@@ -275,56 +344,43 @@ impl VinhetaApplication {
         self.update_playing();
     }
 
-    fn start_audio(&self) {
-        let settings = gio::Settings::new(APP_ID);
-        let config = Config {
-            mic: device_setting(&settings, "microphone"),
-            monitor: device_setting(&settings, "monitor-output"),
-            call_volume: audio::slider_gain(settings.double("call-volume")),
-            monitor_volume: audio::slider_gain(settings.double("monitor-volume")),
-            send_to_call: settings.boolean("send-sounds-to-call"),
-            include_voice: settings.boolean("include-my-voice"),
-            fade_out: fade_out(&settings),
-        };
-        match AudioEngine::start(config) {
-            Ok((engine, events)) => {
-                self.imp().engine.replace(Some(engine));
-                glib::spawn_future_local(glib::clone!(
-                    #[weak(rename_to = app)]
-                    self,
-                    async move {
-                        while let Ok(event) = events.recv().await {
-                            app.handle_event(event);
-                        }
-                    }
-                ));
-            }
-            Err(error) => self.set_audio_error(&error),
-        }
+    fn settings(&self) -> &gio::Settings {
+        self.imp().settings.get().unwrap()
+    }
 
+    /// The settings are the source of truth of the mix: every change of a
+    /// key is forwarded to the engine.
+    fn setup_settings(&self) {
+        let settings = gio::Settings::new(APP_ID);
         settings.connect_changed(
             None,
             glib::clone!(
                 #[weak(rename_to = app)]
                 self,
                 move |settings, key| {
-                    let engine = app.imp().engine.borrow();
-                    let Some(engine) = engine.as_ref() else {
-                        return;
-                    };
-                    match key {
-                        "send-sounds-to-call" => engine.set_send_to_call(settings.boolean(key)),
-                        "include-my-voice" => engine.set_include_voice(settings.boolean(key)),
-                        "call-volume" => {
-                            engine.set_call_volume(audio::slider_gain(settings.double(key)));
+                    {
+                        let engine = app.imp().engine.borrow();
+                        let Some(engine) = engine.as_ref() else {
+                            return;
+                        };
+                        match key {
+                            "send-sounds-to-call" => engine.set_send_to_call(settings.boolean(key)),
+                            "include-my-voice" => engine.set_include_voice(settings.boolean(key)),
+                            "call-volume" => {
+                                engine.set_call_volume(audio::slider_gain(settings.double(key)));
+                            }
+                            "monitor-volume" => {
+                                engine.set_monitor_volume(audio::slider_gain(settings.double(key)));
+                            }
+                            "microphone" => engine.set_microphone(device_setting(settings, key)),
+                            "monitor-output" => engine.set_monitor(device_setting(settings, key)),
+                            "fade-out-on-stop" => engine.set_fade_out(fade_out(settings)),
+                            _ => {}
                         }
-                        "monitor-volume" => {
-                            engine.set_monitor_volume(audio::slider_gain(settings.double(key)));
-                        }
-                        "microphone" => engine.set_microphone(device_setting(settings, key)),
-                        "monitor-output" => engine.set_monitor(device_setting(settings, key)),
-                        "fade-out-on-stop" => engine.set_fade_out(fade_out(settings)),
-                        _ => {}
+                    }
+                    if key == "microphone" || key == "monitor-output" {
+                        app.update_missing_devices();
+                        app.emit_by_name::<()>("devices-changed", &[]);
                     }
                 }
             ),
@@ -333,6 +389,65 @@ impl VinhetaApplication {
         self.add_action(&settings.create_action("send-sounds-to-call"));
         self.add_action(&settings.create_action("include-my-voice"));
         self.imp().settings.set(settings).unwrap();
+    }
+
+    /// Starts an engine with the current settings. Returns whether it did.
+    fn start_audio(&self) -> bool {
+        let imp = self.imp();
+        let settings = self.settings();
+        let config = Config {
+            mic: device_setting(settings, "microphone"),
+            monitor: device_setting(settings, "monitor-output"),
+            call_volume: audio::slider_gain(settings.double("call-volume")),
+            monitor_volume: audio::slider_gain(settings.double("monitor-volume")),
+            send_to_call: settings.boolean("send-sounds-to-call"),
+            include_voice: settings.boolean("include-my-voice"),
+            fade_out: fade_out(settings),
+        };
+        let generation = imp.generation.get().wrapping_add(1);
+        imp.generation.set(generation);
+        let started = match AudioEngine::start(config) {
+            Ok((engine, events)) => {
+                imp.engine.replace(Some(engine));
+                imp.audio_error.set(None);
+                imp.no_microphone.set(false);
+                glib::spawn_future_local(glib::clone!(
+                    #[weak(rename_to = app)]
+                    self,
+                    async move {
+                        while let Ok(event) = events.recv().await {
+                            if app.imp().generation.get() != generation {
+                                break;
+                            }
+                            app.handle_event(event);
+                        }
+                    }
+                ));
+                true
+            }
+            Err(error) => {
+                self.set_audio_error(&error);
+                false
+            }
+        };
+        if let Some(action) = self.lookup_action("retry-audio") {
+            if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
+                action.set_enabled(!started);
+            }
+        }
+        started
+    }
+
+    /// What "Try Again" does. A failure leaves the banner with the new
+    /// reason.
+    fn retry_audio(&self) {
+        if self.audio_available() || !self.start_audio() {
+            return;
+        }
+        if let Some(window) = self.window() {
+            window.set_audio_error(None);
+        }
+        self.emit_by_name::<()>("devices-changed", &[]);
     }
 
     fn handle_event(&self, event: Event) {
@@ -350,17 +465,31 @@ impl VinhetaApplication {
                 microphones,
                 outputs,
             } => self.set_devices(microphones, outputs),
-            Event::Error(error @ audio::Error::PipeWire(_)) => self.set_audio_error(&error),
+            Event::Error(error @ (audio::Error::PipeWire(_) | audio::Error::ConnectionLost(_))) => {
+                self.set_audio_error(&error)
+            }
+            Event::Error(error @ audio::Error::NoMicrophone) => {
+                glib::g_warning!("vinheta", "{error}");
+                let voice = self.settings().boolean("include-my-voice");
+                if voice && !self.imp().no_microphone.replace(true) {
+                    self.notify(
+                        &gettext("No microphone found. Your voice is not sent to the call."),
+                        false,
+                    );
+                }
+            }
+            Event::MicLinked { .. } => self.imp().no_microphone.set(false),
             Event::Error(error) => glib::g_warning!("vinheta", "{error}"),
             event => glib::g_debug!("vinheta", "{event:?}"),
         }
     }
 
     fn load_pads(&self) {
+        let imp = self.imp();
         let file = glib::user_data_dir().join("vinheta").join("pads.json");
         match PadStore::load(&file) {
             Ok(pads) => {
-                self.imp().pads.replace(pads);
+                imp.pads.replace(pads);
             }
             // The file is set aside, so that the next save does not destroy it.
             Err(error) => {
@@ -371,12 +500,20 @@ impl VinhetaApplication {
                     file.display(),
                     aside.display()
                 );
-                if let Err(error) = std::fs::rename(&file, &aside) {
-                    glib::g_warning!("vinheta", "could not move it: {error}");
-                }
+                let message = match std::fs::rename(&file, &aside) {
+                    Ok(()) => gettext(
+                        "Pad settings could not be read and were reset. The old file was kept as “pads.json.corrupt”.",
+                    ),
+                    Err(error) => {
+                        glib::g_warning!("vinheta", "could not move it: {error}");
+                        imp.pads_read_only.set(true);
+                        gettext("Pad settings could not be read. Changes to pads will not be saved.")
+                    }
+                };
+                self.notify(&message, true);
             }
         }
-        self.imp().pads_file.set(file).unwrap();
+        imp.pads_file.set(file).unwrap();
     }
 
     fn save_pads(&self) {
@@ -384,8 +521,34 @@ impl VinhetaApplication {
         let Some(file) = imp.pads_file.get() else {
             return;
         };
+        if imp.pads_read_only.get() {
+            return;
+        }
         if let Err(error) = imp.pads.borrow().save(file) {
             glib::g_warning!("vinheta", "could not save {}: {error}", file.display());
+            // Once per session, not once per attempt.
+            if !imp.save_failed.replace(true) {
+                self.notify(&gettext("Pad settings could not be saved"), false);
+            }
+        }
+    }
+
+    /// Tells the user something with a toast, now or once there is a window.
+    fn notify(&self, message: &str, sticky: bool) {
+        self.imp().notices.borrow_mut().push(Notice {
+            message: message.to_owned(),
+            sticky,
+        });
+        self.show_notices();
+    }
+
+    fn show_notices(&self) {
+        let Some(window) = self.window() else {
+            return;
+        };
+        let notices = std::mem::take(&mut *self.imp().notices.borrow_mut());
+        for notice in &notices {
+            window.notice(notice);
         }
     }
 
@@ -480,6 +643,13 @@ impl VinhetaApplication {
         true
     }
 
+    /// Moves the settings of every file of a folder to another folder.
+    pub fn move_folder_settings(&self, from: &str, to: &str) {
+        if self.imp().pads.borrow_mut().move_folder(from, to) > 0 {
+            self.schedule_save();
+        }
+    }
+
     /// Moves the settings of a file that was renamed or moved.
     pub fn move_pad_settings(&self, from: &str, to: &str) {
         if self.imp().pads.borrow_mut().rename(from, to) {
@@ -498,11 +668,8 @@ impl VinhetaApplication {
 
     /// The folder that receives the copies of loose files.
     pub fn sounds_folder(&self) -> PathBuf {
-        let chosen = self
-            .imp()
-            .settings
-            .get()
-            .map(|settings| settings.string("sounds-folder"));
+        let settings = self.imp().settings.get();
+        let chosen = settings.map(|settings| settings.string("sounds-folder"));
         match chosen.filter(|folder| !folder.is_empty()) {
             Some(folder) => PathBuf::from(folder.as_str()),
             None => glib::user_data_dir().join("vinheta").join("sounds"),
@@ -535,7 +702,7 @@ impl VinhetaApplication {
     }
 
     fn trigger_mode(&self) -> TriggerMode {
-        TriggerMode::from_name(&self.imp().settings.get().unwrap().string("trigger-mode"))
+        TriggerMode::from_name(&self.settings().string("trigger-mode"))
     }
 
     pub fn find_sound(&self, path: &str) -> Option<Sound> {
@@ -695,14 +862,24 @@ impl VinhetaApplication {
 
     fn set_audio_error(&self, error: &audio::Error) {
         glib::g_warning!("vinheta", "audio is unavailable: {error}");
-        let message = error.to_string();
+        let imp = self.imp();
+        let failure = AudioFailure::from(error);
         if let Some(window) = self.window() {
-            window.set_audio_error(Some(&message));
+            window.set_audio_error(Some(failure));
         }
-        self.imp().audio_error.replace(Some(message));
-        self.imp().engine.take();
+        imp.audio_error.set(Some(failure));
+        imp.engine.take();
+        imp.devices_known.set(false);
+        imp.missing.set((false, false));
+        if let Some(action) = self.lookup_action("retry-audio") {
+            if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
+                action.set_enabled(true);
+            }
+        }
         self.forget_playbacks();
-        self.set_devices(Vec::new(), Vec::new());
+        imp.microphones.take();
+        imp.outputs.take();
+        self.emit_by_name::<()>("devices-changed", &[]);
     }
 
     fn set_devices(&self, microphones: Vec<Device>, outputs: Vec<Device>) {
@@ -715,7 +892,55 @@ impl VinhetaApplication {
         );
         imp.microphones.replace(microphones);
         imp.outputs.replace(outputs);
+        imp.devices_known.set(true);
+        self.update_missing_devices();
         self.emit_by_name::<()>("devices-changed", &[]);
+    }
+
+    /// Tells the user when a chosen device goes from present to missing:
+    /// once per change, and nothing when it returns.
+    fn update_missing_devices(&self) {
+        let imp = self.imp();
+        if !imp.devices_known.get() {
+            return;
+        }
+        let settings = self.settings();
+        let missing = |kind: DeviceKind, devices: &[Device]| {
+            let chosen = settings.string(kind.key());
+            devices::is_missing(devices, &chosen).then(|| {
+                let descriptions = imp.descriptions.borrow();
+                descriptions
+                    .get(chosen.as_str())
+                    .cloned()
+                    .unwrap_or_else(|| chosen.to_string())
+            })
+        };
+        let microphone = missing(DeviceKind::Microphone, &imp.microphones.borrow());
+        let output = missing(DeviceKind::Output, &imp.outputs.borrow());
+        let was = imp
+            .missing
+            .replace((microphone.is_some(), output.is_some()));
+        if let Some(name) = microphone.filter(|_| !was.0) {
+            // Translators: {} is the name of a microphone.
+            let message = gettext("Microphone “{}” is not connected. Using the system default.");
+            self.notify(&message.replace("{}", &short_name(&name)), false);
+        }
+        if let Some(name) = output.filter(|_| !was.1) {
+            // Translators: {} is the name of an audio output.
+            let message = gettext("Output “{}” is not connected. Using the system default.");
+            self.notify(&message.replace("{}", &short_name(&name)), false);
+        }
+    }
+
+    /// Whether the chosen device is not connected. Never while audio is
+    /// unavailable: the banner already says so.
+    pub fn device_missing(&self, kind: DeviceKind) -> bool {
+        let missing = self.imp().missing.get();
+        self.audio_available()
+            && match kind {
+                DeviceKind::Microphone => missing.0,
+                DeviceKind::Output => missing.1,
+            }
     }
 
     pub fn audio_available(&self) -> bool {
@@ -729,7 +954,7 @@ impl VinhetaApplication {
         if !self.audio_available() {
             return devices::selector_entries(&[], "", None);
         }
-        let chosen = imp.settings.get().unwrap().string(kind.key());
+        let chosen = self.settings().string(kind.key());
         let devices = match kind {
             DeviceKind::Microphone => imp.microphones.borrow(),
             DeviceKind::Output => imp.outputs.borrow(),
@@ -747,6 +972,37 @@ impl VinhetaApplication {
         let dialog = PreferencesDialog::new(self);
         imp.preferences.set(Some(&dialog));
         dialog.present(self.active_window().as_ref());
+    }
+
+    fn show_call_guide(&self) {
+        let imp = self.imp();
+        if imp.call_guide.upgrade().is_some() {
+            return;
+        }
+        let dialog = CallGuideDialog::new();
+        // However it is closed, it was shown.
+        dialog.connect_closed(glib::clone!(
+            #[weak(rename_to = app)]
+            self,
+            move |_| {
+                if let Err(error) = app.settings().set_boolean("call-guide-shown", true) {
+                    glib::g_warning!(
+                        "vinheta",
+                        "could not save that the guide was shown: {error}"
+                    );
+                }
+            }
+        ));
+        imp.call_guide.set(Some(&dialog));
+        dialog.present(self.active_window().as_ref());
+    }
+
+    /// The guide opens by itself on the first run. Not without audio: the
+    /// banner comes first, and the guide waits for a later launch.
+    fn first_run(&self) {
+        if self.audio_available() && !self.settings().boolean("call-guide-shown") {
+            self.show_call_guide();
+        }
     }
 
     fn toast_playback_failure(&self, sound: &Sound) {
@@ -767,12 +1023,16 @@ impl VinhetaApplication {
         let about = adw::AboutDialog::builder()
             .application_name("Vinheta")
             .application_icon("io.github.wilfison.Vinheta")
-            .developer_name("Will")
+            .developer_name("wilfison")
             .version(VERSION)
-            .developers(vec!["Will"])
+            .comments(gettext("Play sounds into your calls"))
+            .website("https://github.com/wilfison/Vinheta")
+            .issue_url("https://github.com/wilfison/Vinheta/issues")
+            .license_type(gtk::License::Gpl30)
+            .developers(vec!["wilfison"])
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(gettext("translator-credits"))
-            .copyright("© 2026 Will")
+            .copyright("© 2026 wilfison")
             .build();
 
         about.present(Some(&window));

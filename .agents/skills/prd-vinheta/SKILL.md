@@ -23,7 +23,7 @@ Before asking anything, read:
 - `ROADMAP.md`: the items of the phase, the "Notes for the next phases" of earlier phases, and the risks.
 - `AGENTS.md`: architecture, conventions, and the verification scripts.
 - The most recent PRD in `tasks/`, to keep the same structure, tone, and level of detail.
-- The mockups in `mockups/` that the phase mentions (they are SVG and can be read as text), and `docs/audio-poc.md` when the phase touches the engine.
+- The mockups in `mockups/` that the phase mentions (they are SVG and can be read as text), and `docs/audio.md` when the phase touches the engine.
 - The code the phase will touch (`src/audio/mod.rs` for the engine API, `src/ui/` for the interface, the schema in `data/`).
 
 ## Step 2: Clarifying questions
@@ -52,7 +52,7 @@ Every technical claim in the PRD must have been checked, not remembered. Use `Ba
 - Run `scripts/check.sh --all` (several minutes; run it in the background while writing) and record the starting state under "Technical Considerations". If something already fails before the phase, the first story fixes it.
 - Check each interface story against the states the app already has (audio unavailable, an empty folder, a missing folder): a rule of an earlier phase, such as pads being disabled without audio, can make a new criterion impossible.
 - Test cheap hypotheses on the spot (an environment variable, an action over D-Bus, a screenshot of the current app) instead of writing them down as facts.
-- For a PipeWire or WirePlumber behavior, try it with the command line tools before designing on top of it: a silent file played with `gst-launch-1.0 ... ! pipewiresink`, a fake device from `create_node` in `scripts/audio-poc-common.sh`, then `pw-link -l`, `pw-metadata`, and `pw-cli destroy`. Name the test nodes without the `vinheta` prefix, and destroy them. `docs/audio-poc.md` has the findings so far; read it first.
+- For a PipeWire or WirePlumber behavior, try it with the command line tools before designing on top of it: a silent file played with `gst-launch-1.0 ... ! pipewiresink`, a fake device from `create_node` in `scripts/audio-common.sh`, then `pw-link -l`, `pw-metadata`, and `pw-cli destroy`. Name the test nodes without the `vinheta` prefix, and destroy them. `docs/audio.md` has the findings so far; read it first.
 - A claim about a crate API that the design depends on is worth a throwaway program in the scratchpad when reading the source is not enough.
 
 - A claim about how the desktop sees the app (a portal, the app ID, a D-Bus service of the session, autostart) is tested the way a user runs it, never from the terminal of the agent alone: start the test with `systemd-run --user --scope`, because a terminal started by the desktop has an app scope that a portal takes for the app. Test with the files the app really installs (its own desktop file, from the local prefix and as the package installs it), not with a probe made for the test: in Phase 5 a probe with a valid `Exec` passed while the desktop file of the local prefix (`Exec=vinheta`, not in `PATH`) was refused, and three stories were built on it.
@@ -109,19 +109,22 @@ There is no browser and no Playwright here. Every story ends with the criterion 
 
 | The story touches | Required criterion |
 |---|---|
-| Any code | `scripts/check.sh` passes (clippy without warnings, a single glib version, no em dash, `meson test`) |
-| Engine (`src/audio/`) | `scripts/check.sh --audio` passes, and the harness `scripts/verify-audio-poc.sh` gains a check for each new engine operation, exposed through an option of `vinheta-audio-poc` |
+| Any code | `scripts/check.sh` passes (clippy without warnings, a single glib version, no em dash, one version, complete translations, `meson test`) |
+| A new or changed UI string | `po/pt_BR.po` translates it (`scripts/check-translations.sh`), and a screenshot check with `--lang pt_BR` shows it |
+| Engine (`src/audio/`) | `scripts/check.sh --audio` passes, and the harness `scripts/verify-audio.sh` gains a check for each new engine operation, exposed through an option of `vinheta-audio-test` |
 | Logic without interface | Rust unit tests in the module itself, run by `cargo test --lib` |
 | Interface (`src/ui/`) | "Screenshot check": `scripts/screenshot.sh NAME ...` in the described state, read and compared with the mockup and with the criteria; in the dark and `--light` styles when the story creates a new screen |
 | Interface wired to the engine | `scripts/verify-app.sh` passes, with a new section (self-contained, runnable alone with `--only`) when the story changes what reaches the virtual microphone |
-| Packaging or dependencies | `scripts/build-deb.sh` succeeds, and `debian/control` declares what changed |
+| Packaging or dependencies | `scripts/build-deb.sh` succeeds, `debian/control` declares what changed, and `scripts/ci-container.sh` (the CI gate, `scripts/check.sh --deb`, in a clean Ubuntu 26.04 container, with `lintian` and an install in a second container) passes |
 
 When writing a "Screenshot check", say how the state is reached. The tools of `scripts/screenshot.sh`:
 
-- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--pads FILE` gives the app a `pads.json` (the pad settings) to start with; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--right-click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, `--restart` (quits and starts the app again, to check what is restored), and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
+- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--pads FILE` gives the app a `pads.json` (the pad settings) to start with; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--right-click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, `--restart` (quits and starts the app again, to check what is restored), and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style; `--lang pt_BR` runs the app in that language; `--first-run` lets the call setup guide open (every other run starts with `call-guide-shown true`).
+- `--private-pipewire` starts a PipeWire instance of the script's own, with no session manager and no devices; `--stop-pipewire` and `--start-pipewire` are steps. Use it for a lost connection (`--stop-pipewire`) and for a system with no microphone. Nothing plays there (a pad stays at 00:00), and `--expect-playing` does not work with it.
+- A node named `vinheta` created with `--fake-sink 'vinheta Other'` makes the engine fail with the name taken; `--unplug vinheta` before `--action retry-audio` frees it.
 - `--expect-setting 'KEY VALUE'` and `--expect-playing N` check a value instead of showing it, and fail the run. Write a criterion on a value with them ("`--key q --expect-playing 1`"), and keep the pictures for what only a picture shows.
 - `--capture NAME` takes a picture in the middle of the sequence and `--crop WxH+X+Y` crops the ones that follow, so one run can check several states; `--sheet` stacks them in one picture.
-- `scripts/fixtures.sh` creates the sound folders and pad settings for these checks in `tmp/fixtures`. Name its paths in the criteria instead of describing a fixture to build. Besides `Fixture`, `Palette`, and `Loop` it has `Many` (60 pads, enough to scroll), `Effects` (a second folder for the search), `favorites.json` (two favorites and a custom name), and `shortcuts.json` (pad keys on three pads of two folders).
+- `scripts/fixtures.sh` creates the sound folders and pad settings for these checks in `tmp/fixtures`. Name its paths in the criteria instead of describing a fixture to build. Besides `Fixture`, `Palette`, and `Loop` it has `Many` (60 pads, enough to scroll), `Effects` (a second folder for the search), `favorites.json` (two favorites and a custom name), `shortcuts.json` (pad keys on three pads of two folders), `Broken` (a file that cannot be played), and `corrupt-pads.json` (a pad file that cannot be read).
 - A check that creates, renames, or deletes files works on a copy of a fixture made by the check itself (for example `cp -r tmp/fixtures/Fixture tmp/monitor-test/Fixture`), never in `tmp/fixtures`, and removes it at the end.
 - The virtual display has no window manager: the content of the window is 10 pixels narrower than the size given to `--size`, and a dialog needs a content of exactly 360 pixels. Narrow checks use `--size 370,700`.
 - `--fake-mic 'NODE DESCRIPTION'` and `--fake-sink 'NODE DESCRIPTION'` create a fake device before the app starts; the steps `--plug-mic`, `--plug-sink`, and `--unplug NODE` do it while the app runs. Use them whenever a criterion names a device: the real device list differs between machines.
@@ -139,6 +142,7 @@ Limits the PRD must respect (do not write criteria that depend on them):
 - A level measured on the virtual microphone includes the real microphone, which can be noisy enough to hide a quiet tone. Turn "Include My Voice" off (`include-my-voice false`) before measuring.
 - Real clicks on a list entry, drags, and typing are not simulated reliably. Write the criterion on the state (the setting, the action) and mark the gesture for manual testing.
 - Screenshots go to `tmp/screenshots/` and are deleted at the end of the story.
+- The CI (GitHub Actions, `scripts/ci.sh`) only runs `scripts/check.sh --deb`: it has no PipeWire session and no display, so the audio harness and `scripts/verify-app.sh` stay local.
 - The audio harness only uses fake devices; nothing in it needs a person listening. A test on a real call is always optional.
 - A harness criterion with a new sound or a new level is rehearsed before its numbers are written: the recorders are ready 0.2 to 0.3 seconds after the subject starts (a sound with no silence at its start needs `--start-after 1`), and a tone below -40 dBFS in the recording has no onset for `window` and `after` (a gain of 0.1 puts the test tone at -50).
 - A screenshot criterion that names times must count the half second the script waits after each step and the time a capture takes.
@@ -150,7 +154,7 @@ The last story of every phase updates the documents and closes the verification:
 - `AGENTS.md`: "Current state", Architecture, and any instruction that is no longer true.
 - `ROADMAP.md`: the items of the phase ticked, with "What changed from the original plan" and "Notes for the next phases".
 - `po/POTFILES.in` (every `.ui` and `.rs` file with translatable strings, in alphabetical order) and `src/vinheta.gresource.xml` (every new `.ui` file, with an `alias` that drops the `ui/` directory).
-- `docs/audio-poc.md` when the engine or the diagnostic binary changed.
+- `docs/audio.md` when the engine or the diagnostic binary changed.
 - `scripts/check.sh --all` passes.
 - `tmp/screenshots/` is empty.
 

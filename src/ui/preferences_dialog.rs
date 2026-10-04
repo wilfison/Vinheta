@@ -1,6 +1,6 @@
 /* preferences_dialog.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -128,6 +128,44 @@ impl PreferencesDialog {
         let imp = dialog.imp();
         device_selector::bind(&*imp.microphone, app, DeviceKind::Microphone);
         device_selector::bind(&*imp.monitor_output, app, DeviceKind::Output);
+
+        // A chosen device that is not connected is told in the subtitle,
+        // which is never ellipsized.
+        let rows = [
+            (imp.microphone.get(), DeviceKind::Microphone),
+            (imp.monitor_output.get(), DeviceKind::Output),
+        ]
+        .map(|(row, kind)| (row.subtitle(), row, kind));
+        let update = glib::clone!(
+            #[weak]
+            app,
+            move || {
+                for (subtitle, row, kind) in &rows {
+                    if app.device_missing(*kind) {
+                        row.set_subtitle(&gettext("Not connected. Using the system default."));
+                        row.add_css_class("warning");
+                    } else {
+                        row.set_subtitle(subtitle.as_deref().unwrap_or_default());
+                        row.remove_css_class("warning");
+                    }
+                }
+            }
+        );
+        update();
+        let handler = app.connect_local("devices-changed", false, move |_| {
+            update();
+            None
+        });
+        let handler = std::cell::RefCell::new(Some(handler));
+        dialog.connect_closed(glib::clone!(
+            #[weak]
+            app,
+            move |_| {
+                if let Some(handler) = handler.take() {
+                    app.disconnect(handler);
+                }
+            }
+        ));
 
         // The row follows the key while the dialog is open.
         let settings = gio::Settings::new(APP_ID);

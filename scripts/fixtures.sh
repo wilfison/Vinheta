@@ -7,7 +7,7 @@ set -uo pipefail
 require_tools ffmpeg
 
 fixtures="$root/tmp/fixtures"
-mkdir -p "$fixtures/Fixture" "$fixtures/Palette" "$fixtures/Loop" "$fixtures/Many" "$fixtures/Effects"
+mkdir -p "$fixtures/Fixture" "$fixtures/Palette" "$fixtures/Loop" "$fixtures/Many" "$fixtures/Effects" "$fixtures/Broken"
 
 sound() { [ -f "$1" ] || silent_sound "$1" "$2" || exit 1; }
 
@@ -29,6 +29,10 @@ done
 for name in "Applause Short" Bell "Drum Roll"; do
     sound "$fixtures/Effects/$name.wav" 5
 done
+
+# Text in a sound file: it is listed as a pad and cannot be played.
+[ -f "$fixtures/Broken/Broken.wav" ] || echo "this is not audio" >"$fixtures/Broken/Broken.wav"
+[ -f "$fixtures/corrupt-pads.json" ] || echo '{"version": 1, "pads": {' >"$fixtures/corrupt-pads.json"
 
 cat >"$fixtures/palette.json" <<JSON
 {"version": 1, "pads": {
@@ -70,6 +74,8 @@ $fixtures/Palette       eight pads; --pads $fixtures/palette.json colors seven
 $fixtures/Loop          Short (3 s, silent); --pads $fixtures/loop.json makes it loop
 $fixtures/Many          Sound 01 to Sound 60 (5 s, silent), enough to scroll
 $fixtures/Effects       Applause Short, Bell, Drum Roll (5 s, silent)
+$fixtures/Broken        Broken (text, not audio: playing it fails)
+$fixtures/corrupt-pads.json  not valid JSON, for --pads
 $fixtures/dialog.json   Applause with a name, purple, volume 0.54, and loop
 $fixtures/favorites.json  Applause and Bell are favorites, Crickets is named "Zebra"
 $fixtures/shortcuts.json  the keys 1 (Air Horn), Q (Applause), and W (Bell)

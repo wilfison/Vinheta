@@ -1,6 +1,6 @@
 /* devices.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -64,6 +64,12 @@ pub fn selector_entries(
     (entries, selected)
 }
 
+/// Whether the chosen device is not among the devices. The system default
+/// (an empty name) is never missing.
+pub fn is_missing(devices: &[Device], chosen: &str) -> bool {
+    !chosen.is_empty() && !devices.iter().any(|device| device.name == chosen)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,5 +127,18 @@ mod tests {
         let (entries, selected) = selector_entries(&[], "gone", Some("Headset"));
         assert_eq!(entries[selected].description, "Headset");
         assert!(!entries[selected].available);
+    }
+
+    #[test]
+    fn the_system_default_is_never_missing() {
+        assert!(!is_missing(&[], ""));
+        assert!(!is_missing(&devices(), ""));
+    }
+
+    #[test]
+    fn a_chosen_device_is_missing_when_not_listed() {
+        assert!(!is_missing(&devices(), "usb"));
+        assert!(is_missing(&devices(), "gone"));
+        assert!(is_missing(&[], "usb"));
     }
 }

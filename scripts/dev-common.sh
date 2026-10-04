@@ -47,12 +47,14 @@ app_env() {
 # with its own D-Bus session, with settings kept in CONFIG_DIR and data (the
 # pad settings, vinheta/pads.json) in CONFIG_DIR/data, so nothing shows up on
 # the desktop and the user's settings and pads are not touched. PipeWire is
-# still the real one.
+# still the real one. The app runs in English whatever the language of the
+# user, unless session_language is set (pt_BR).
 virtual_session() {
-    local config=$1
+    local config=$1 language=${session_language:-}
     shift
     app_env
-    GDK_BACKEND=x11 GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME="$config" XDG_DATA_HOME="$config/data" \
+    LANGUAGE=$language LANG=${language:-C}.UTF-8 LC_ALL=${language:-C}.UTF-8 \
+        GDK_BACKEND=x11 GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME="$config" XDG_DATA_HOME="$config/data" \
         xvfb-run -a -s "-screen 0 1100x800x24" dbus-run-session -- "$@"
 }
 

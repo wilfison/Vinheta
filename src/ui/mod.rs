@@ -1,6 +1,6 @@
 /* mod.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 
 //! Interface components: each widget with its `.ui` template.
 
+pub mod call_guide_dialog;
 pub mod device_selector;
 pub mod folder_page;
 pub mod preferences_dialog;

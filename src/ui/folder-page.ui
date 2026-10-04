@@ -45,6 +45,33 @@
               <object class="AdwStatusPage" id="missing">
                 <property name="icon-name">folder-symbolic</property>
                 <property name="title" translatable="yes">Folder Not Found</property>
+                <property name="child">
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">12</property>
+                    <child>
+                      <object class="GtkButton">
+                        <property name="label" translatable="yes">Locate Folder…</property>
+                        <property name="halign">center</property>
+                        <property name="action-name">win.find-folder</property>
+                        <style>
+                          <class name="pill"/>
+                          <class name="suggested-action"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton">
+                        <property name="label" translatable="yes">Remove Folder</property>
+                        <property name="halign">center</property>
+                        <property name="action-name">win.remove-folder</property>
+                        <style>
+                          <class name="pill"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </property>
               </object>
             </property>
           </object>

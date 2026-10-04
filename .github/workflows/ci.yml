@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # The package needs GTK 4.20 and libadwaita 1.8, which Ubuntu 24.04
+    # (ubuntu-latest) does not have.
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checks and package (scripts/check.sh --deb)
+        run: scripts/ci.sh

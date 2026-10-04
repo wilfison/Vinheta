@@ -1,16 +1,17 @@
 [package]
 name = "vinheta"
-version = "0.1.0"
+version = "1.0.0"
+rust-version = "1.93"
 edition = "2021"
 default-run = "vinheta"
 
 [features]
-audio-poc = []
+audio-test = []
 
 [[bin]]
-name = "vinheta-audio-poc"
-path = "src/bin/vinheta-audio-poc.rs"
-required-features = ["audio-poc"]
+name = "vinheta-audio-test"
+path = "src/bin/vinheta-audio-test.rs"
+required-features = ["audio-test"]
 
 [dependencies]
 gettext-rs = { version = "0.7", features = ["gettext-system"] }

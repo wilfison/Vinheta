@@ -1,4 +1,4 @@
-# Helpers shared by audio-poc.sh and verify-audio-poc.sh. Meant to be sourced.
+# Helpers shared by verify-audio.sh, screenshot.sh, and verify-app.sh. Meant to be sourced.
 
 # Prints the id of the node with the given node.name, or nothing.
 node_id() {
@@ -33,22 +33,4 @@ wait_for() {
     done
     echo "timed out waiting for $label" >&2
     return 1
-}
-
-# link_to_stereo SOURCE_NODE DEST_NODE PORT_PREFIX DEST_PREFIX
-# A mono source feeds both channels, a stereo one is linked channel by channel.
-link_to_stereo() {
-    local src=$1 dst=$2 src_prefix=$3 dst_prefix=$4 ports
-    ports=$(pw-link -o | grep -F "$src:${src_prefix}_" || true)
-    if [ "$(printf '%s\n' "$ports" | grep -c .)" -eq 1 ]; then
-        pw-link "$ports" "$dst:${dst_prefix}_FL"
-        pw-link "$ports" "$dst:${dst_prefix}_FR"
-    else
-        pw-link "$src:${src_prefix}_FL" "$dst:${dst_prefix}_FL"
-        pw-link "$src:${src_prefix}_FR" "$dst:${dst_prefix}_FR"
-    fi
-}
-
-default_source() {
-    pw-metadata 0 default.audio.source | sed -n 's/.*"name":"\([^"]*\)".*/\1/p'
 }

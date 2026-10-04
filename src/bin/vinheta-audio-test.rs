@@ -1,6 +1,6 @@
-/* vinheta-audio-poc.rs
+/* vinheta-audio-test.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
  */
 
 //! Diagnostic tool that exercises the audio engine without the interface.
-//! See docs/audio-poc.md.
+//! See docs/audio.md.
 
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
@@ -30,7 +30,7 @@ use std::time::Duration;
 use gst::glib;
 use vinheta::audio::{self, AudioEngine, Config, Event, PlayOptions, PlaybackId};
 
-const USAGE: &str = "usage: vinheta-audio-poc [--help] [--version] [--once] [--mic NODE_NAME] \
+const USAGE: &str = "usage: vinheta-audio-test [--help] [--version] [--once] [--mic NODE_NAME] \
 [--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] [--no-call] \
 [--stop-after SECONDS] [--stop-all-after SECONDS] [--mute-call-after SECONDS] \
 [--unmute-call-after SECONDS] [--call-volume-after SECONDS GAIN] \
@@ -39,7 +39,7 @@ const USAGE: &str = "usage: vinheta-audio-poc [--help] [--version] [--once] [--m
 [--monitor-after SECONDS NODE_NAME] [--replay-after SECONDS] [--volume GAIN] \
 [--playback-volume-after SECONDS GAIN] [--loop] [--loop-off-after SECONDS] \
 [--restart-after SECONDS] [--position-after SECONDS] [--fade-out SECONDS] \
-[--start-after SECONDS] [FILE...]
+[--start-after SECONDS] [--restart-engine-after SECONDS] [FILE...]
 
 Without FILE, only the virtual microphone and the microphone link are created.
 With FILEs, they are played together once, and again each time Enter is pressed.
@@ -61,7 +61,12 @@ beginning. --position-after prints \"position ELAPSED_MS DURATION_MS\" for the
 first FILE (\"unknown\" for a missing duration, \"position none\" when it is over).
 --fade-out is how long a stopped FILE takes to fade out (0 by default).
 --start-after waits before the first playback, so a recorder can be ready.
-The device lists are printed after the start and whenever they change.";
+--restart-engine-after drops the engine that many seconds after the playback
+starts, starts a new one, and plays the FILEs again; it does so twice, and
+prints \"threads N\" (the threads of the process) after each drop.
+The device lists are printed after the start and whenever they change.
+An error is printed as \"error: KIND: TEXT\", KIND being a stable name
+(unreachable, connection-lost, node-exists, ...).";
 
 #[derive(Default)]
 struct Args {
@@ -86,6 +91,7 @@ struct Args {
     restart_after: Option<Duration>,
     position_after: Option<Duration>,
     start_after: Option<Duration>,
+    restart_engine_after: Option<Duration>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -138,6 +144,7 @@ fn parse_args() -> Result<Args, String> {
             "--restart-after" => parsed.restart_after = seconds(value()?)?,
             "--position-after" => parsed.position_after = seconds(value()?)?,
             "--start-after" => parsed.start_after = seconds(value()?)?,
+            "--restart-engine-after" => parsed.restart_engine_after = seconds(value()?)?,
             "--fade-out" => parsed.config.fade_out = seconds(value()?)?.unwrap_or_default(),
             _ if arg.starts_with('-') => return Err(format!("unknown option: {arg}")),
             _ => parsed.files.push(PathBuf::from(&arg)),
@@ -149,18 +156,39 @@ fn parse_args() -> Result<Args, String> {
     Ok(parsed)
 }
 
-struct Poc {
-    engine: AudioEngine,
+/// How many times --restart-engine-after starts a new engine.
+const ENGINE_RESTARTS: u32 = 2;
+
+fn report(error: &audio::Error) {
+    eprintln!("error: {}: {error}", error.kind());
+}
+
+fn thread_count() -> usize {
+    std::fs::read_dir("/proc/self/task").map_or(0, Iterator::count)
+}
+
+struct Tester {
+    engine: RefCell<Option<AudioEngine>>,
+    config: Config,
+    restarts: Cell<u32>,
     args: Args,
     main_loop: glib::MainLoop,
     playing: RefCell<Vec<PlaybackId>>,
     failed: Cell<bool>,
 }
 
-impl Poc {
+impl Tester {
+    /// Runs `action` on the engine, when there is one.
+    fn engine<T>(&self, action: impl FnOnce(&AudioEngine) -> T) -> Option<T> {
+        self.engine.borrow().as_ref().map(action)
+    }
+
     fn play_all(&self) {
         for file in &self.args.files {
-            match self.engine.play(file, self.args.options) {
+            let Some(result) = self.engine(|engine| engine.play(file, self.args.options)) else {
+                return;
+            };
+            match result {
                 Ok(id) => self.playing.borrow_mut().push(id),
                 Err(error) => self.playback_failed(&error),
             }
@@ -168,7 +196,7 @@ impl Poc {
     }
 
     fn playback_failed(&self, error: &audio::Error) {
-        eprintln!("error: {error}");
+        report(error);
         if self.args.once {
             self.failed.set(true);
             self.main_loop.quit();
@@ -177,96 +205,98 @@ impl Poc {
 
     fn ended(&self, id: PlaybackId) {
         self.playing.borrow_mut().retain(|playing| *playing != id);
-        if self.args.once && self.playing.borrow().is_empty() {
+        let restarting =
+            self.args.restart_engine_after.is_some() && self.restarts.get() < ENGINE_RESTARTS;
+        if self.args.once && !restarting && self.playing.borrow().is_empty() {
             self.main_loop.quit();
         }
     }
 
     fn schedule(self: &Rc<Self>, delay: Option<Duration>, action: impl FnOnce(&Self) + 'static) {
         if let Some(delay) = delay {
-            let poc = self.clone();
-            glib::timeout_add_local_once(delay, move || action(&poc));
+            let tester = self.clone();
+            glib::timeout_add_local_once(delay, move || action(&tester));
         }
     }
 
     fn start(self: &Rc<Self>) {
         self.play_all();
         let first = self.playing.borrow().first().copied();
-        self.schedule(self.args.stop_after, move |poc| {
+        self.schedule(self.args.stop_after, move |tester| {
             if let Some(id) = first {
-                poc.engine.stop(id);
+                tester.engine(|engine| engine.stop(id));
                 println!("stopped the first file");
-                poc.ended(id);
+                tester.ended(id);
             }
         });
-        self.schedule(self.args.stop_all_after, |poc| {
-            poc.engine.stop_all();
+        self.schedule(self.args.stop_all_after, |tester| {
+            tester.engine(|engine| engine.stop_all());
             println!("stopped all files");
-            poc.playing.borrow_mut().clear();
-            if poc.args.once {
-                poc.main_loop.quit();
+            tester.playing.borrow_mut().clear();
+            if tester.args.once {
+                tester.main_loop.quit();
             }
         });
-        self.schedule(self.args.mute_call_after, |poc| {
-            poc.engine.set_send_to_call(false);
+        self.schedule(self.args.mute_call_after, |tester| {
+            tester.engine(|engine| engine.set_send_to_call(false));
             println!("call branch muted");
         });
-        self.schedule(self.args.unmute_call_after, |poc| {
-            poc.engine.set_send_to_call(true);
+        self.schedule(self.args.unmute_call_after, |tester| {
+            tester.engine(|engine| engine.set_send_to_call(true));
             println!("call branch unmuted");
         });
         if let Some((delay, gain)) = self.args.call_volume_after {
-            self.schedule(Some(delay), move |poc| {
-                poc.engine.set_call_volume(gain);
+            self.schedule(Some(delay), move |tester| {
+                tester.engine(|engine| engine.set_call_volume(gain));
                 println!("call volume set to {gain}");
             });
         }
         if let Some((delay, gain)) = self.args.monitor_volume_after {
-            self.schedule(Some(delay), move |poc| {
-                poc.engine.set_monitor_volume(gain);
+            self.schedule(Some(delay), move |tester| {
+                tester.engine(|engine| engine.set_monitor_volume(gain));
                 println!("monitor volume set to {gain}");
             });
         }
-        self.schedule(self.args.voice_off_after, |poc| {
-            poc.engine.set_include_voice(false);
+        self.schedule(self.args.voice_off_after, |tester| {
+            tester.engine(|engine| engine.set_include_voice(false));
             println!("voice turned off");
         });
-        self.schedule(self.args.voice_on_after, |poc| {
-            poc.engine.set_include_voice(true);
+        self.schedule(self.args.voice_on_after, |tester| {
+            tester.engine(|engine| engine.set_include_voice(true));
             println!("voice turned on");
         });
         if let Some((delay, name)) = self.args.mic_after.clone() {
-            self.schedule(Some(delay), move |poc| {
+            self.schedule(Some(delay), move |tester| {
                 println!("microphone set to {name:?}");
-                poc.engine.set_microphone(name);
+                tester.engine(|engine| engine.set_microphone(name));
             });
         }
         if let Some((delay, name)) = self.args.monitor_after.clone() {
-            self.schedule(Some(delay), move |poc| {
+            self.schedule(Some(delay), move |tester| {
                 println!("monitor output set to {name:?}");
-                poc.engine.set_monitor(name);
+                tester.engine(|engine| engine.set_monitor(name));
             });
         }
         if let (Some((delay, gain)), Some(id)) = (self.args.playback_volume_after, first) {
-            self.schedule(Some(delay), move |poc| {
-                poc.engine.set_playback_volume(id, gain);
+            self.schedule(Some(delay), move |tester| {
+                tester.engine(|engine| engine.set_playback_volume(id, gain));
                 println!("playback volume set to {gain}");
             });
         }
-        self.schedule(self.args.loop_off_after, move |poc| {
+        self.schedule(self.args.loop_off_after, move |tester| {
             if let Some(id) = first {
-                poc.engine.set_playback_loop(id, false);
+                tester.engine(|engine| engine.set_playback_loop(id, false));
                 println!("loop turned off");
             }
         });
-        self.schedule(self.args.restart_after, move |poc| {
+        self.schedule(self.args.restart_after, move |tester| {
             if let Some(id) = first {
-                poc.engine.restart(id);
+                tester.engine(|engine| engine.restart(id));
                 println!("restarted the first file");
             }
         });
-        self.schedule(self.args.position_after, move |poc| {
-            match first.and_then(|id| poc.engine.position(id)) {
+        self.schedule(self.args.position_after, move |tester| {
+            match first.and_then(|id| tester.engine(|engine| engine.position(id)).flatten()) {
                 Some(position) => println!(
                     "position {} {}",
                     position.elapsed.as_millis(),
@@ -279,9 +309,99 @@ impl Poc {
                 None => println!("position none"),
             }
         });
-        self.schedule(self.args.replay_after, |poc| {
+        self.schedule_engine_restart();
+        self.schedule(self.args.replay_after, |tester| {
             println!("playing the files again");
-            poc.play_all();
+            tester.play_all();
+        });
+    }
+}
+
+impl Tester {
+    fn schedule_engine_restart(self: &Rc<Self>) {
+        if self.restarts.get() >= ENGINE_RESTARTS {
+            return;
+        }
+        let this = self.clone();
+        self.schedule(self.args.restart_engine_after, move |tester| {
+            tester.restarts.set(tester.restarts.get() + 1);
+            tester.playing.borrow_mut().clear();
+            tester.engine.take();
+            println!("engine dropped");
+            println!("threads {}", thread_count());
+            match AudioEngine::start(tester.config.clone()) {
+                Ok((engine, events)) => {
+                    tester.engine.replace(Some(engine));
+                    println!("engine started again");
+                    this.watch(events);
+                }
+                Err(error) => {
+                    report(&error);
+                    tester.failed.set(true);
+                    tester.main_loop.quit();
+                }
+            }
+        });
+    }
+
+    /// Consumes the events of one engine. Only the first engine runs the
+    /// scheduled actions; a later one plays the files again.
+    fn watch(self: &Rc<Self>, events: async_channel::Receiver<Event>) {
+        let tester = self.clone();
+        glib::spawn_future_local(async move {
+            while let Ok(event) = events.recv().await {
+                match event {
+                    Event::NodeCreated(id) => {
+                        println!("virtual microphone created, node id {id}");
+                        if tester.restarts.get() > 0 {
+                            println!("playing the files again");
+                            tester.play_all();
+                            tester.schedule_engine_restart();
+                            continue;
+                        }
+                        match tester.args.start_after {
+                            Some(delay) => {
+                                let tester = tester.clone();
+                                glib::timeout_add_local_once(delay, move || tester.start());
+                            }
+                            None => tester.start(),
+                        }
+                    }
+                    Event::MicLinked {
+                        name,
+                        fallback: false,
+                    } => {
+                        println!("microphone linked: {name}");
+                    }
+                    Event::MicLinked {
+                        name,
+                        fallback: true,
+                    } => {
+                        println!("microphone linked as a fallback: {name}");
+                    }
+                    Event::MicUnlinked => println!("microphone unlinked"),
+                    Event::DevicesChanged {
+                        microphones,
+                        outputs,
+                    } => {
+                        println!("devices changed");
+                        for device in microphones {
+                            println!("microphone: {} ({})", device.name, device.description);
+                        }
+                        for device in outputs {
+                            println!("output: {} ({})", device.name, device.description);
+                        }
+                    }
+                    Event::PlaybackFinished { id, path } => {
+                        println!("finished playing {}", path.display());
+                        tester.ended(id);
+                    }
+                    Event::Error(error @ audio::Error::Playback { .. }) => {
+                        tester.playback_failed(&error);
+                    }
+                    Event::Error(error) => report(&error),
+                }
+            }
         });
     }
 }
@@ -313,10 +433,11 @@ fn main() -> ExitCode {
         };
     }
 
-    let (engine, events) = match AudioEngine::start(std::mem::take(&mut args.config)) {
+    let config = std::mem::take(&mut args.config);
+    let (engine, events) = match AudioEngine::start(config.clone()) {
         Ok(started) => started,
         Err(error) => {
-            eprintln!("{error}");
+            report(&error);
             return ExitCode::FAILURE;
         }
     };
@@ -333,8 +454,10 @@ fn main() -> ExitCode {
         });
     }
 
-    let poc = Rc::new(Poc {
-        engine,
+    let tester = Rc::new(Tester {
+        engine: RefCell::new(Some(engine)),
+        config,
+        restarts: Cell::new(0),
         args,
         main_loop: main_loop.clone(),
         playing: RefCell::default(),
@@ -342,7 +465,7 @@ fn main() -> ExitCode {
     });
 
     // Enter replays the files. Lines are read on a thread and forwarded here.
-    if !poc.args.files.is_empty() && !poc.args.once {
+    if !tester.args.files.is_empty() && !tester.args.once {
         let (replays, replay_receiver) = async_channel::unbounded();
         std::thread::spawn(move || {
             for _ in std::io::stdin().lines().map_while(Result::ok) {
@@ -351,69 +474,18 @@ fn main() -> ExitCode {
                 }
             }
         });
-        let poc = poc.clone();
+        let tester = tester.clone();
         glib::spawn_future_local(async move {
             while replay_receiver.recv().await.is_ok() {
-                poc.play_all();
+                tester.play_all();
             }
         });
     }
 
-    glib::spawn_future_local({
-        let poc = poc.clone();
-        async move {
-            while let Ok(event) = events.recv().await {
-                match event {
-                    Event::NodeCreated(id) => {
-                        println!("virtual microphone created, node id {id}");
-                        match poc.args.start_after {
-                            Some(delay) => {
-                                let poc = poc.clone();
-                                glib::timeout_add_local_once(delay, move || poc.start());
-                            }
-                            None => poc.start(),
-                        }
-                    }
-                    Event::MicLinked {
-                        name,
-                        fallback: false,
-                    } => {
-                        println!("microphone linked: {name}");
-                    }
-                    Event::MicLinked {
-                        name,
-                        fallback: true,
-                    } => {
-                        println!("microphone linked as a fallback: {name}");
-                    }
-                    Event::MicUnlinked => println!("microphone unlinked"),
-                    Event::DevicesChanged {
-                        microphones,
-                        outputs,
-                    } => {
-                        println!("devices changed");
-                        for device in microphones {
-                            println!("microphone: {} ({})", device.name, device.description);
-                        }
-                        for device in outputs {
-                            println!("output: {} ({})", device.name, device.description);
-                        }
-                    }
-                    Event::PlaybackFinished { id, path } => {
-                        println!("finished playing {}", path.display());
-                        poc.ended(id);
-                    }
-                    Event::Error(error @ audio::Error::Playback { .. }) => {
-                        poc.playback_failed(&error);
-                    }
-                    Event::Error(error) => eprintln!("error: {error}"),
-                }
-            }
-        }
-    });
+    tester.watch(events);
 
     main_loop.run();
-    if poc.failed.get() {
+    if tester.failed.get() {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS

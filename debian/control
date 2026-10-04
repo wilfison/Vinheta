@@ -19,6 +19,9 @@ Build-Depends:
  desktop-file-utils,
  appstream,
 Standards-Version: 4.7.2
+Homepage: https://github.com/wilfison/Vinheta
+Vcs-Git: https://github.com/wilfison/Vinheta.git
+Vcs-Browser: https://github.com/wilfison/Vinheta
 
 Package: vinheta
 Architecture: any
@@ -28,9 +31,10 @@ Depends:
  gstreamer1.0-pipewire,
  gstreamer1.0-plugins-base,
  gstreamer1.0-plugins-good,
-Description: Soundboard for GNOME with virtual microphone support
- Vinheta is a soundboard for the GNOME desktop. Each directory added by
- the user becomes a tab, and every sound in it can be played with a click.
+Description: soundboard that plays sounds into your calls
+ Vinheta is a soundboard for the GNOME desktop. Each folder added by the
+ user becomes a tab with a pad per sound, played with a click or a key.
  .
- Sounds are played on the audio output and can also be sent to a virtual
- microphone, so they can be heard by other people in calls.
+ Sounds are played on the audio output and are also sent to a virtual
+ microphone named "Vinheta", together with the voice of the user, so that
+ other people hear them in calls.

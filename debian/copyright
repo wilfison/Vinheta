@@ -1,12 +1,13 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: vinheta
+Source: https://github.com/wilfison/Vinheta
 
 Files: *
-Copyright: 2026 Will
+Copyright: 2026 wilfison
 License: GPL-3+
 
 Files: data/*.metainfo.xml.in
-Copyright: 2026 Will
+Copyright: 2026 wilfison
 License: CC0-1.0
 
 License: GPL-3+

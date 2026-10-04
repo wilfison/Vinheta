@@ -31,3 +31,4 @@ debian/*.substvars
 debian/*.debhelper.log
 debian/debhelper-build-stamp
 obj-*/
+po/vinheta.pot

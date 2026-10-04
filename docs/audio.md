@@ -1,6 +1,6 @@
-# Audio proof of concept (Phase 0)
+# The audio engine
 
-This document records what was learned while proving the audio path of Vinheta: a virtual microphone that carries the user's voice and the soundboard sounds, plus a local monitor on the headphones. It is the reference for the later phases.
+This document records what was learned while proving the audio path of Vinheta (Phase 0, a proof of concept with command line tools and then in Rust) and what the engine does since: a virtual microphone that carries the user's voice and the soundboard sounds, plus a local monitor on the headphones. The command lines below are the record of what was measured; the shell script that wrapped them was removed in Phase 6.
 
 ## Environment and versions
 
@@ -132,7 +132,7 @@ Measured on 2026-10-03 with throwaway programs of the same pipeline shape, then 
 
 Measured by the harness: one channel of each branch is recorded into the same stereo file and the moment the 1000 Hz tone appears on each side is compared.
 
-Over 8 runs (3 with the shell script, 5 with the Rust engine) the offset "call minus monitor" was either about 0 ms (0.0, 0.0, 0.0, 0.5, 0.5) or about -21 ms (-21.0, -21.0, -21.5). 21.3 ms is one PipeWire quantum (1024 samples at 48 kHz): depending on the order in which the graph processes the nodes, the monitor path picks the sound up one cycle later. There is no target for this value and it is far below what a call would notice.
+Over 8 runs (3 with the shell script of Phase 0, 5 with the Rust engine) the offset "call minus monitor" was either about 0 ms (0.0, 0.0, 0.0, 0.5, 0.5) or about -21 ms (-21.0, -21.0, -21.5). 21.3 ms is one PipeWire quantum (1024 samples at 48 kHz): depending on the order in which the graph processes the nodes, the monitor path picks the sound up one cycle later. There is no target for this value and it is far below what a call would notice.
 
 ## Cleanup
 
@@ -142,7 +142,7 @@ The Rust engine creates the node and the links on its own connection, without `o
 - SIGINT (Ctrl+C),
 - SIGKILL (`kill -9`).
 
-All three pass. The shell script uses lingering nodes and removes them in a `trap`, so `kill -9` on the script does leave the node behind; remove it with `pw-cli destroy`.
+All three pass. A node made with `pw-cli` and `object.linger` (as the fake devices of the checks are) stays until `pw-cli destroy`.
 
 ## Known issues
 
@@ -154,16 +154,10 @@ All three pass. The shell script uses lingering nodes and removes them in a `tra
 
 ## Running it
 
-The shell proof of concept (command line tools only):
+The engine is exercised without the interface through the test binary (behind the `audio-test` cargo feature, never installed or packaged):
 
 ```sh
-scripts/audio-poc.sh [--mic NODE_NAME] [--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] FILE
-```
-
-The Rust engine, through the diagnostic binary (behind the `audio-poc` cargo feature, never installed or packaged):
-
-```sh
-cargo run --features audio-poc --bin vinheta-audio-poc -- [OPTIONS] [FILE...]
+cargo run --features audio-test --bin vinheta-audio-test -- [OPTIONS] [FILE...]
 ```
 
 - Without `FILE`: creates the node, links the microphone, and waits for Ctrl+C.
@@ -183,14 +177,17 @@ cargo run --features audio-poc --bin vinheta-audio-poc -- [OPTIONS] [FILE...]
 - `--fade-out SECONDS`: how long a stopped file takes to fade out (0 by default).
 - `--start-after SECONDS`: waits before the first playback, so the recorders of the harness are ready for a sound with no silence at its start.
 - The device lists are printed after the start and whenever they change (`devices changed`, then `microphone: NAME (DESCRIPTION)` and `output: NAME (DESCRIPTION)` lines).
-- `--mic`, `--monitor`, `--call-volume`, `--monitor-volume`: same meaning as in the script.
+- `--restart-engine-after SECONDS`: drops the engine that many seconds after the playback starts, starts a new one in the same process, and plays the files again. It does so twice, and prints `threads N` (the threads of the process) after each drop.
+- `--mic NODE_NAME`, `--monitor NODE_NAME`: the microphone and the monitor output. `--call-volume N`, `--monitor-volume N`: the gain of each branch.
+- An error is printed as `error: KIND: TEXT`. `KIND` is the stable name of the variant (`Error::kind`): `unreachable` (PipeWire cannot be reached at the start), `connection-lost`, `node-exists`, `pipewire`, `gstreamer`, `mic-not-found`, `no-microphone`, `file-not-found`, `playback`.
 - `--version`: prints the PipeWire and GStreamer library versions.
 
 The automated check:
 
 ```sh
-scripts/verify-audio-poc.sh shell   # checks scripts/audio-poc.sh
-scripts/verify-audio-poc.sh rust    # builds and checks vinheta-audio-poc
+scripts/verify-audio.sh                  # builds and checks vinheta-audio-test
+scripts/verify-audio.sh --only 'loop'    # only the sections whose title matches
+scripts/verify-audio.sh --list           # the section titles
 ```
 
 It never uses the real microphone or headphones. A fake microphone (a mono virtual source fed with a 440 Hz tone) and a temporary sink stand in for them, and the sound is a 1000 Hz tone. It checks that:
@@ -198,22 +195,25 @@ It never uses the real microphone or headphones. A fake microphone (a mono virtu
 - the call recording has both tones on both channels (-40 dBFS or louder),
 - the monitor recording has the sound and not the voice (below -60 dBFS),
 - a branch volume of 0 silences only that branch,
-- (Rust only) stopping one sound, or all of two sounds, silences both branches while the process, the node, and the voice stay,
-- (Rust only) muting the call branch silences the sound in the call recording only, keeps the voice there, and unmuting brings the sound back,
-- (Rust only) with `--no-call` the sound never reaches the call recording,
-- (Rust only) a gain of 0.1 on one branch lowers it by 20 dB within 200 ms and leaves the other branch and the voice alone,
-- (Rust only) a stop without a fade is silent 150 ms later,
-- (Rust only) a playback gain raised from 0.1 to 1 raises both branches by 20 dB within 200 ms and leaves the voice alone, and a branch volume change keeps the playback gain,
-- (Rust only) a looping 1 second tone is still there in its third pass with no silence longer than 15 ms at the seams (voice off, so silence means a gap), and reports no end,
-- (Rust only) a loop turned off in the second pass ends after two passes, with one "finished" line and exit status 0,
-- (Rust only) a restart goes back to the silence at the start of the file and plays again, with the voice untouched,
-- (Rust only) the position 2 seconds in and the duration of the file are reported,
-- (Rust only) a stop with a fade of 0.3 s is 1 to 15 dB down 100 to 200 ms later and silent after 600 ms, and reports no end; an exit in the middle of a 2 second fade leaves nothing behind,
-- (Rust only) the device lists name the fake devices, never the virtual microphone, and follow a sink that is created and destroyed,
-- (Rust only) turning the voice off removes it from the call recording and keeps the sound, and `--no-voice` starts that way,
-- (Rust only) switching to a second fake microphone (880 Hz) replaces the voice in the call recording,
-- (Rust only) switching to a second fake sink moves the playing sound within a second, without a gap in the call recording, and the next sound starts there,
-- (Rust only) when the chosen sink or microphone is destroyed, the engine falls back to the system default and keeps running, and the chosen microphone is linked again when it returns,
+- stopping one sound, or all of two sounds, silences both branches while the process, the node, and the voice stay,
+- muting the call branch silences the sound in the call recording only, keeps the voice there, and unmuting brings the sound back,
+- with `--no-call` the sound never reaches the call recording,
+- a gain of 0.1 on one branch lowers it by 20 dB within 200 ms and leaves the other branch and the voice alone,
+- a stop without a fade is silent 150 ms later,
+- a playback gain raised from 0.1 to 1 raises both branches by 20 dB within 200 ms and leaves the voice alone, and a branch volume change keeps the playback gain,
+- a looping 1 second tone is still there in its third pass with no silence longer than 15 ms at the seams (voice off, so silence means a gap), and reports no end,
+- a loop turned off in the second pass ends after two passes, with one "finished" line and exit status 0,
+- a restart goes back to the silence at the start of the file and plays again, with the voice untouched,
+- the position 2 seconds in and the duration of the file are reported,
+- a stop with a fade of 0.3 s is 1 to 15 dB down 100 to 200 ms later and silent after 600 ms, and reports no end; an exit in the middle of a 2 second fade leaves nothing behind,
+- the device lists name the fake devices, never the virtual microphone, and follow a sink that is created and destroyed,
+- turning the voice off removes it from the call recording and keeps the sound, and `--no-voice` starts that way,
+- switching to a second fake microphone (880 Hz) replaces the voice in the call recording,
+- switching to a second fake sink moves the playing sound within a second, without a gap in the call recording, and the next sound starts there,
+- when the chosen sink or microphone is destroyed, the engine falls back to the system default and keeps running, and the chosen microphone is linked again when it returns,
+- a second and a third engine started in the same process (`--restart-engine-after`) create the node again, once, play on both branches, leave nothing behind, and the process has no more threads after the second drop than after the first,
+- while another node named `vinheta` exists the start fails with the kind `node-exists`, and it succeeds once that node is gone,
+- against a private PipeWire instance (`PIPEWIRE_CORE=NAME pipewire`, reached with `PIPEWIRE_REMOTE=NAME`) that is not running the start fails with the kind `unreachable`, and killing a running one is reported as `connection-lost` within 2 seconds. Nothing is played there: a private instance has no session manager, so the monitor branch never links and a playback stays at position 0. The harness removes the instance and its socket whatever happens,
 - nothing is left behind after each kind of exit,
 - the default source and sink are unchanged.
 
@@ -221,19 +221,20 @@ If a real device is unplugged during the run, the system defaults change by them
 
 The two removal checks fall back to the real default devices, so the sink one plays with the monitor volume at 0 and the microphone one plays and records nothing.
 
-It prints one `PASS` or `FAIL` line per check and exits with status 0 only when all pass. Recordings and logs go to `tmp/audio-poc/`. It needs `ffmpeg` and `python3`, which are development tools only, not package dependencies.
+It prints one `PASS` or `FAIL` line per check and exits with status 0 only when all pass. Recordings and logs go to `tmp/audio/`. It needs `ffmpeg` and `python3`, which are development tools only, not package dependencies.
 
 ## Manual call checklist
 
-Optional. It does not block Phase 0, but its results feed the first-run screen planned for Phase 6. Use headphones unless a step says otherwise.
+Optional, and not done yet: it needs a person on a real call. Its results decide the wording of the call setup guide of the app, which ships with generic advice until then. Use headphones unless a step says otherwise.
 
-1. Start the engine: `cargo run --features audio-poc --bin vinheta-audio-poc -- some-sound.ogg`.
+1. Start the app (`scripts/run-dev.sh`, or the installed package) and add a folder with one audible sound.
 2. In the call app, pick "Vinheta" as the microphone (input device).
-3. Join a call with someone else, or use the app's microphone test.
-4. Speak, then press Enter in the terminal to play the sound while speaking.
+3. Join a call with someone else, or use the microphone test of the app.
+4. Speak, then click the pad while speaking.
 5. Ask the other side: do they hear the voice and the sound together? On both sides (left and right)?
-6. Repeat step 4 with the app's noise suppression turned on, then off.
-7. Repeat step 4 with speakers instead of headphones and ask whether the sound is heard twice (echo).
+6. Repeat step 4 with the noise suppression of the call app turned on, then off. Write down where that setting is, as the app names it.
+7. Repeat step 4 with a long or looping sound and the noise suppression on: is it cut after some seconds?
+8. Repeat step 4 with speakers instead of headphones and ask whether the sound is heard twice (echo).
 
 | Check | Discord | Google Meet |
 | --- | --- | --- |
@@ -243,3 +244,5 @@ Optional. It does not block Phase 0, but its results feed the first-run screen p
 | Sound survives with noise suppression on | | |
 | Sound survives with noise suppression off | | |
 | Echo with speakers | | |
+| A long sound survives with noise suppression on | | |
+| Where the noise suppression setting is | | |

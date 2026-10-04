@@ -72,5 +72,10 @@
 			<summary>Sounds folder</summary>
 			<description>Absolute path of the folder that receives the copies of loose files. Empty means "sounds" inside the data directory of the app.</description>
 		</key>
+		<key name="call-guide-shown" type="b">
+			<default>false</default>
+			<summary>Call setup guide shown</summary>
+			<description>Whether the call setup guide was shown on the first run. While false, the guide opens by itself when the app starts with working audio.</description>
+		</key>
 	</schema>
 </schemalist>

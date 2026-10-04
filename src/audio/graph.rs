@@ -1,6 +1,6 @@
 /* graph.rs
  *
- * Copyright 2026 Will
+ * Copyright 2026 wilfison
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -412,7 +412,7 @@ fn roundtrip(main_loop: &pw::main_loop::MainLoopRc, core: &pw::core::CoreRc) -> 
 
     while !done.get() {
         if failed.get() {
-            return Err(Error::PipeWire("connection lost".into()));
+            return Err(Error::ConnectionLost("during the start".into()));
         }
         main_loop.run();
     }
@@ -443,7 +443,9 @@ fn run_loop(
     pw::init();
     let main_loop = pw::main_loop::MainLoopRc::new(None).map_err(pipewire_error)?;
     let context = pw::context::ContextRc::new(&main_loop, None).map_err(pipewire_error)?;
-    let core = context.connect_rc(None).map_err(pipewire_error)?;
+    let core = context
+        .connect_rc(None)
+        .map_err(|error| Error::Unreachable(error.to_string()))?;
     let registry = core.get_registry_rc().map_err(pipewire_error)?;
 
     let graph = Rc::new(RefCell::new(Graph {
@@ -584,7 +586,7 @@ fn run_loop(
                 // resource": the server removed a link along with a stream
                 // that ended, just before the engine dropped its proxy.
                 if id == pw::core::PW_ID_CORE && res == -EPIPE {
-                    let error = Error::PipeWire(format!("connection lost: {message}"));
+                    let error = Error::ConnectionLost(message.to_string());
                     let _ = events.try_send(Event::Error(error));
                     main_loop.quit();
                 }

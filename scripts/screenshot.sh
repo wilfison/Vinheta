@@ -8,7 +8,8 @@ usage() {
     cat >&2 <<'USAGE'
 usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [--pads FILE]
                      [--fake-mic 'NODE DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
-                     [STEP]... [--no-audio] [--light] [--debug] [--sheet]
+                     [STEP]... [--no-audio] [--private-pipewire] [--first-run]
+                     [--lang LOCALE] [--light] [--debug] [--sheet]
        screenshot.sh --clean
 
 Writes tmp/screenshots/NAME.png from the app installed in build/install.
@@ -22,6 +23,13 @@ Writes tmp/screenshots/NAME.png from the app installed in build/install.
                creates a fake device before the app starts, for a known entry
                in the device lists (use the node name prefix vinheta-shot-)
 --no-audio     makes PipeWire unreachable, to capture the audio failure state
+--private-pipewire  starts a PipeWire instance of its own (no session manager,
+               no devices) and points the app, and every fake device, at it.
+               A pad shows as playing at 00:00 there and nothing is heard, so
+               --expect-playing cannot be used with it
+--first-run    leaves call-guide-shown at its default, so the call setup guide
+               opens by itself (every other run starts with it set to true)
+--lang LOCALE  runs the app in that language (pt_BR)
 --light        uses the light style instead of the dark one
 --debug        prints the app's debug messages (playback start times) at the end
 --sheet        also writes tmp/screenshots/NAME-sheet.png, every capture of
@@ -39,6 +47,8 @@ Steps run in the given order once the window is up, before the capture:
 --plug-mic 'NODE DESCRIPTION', --plug-sink 'NODE DESCRIPTION'
                creates a fake device while the app runs
 --unplug NODE  destroys a fake device
+--stop-pipewire, --start-pipewire  kills and starts the instance of
+               --private-pipewire while the app runs
 --capture NAME writes tmp/screenshots/NAME.png at this point of the sequence
 --crop WxH+X+Y crops the captures that follow (--crop full undoes it)
 --restart      quits the app and starts it again with the same settings and
@@ -59,7 +69,7 @@ USAGE
 }
 
 . "$(dirname "$0")/dev-common.sh"
-. "$root/scripts/audio-poc-common.sh"
+. "$root/scripts/audio-common.sh"
 
 name=
 folders=()
@@ -75,6 +85,9 @@ no_audio=
 pads=
 debug=
 sheet=
+first_run=
+lang=
+private=
 while [ $# -gt 0 ]; do
     case $1 in
         --folder) [ $# -ge 2 ] || usage; folders+=("$(realpath "$2")"); shift ;;
@@ -96,6 +109,11 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --restart) steps+=("restart -") ;;
+        --stop-pipewire) steps+=("stop-pipewire -") ;;
+        --start-pipewire) steps+=("start-pipewire -") ;;
+        --private-pipewire) private=1 ;;
+        --first-run) first_run=1 ;;
+        --lang) [ $# -ge 2 ] || usage; lang=$2; shift ;;
         --debug) debug=1 ;;
         --sheet) sheet=1 ;;
         --clean)
@@ -125,6 +143,34 @@ if [ -n "$pads" ]; then
     mkdir -p "$config/data/vinheta"
     cp "$pads" "$config/data/vinheta/pads.json" || exit 1
 fi
+
+# The private instance is known by its process id, never by its name: a
+# "pkill pipewire" would kill the real one.
+private_name=vinheta-screenshot-pipewire
+private_pid_file="$config/pipewire.pid"
+private_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$private_name"
+start_pipewire() {
+    local i
+    PIPEWIRE_REMOTE= PIPEWIRE_CORE=$private_name pipewire >>"$config/pipewire.log" 2>&1 &
+    echo $! >"$private_pid_file"
+    for i in $(seq 50); do
+        [ -S "$private_socket" ] && return 0
+        sleep 0.1
+    done
+    echo "the private PipeWire instance did not start" >&2
+    return 1
+}
+stop_pipewire() {
+    local pid i
+    pid=$(cat "$private_pid_file" 2>/dev/null) || return 0
+    kill "$pid" 2>/dev/null
+    for i in $(seq 30); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    rm -f "$private_pid_file" "$private_socket" "$private_socket.lock" \
+        "$private_socket-manager" "$private_socket-manager.lock"
+}
 
 # fake_device KIND NODE DESCRIPTION
 fake_device() {
@@ -158,9 +204,15 @@ unplug() {
 remove_fakes() {
     local node
     for node in "${fake_names[@]}"; do unplug "$node"; done
+    [ -z "$private" ] || stop_pipewire
 }
 trap remove_fakes EXIT
 trap 'exit 130' INT TERM
+
+if [ -n "$private" ]; then
+    start_pipewire || exit 1
+    export PIPEWIRE_REMOTE=$private_name
+fi
 
 for fake in "${fakes[@]}"; do
     kind=${fake%% *}
@@ -177,6 +229,7 @@ session() {
         [ -z "$crop" ] || mogrify -crop "$crop" +repage "$shots/$1.png"
     }
     gsettings set "$app_id" directories "$directories" || return 1
+    [ -n "$first_run" ] || gsettings set "$app_id" call-guide-shown true || return 1
     for setting in "${settings[@]}"; do
         gsettings set "$app_id" "${setting%% *}" "${setting#* }" || return 1
     done
@@ -204,6 +257,8 @@ session() {
             plug-mic) fake_device mic "${value%% *}" "${value#* }" ;;
             plug-sink) fake_device sink "${value%% *}" "${value#* }" ;;
             unplug) unplug "$value" ;;
+            stop-pipewire) stop_pipewire ;;
+            start-pipewire) start_pipewire ;;
             capture) capture "$value" ;;
             restart) quit_app; start_app ;;
             crop) crop=$value; [ "$crop" != full ] || crop= ;;
@@ -220,15 +275,16 @@ session() {
 # handed over as a script.
 {
     echo ". '$root/scripts/dev-common.sh'"
-    echo ". '$root/scripts/audio-poc-common.sh'"
-    declare -p directories shots name settings steps
-    declare -f fake_device unplug playing_count expect session
+    echo ". '$root/scripts/audio-common.sh'"
+    declare -p directories shots name settings steps first_run private_name private_pid_file private_socket config
+    declare -f fake_device unplug playing_count expect start_pipewire stop_pipewire session
     echo session
 } >"$config/session.sh"
 
 export ADW_DEBUG_COLOR_SCHEME=$scheme
 [ -n "$no_audio" ] && export PIPEWIRE_REMOTE=vinheta-screenshot-no-audio
 [ -n "$debug" ] && export G_MESSAGES_DEBUG=vinheta
+session_language=$lang
 virtual_session "$config" bash "$config/session.sh" >"$log" 2>&1
 
 status=0
