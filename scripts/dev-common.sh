@@ -38,14 +38,15 @@ app_env() {
 }
 
 # virtual_session CONFIG_DIR COMMAND...: runs COMMAND on a virtual display,
-# with its own D-Bus session and with settings kept in CONFIG_DIR, so nothing
-# shows up on the desktop and the user's settings are not touched. PipeWire is
+# with its own D-Bus session, with settings kept in CONFIG_DIR and data (the
+# pad settings, vinheta/pads.json) in CONFIG_DIR/data, so nothing shows up on
+# the desktop and the user's settings and pads are not touched. PipeWire is
 # still the real one.
 virtual_session() {
     local config=$1
     shift
     app_env
-    GDK_BACKEND=x11 GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME="$config" \
+    GDK_BACKEND=x11 GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME="$config" XDG_DATA_HOME="$config/data" \
         xvfb-run -a -s "-screen 0 1100x800x24" dbus-run-session -- "$@"
 }
 
@@ -93,6 +94,7 @@ activate() {
 # The window sits at the top left corner of the display, so window and screen
 # coordinates are the same.
 click() { xdotool mousemove "$1" "$2" click 1; }
+right_click() { xdotool mousemove "$1" "$2" click 3; }
 key() { xdotool key "$@"; }
 resize_window() {
     xdotool search --onlyvisible --name '^Vinheta$' | head -n 1 | xargs -I{} xdotool windowsize {} "$1" "$2"

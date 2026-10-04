@@ -38,5 +38,20 @@
 			<summary>Include my voice</summary>
 			<description>Whether the microphone is passed through the virtual microphone.</description>
 		</key>
+		<key name="trigger-mode" type="s">
+			<choices>
+				<choice value="overlap"/>
+				<choice value="restart"/>
+				<choice value="stop-others"/>
+			</choices>
+			<default>'overlap'</default>
+			<summary>When a pad is triggered</summary>
+			<description>What a click on a pad does: "overlap" plays sounds together and stops a pad that is playing, "restart" starts a playing pad again, "stop-others" stops every other sound when a pad starts.</description>
+		</key>
+		<key name="fade-out-on-stop" type="b">
+			<default>true</default>
+			<summary>Fade out on stop</summary>
+			<description>Whether a stopped sound fades out instead of being cut.</description>
+		</key>
 	</schema>
 </schemalist>

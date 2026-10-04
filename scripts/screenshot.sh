@@ -6,7 +6,7 @@ set -uo pipefail
 
 usage() {
     cat >&2 <<'USAGE'
-usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']...
+usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [--pads FILE]
                      [--fake-mic 'NODE DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
                      [STEP]... [--no-audio] [--light]
 
@@ -14,6 +14,9 @@ Writes tmp/screenshots/NAME.png from the app installed in build/install.
 --folder DIR   adds DIR to the library before the app starts
 --setting 'KEY VALUE'  sets a key of the app's settings before the app starts;
                VALUE is a GVariant such as 0.5, false, or "'text'"
+--pads FILE    uses FILE as the pad settings (pads.json) the app starts with:
+               {"version": 1, "pads": {"/abs/sound.wav": {"name": "Intro",
+               "color": "purple", "volume": 0.8, "loop": true}}}
 --fake-mic 'NODE DESCRIPTION', --fake-sink 'NODE DESCRIPTION'
                creates a fake device before the app starts, for a known entry
                in the device lists (use the node name prefix vinheta-shot-)
@@ -24,6 +27,7 @@ Steps run in the given order once the window is up, before the capture:
 --action 'ACTION [PARAMETER]'  activates app.NAME (or NAME) or win.NAME;
                                PARAMETER is a GVariant such as "'text'"
 --click X,Y    clicks at that position of the window
+--right-click X,Y  clicks there with the secondary button
 --key KEYS     presses keys, in xdotool syntax (Return, ctrl+q, Tab)
 --size W,H     resizes the window
 --wait SECONDS waits
@@ -53,17 +57,19 @@ fake_names=()
 captures=()
 scheme=prefer-dark
 no_audio=
+pads=
 while [ $# -gt 0 ]; do
     case $1 in
         --folder) [ $# -ge 2 ] || usage; folders+=("$(realpath "$2")"); shift ;;
         --setting) [ $# -ge 2 ] || usage; settings+=("$2"); shift ;;
+        --pads) [ $# -ge 2 ] || usage; pads=$(realpath "$2"); shift ;;
         --fake-mic | --fake-sink)
             [ $# -ge 2 ] || usage
             fakes+=("${1#--fake-} $2")
             fake_names+=("${2%% *}")
             shift
             ;;
-        --action | --click | --key | --size | --wait | --exec | --plug-mic | --plug-sink | --unplug | --capture | --crop)
+        --action | --click | --right-click | --key | --size | --wait | --exec | --plug-mic | --plug-sink | --unplug | --capture | --crop)
             [ $# -ge 2 ] || usage
             steps+=("${1#--} $2")
             case $1 in
@@ -91,6 +97,10 @@ log="$root/tmp/screenshot.log"
 rm -rf "$config"
 mkdir -p "$config" "$shots"
 for capture in "${captures[@]}"; do rm -f "$shots/$capture.png"; done
+if [ -n "$pads" ]; then
+    mkdir -p "$config/data/vinheta"
+    cp "$pads" "$config/data/vinheta/pads.json" || exit 1
+fi
 
 # fake_device KIND NODE DESCRIPTION
 fake_device() {
@@ -144,6 +154,7 @@ session() {
                 fi
                 ;;
             click) click "${value%,*}" "${value#*,}" ;;
+            right-click) right_click "${value%,*}" "${value#*,}" ;;
             key) key "$value" ;;
             size) resize_window "${value%,*}" "${value#*,}" ;;
             wait) sleep "$value" ;;
