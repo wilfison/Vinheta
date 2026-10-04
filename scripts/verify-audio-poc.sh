@@ -7,7 +7,25 @@ set -uo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 . "$root/scripts/audio-poc-common.sh"
 
+usage() {
+    echo "usage: $0 shell|rust [--only REGEX] [--list]
+--only REGEX  runs only the sections whose title matches (grep -E), for example
+              --only 'loop|fade'; the setup and the final checks always run
+--list        prints the section titles and exits" >&2
+    exit 2
+}
+
 mode=${1:-}
+[ $# -gt 0 ] && shift
+only=
+while [ $# -gt 0 ]; do
+    case $1 in
+        --only) [ $# -ge 2 ] || usage; only=$2; shift ;;
+        --list) sed -n 's/^ *if section "\(.*\)"; then$/\1/p' "$0"; exit 0 ;;
+        *) usage ;;
+    esac
+    shift
+done
 case $mode in
     shell) subject=("$root/scripts/audio-poc.sh") ;;
     rust)
@@ -15,11 +33,12 @@ case $mode in
             --features audio-poc --bin vinheta-audio-poc || exit 1
         subject=("$root/target/debug/vinheta-audio-poc")
         ;;
-    *) echo "usage: $0 shell|rust" >&2; exit 2 ;;
+    *) usage ;;
 esac
 
 work="$root/tmp/audio-poc"
 mkdir -p "$work"
+rm -f "$work/onset-failures"
 sound="$work/sound.wav"
 mic=vinheta-test-mic
 monitor=vinheta-test-monitor
@@ -30,6 +49,14 @@ absent=-60
 failures=0
 pids=()
 nodes=()
+
+# section TITLE: announces a section, or skips it when --only does not match.
+section() {
+    if [ -n "$only" ] && ! grep -Eq -- "$only" <<<"$1"; then
+        return 1
+    fi
+    echo "== $1"
+}
 
 check() {
     if [ "$2" = ok ]; then
@@ -203,7 +230,12 @@ expect() {
 window() {
     local onset
     onset=$(analyze onset "$1" 0 1000)
-    [ "$onset" = none ] && onset=1000
+    # A guessed onset would put every measurement in the wrong place. This
+    # runs in a subshell, so the failure is counted through a file.
+    if [ "$onset" = none ]; then
+        echo "FAIL no 1000 Hz onset (above -40 dBFS) in $1" | tee -a "$work/onset-failures" >&2
+        onset=1000
+    fi
     python3 -c 'import sys; print(float(sys.argv[1]) / 1000 + float(sys.argv[2]))' "$onset" "${2:-0.5}"
 }
 
@@ -270,37 +302,40 @@ pw-link vinheta-test-tone:output_MONO "$mic:input_MONO"
 once=()
 [ "$mode" = rust ] && once=(--once)
 
-echo "== both branches"
-playback full "${once[@]}"
-check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
-start=$(window "$work/full-call.wav")
-expect "call" "$work/full-call.wav" 440 present "$start"
-expect "call" "$work/full-call.wav" 1000 present "$start"
-expect "monitor" "$work/full-monitor.wav" 1000 present "$(window "$work/full-monitor.wav")"
-expect "monitor" "$work/full-monitor.wav" 440 absent 1
-check "nothing left after a normal exit" "$(gone_within_2s && echo ok)"
+if section "both branches"; then
+    playback full "${once[@]}"
+    check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
+    start=$(window "$work/full-call.wav")
+    expect "call" "$work/full-call.wav" 440 present "$start"
+    expect "call" "$work/full-call.wav" 1000 present "$start"
+    expect "monitor" "$work/full-monitor.wav" 1000 present "$(window "$work/full-monitor.wav")"
+    expect "monitor" "$work/full-monitor.wav" 440 absent 1
+    check "nothing left after a normal exit" "$(gone_within_2s && echo ok)"
 
-call_onset=$(analyze onset "$work/full-probe.wav" 0 1000)
-monitor_onset=$(analyze onset "$work/full-probe.wav" 1 1000)
-if [ "$call_onset" = none ] || [ "$monitor_onset" = none ]; then
-    check "branch offset measured" fail
-else
-    offset=$(python3 -c 'import sys; print(f"{float(sys.argv[1]) - float(sys.argv[2]):+.1f}")' "$call_onset" "$monitor_onset")
-    check "branch offset measured: call minus monitor = $offset ms" ok
+    call_onset=$(analyze onset "$work/full-probe.wav" 0 1000)
+    monitor_onset=$(analyze onset "$work/full-probe.wav" 1 1000)
+    if [ "$call_onset" = none ] || [ "$monitor_onset" = none ]; then
+        check "branch offset measured" fail
+    else
+        offset=$(python3 -c 'import sys; print(f"{float(sys.argv[1]) - float(sys.argv[2]):+.1f}")' "$call_onset" "$monitor_onset")
+        check "branch offset measured: call minus monitor = $offset ms" ok
+    fi
 fi
 
-echo "== call volume 0"
-playback call-muted "${once[@]}" --call-volume 0
-start=$(window "$work/call-muted-monitor.wav")
-expect "call" "$work/call-muted-call.wav" 1000 absent "$start"
-expect "call" "$work/call-muted-call.wav" 440 present "$start"
-expect "monitor" "$work/call-muted-monitor.wav" 1000 present "$start"
+if section "call volume 0"; then
+    playback call-muted "${once[@]}" --call-volume 0
+    start=$(window "$work/call-muted-monitor.wav")
+    expect "call" "$work/call-muted-call.wav" 1000 absent "$start"
+    expect "call" "$work/call-muted-call.wav" 440 present "$start"
+    expect "monitor" "$work/call-muted-monitor.wav" 1000 present "$start"
+fi
 
-echo "== monitor volume 0"
-playback monitor-muted "${once[@]}" --monitor-volume 0
-start=$(window "$work/monitor-muted-call.wav")
-expect "call" "$work/monitor-muted-call.wav" 1000 present "$start"
-expect "monitor" "$work/monitor-muted-monitor.wav" 1000 absent "$start"
+if section "monitor volume 0"; then
+    playback monitor-muted "${once[@]}" --monitor-volume 0
+    start=$(window "$work/monitor-muted-call.wav")
+    expect "call" "$work/monitor-muted-call.wav" 1000 present "$start"
+    expect "monitor" "$work/monitor-muted-monitor.wav" 1000 absent "$start"
+fi
 
 if [ "$mode" = rust ]; then
     # 8 seconds of tone, so there is room to act in the middle of it.
@@ -312,90 +347,97 @@ if [ "$mode" = rust ]; then
     done
 
     # The actions below happen 4 s into the playback, in the middle of the tone.
-    echo "== stop one sound"
-    files=("$long") run_for=8
-    playback stop --stop-after 4
-    check "subject and node still there after the stop" "$subject_alive"
-    for branch in call monitor; do
-        expect "$branch before the stop" "$work/stop-$branch.wav" 1000 present "$(window "$work/stop-$branch.wav")" 1.5
-        expect "$branch after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4)"
-        # Without a fade the sound is cut at once.
-        expect "$branch 150 ms after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4 0.15)" 0.5
-    done
-    expect "call after the stop" "$work/stop-call.wav" 440 present "$(after "$work/stop-call.wav" 4)"
-
-    echo "== stop all sounds"
-    files=("$long" "$other") run_for=8
-    playback stop-all --stop-all-after 4
-    check "subject and node still there after the stop" "$subject_alive"
-    for branch in call monitor; do
-        for freq in 1000 2000; do
-            expect "$branch before the stop" "$work/stop-all-$branch.wav" "$freq" present "$(window "$work/stop-all-$branch.wav")" 1.5
-            expect "$branch after the stop" "$work/stop-all-$branch.wav" "$freq" absent "$(after "$work/stop-all-$branch.wav" 4)"
+    if section "stop one sound"; then
+        files=("$long") run_for=8
+        playback stop --stop-after 4
+        check "subject and node still there after the stop" "$subject_alive"
+        for branch in call monitor; do
+            expect "$branch before the stop" "$work/stop-$branch.wav" 1000 present "$(window "$work/stop-$branch.wav")" 1.5
+            expect "$branch after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4)"
+            # Without a fade the sound is cut at once.
+            expect "$branch 150 ms after the stop" "$work/stop-$branch.wav" 1000 absent "$(after "$work/stop-$branch.wav" 4 0.15)" 0.5
         done
-    done
+        expect "call after the stop" "$work/stop-call.wav" 440 present "$(after "$work/stop-call.wav" 4)"
+    fi
 
-    echo "== mute and unmute the call branch"
-    files=("$long")
-    playback mute --once --mute-call-after 4 --unmute-call-after 6.5
-    call="$work/mute-call.wav"
-    expect "call before the mute" "$call" 1000 present "$(window "$call")" 1.5
-    expect "call while muted" "$call" 1000 absent "$(after "$call" 4 0.5)" 1.5
-    expect "call while muted" "$call" 440 present "$(after "$call" 4 0.5)" 1.5
-    expect "monitor while muted" "$work/mute-monitor.wav" 1000 present "$(after "$work/mute-monitor.wav" 4 0.5)" 1.5
-    expect "call after the unmute" "$call" 1000 present "$(after "$call" 6.5 0.5)" 1.5
+    if section "stop all sounds"; then
+        files=("$long" "$other") run_for=8
+        playback stop-all --stop-all-after 4
+        check "subject and node still there after the stop" "$subject_alive"
+        for branch in call monitor; do
+            for freq in 1000 2000; do
+                expect "$branch before the stop" "$work/stop-all-$branch.wav" "$freq" present "$(window "$work/stop-all-$branch.wav")" 1.5
+                expect "$branch after the stop" "$work/stop-all-$branch.wav" "$freq" absent "$(after "$work/stop-all-$branch.wav" 4)"
+            done
+        done
+    fi
 
-    echo "== call branch off from the start"
-    playback no-call --once --no-call
-    start=$(window "$work/no-call-monitor.wav")
-    expect "call" "$work/no-call-call.wav" 1000 absent "$start"
-    expect "call" "$work/no-call-call.wav" 440 present "$start"
-    expect "monitor" "$work/no-call-monitor.wav" 1000 present "$start"
+    if section "mute and unmute the call branch"; then
+        files=("$long")
+        playback mute --once --mute-call-after 4 --unmute-call-after 6.5
+        call="$work/mute-call.wav"
+        expect "call before the mute" "$call" 1000 present "$(window "$call")" 1.5
+        expect "call while muted" "$call" 1000 absent "$(after "$call" 4 0.5)" 1.5
+        expect "call while muted" "$call" 440 present "$(after "$call" 4 0.5)" 1.5
+        expect "monitor while muted" "$work/mute-monitor.wav" 1000 present "$(after "$work/mute-monitor.wav" 4 0.5)" 1.5
+        expect "call after the unmute" "$call" 1000 present "$(after "$call" 6.5 0.5)" 1.5
+    fi
+
+    if section "call branch off from the start"; then
+        playback no-call --once --no-call
+        start=$(window "$work/no-call-monitor.wav")
+        expect "call" "$work/no-call-call.wav" 1000 absent "$start"
+        expect "call" "$work/no-call-call.wav" 440 present "$start"
+        expect "monitor" "$work/no-call-monitor.wav" 1000 present "$start"
+    fi
 
     for branch in call monitor; do
         other=monitor
         [ "$branch" = monitor ] && other=call
-        echo "== $branch volume change"
+        if section "$branch volume change"; then
+            files=("$long")
+            playback "$branch-volume" --once "--$branch-volume-after" 4 0.1
+            changed="$work/$branch-volume-$branch.wav"
+            kept="$work/$branch-volume-$other.wav"
+            value=$(drop "$changed" 1000 "$(window "$changed")" "$(after "$changed" 4)")
+            check "$branch falls by 20 dB at gain 0.1 ($value dB)" "$(between "$value" 17 23)"
+            value=$(drop "$changed" 1000 "$(window "$changed")" "$(after "$changed" 4 0.2)" 0.5)
+            check "$branch has fallen 200 ms after the change ($value dB)" "$(between "$value" 17 23)"
+            value=$(drop "$kept" 1000 "$(window "$kept")" "$(after "$kept" 4)")
+            check "$other keeps its level ($value dB)" "$(between "$value" -2 2)"
+            call="$work/$branch-volume-call.wav"
+            value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
+            check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
+        fi
+    done
+
+    if section "playback volume"; then
         files=("$long")
-        playback "$branch-volume" --once "--$branch-volume-after" 4 0.1
-        changed="$work/$branch-volume-$branch.wav"
-        kept="$work/$branch-volume-$other.wav"
-        value=$(drop "$changed" 1000 "$(window "$changed")" "$(after "$changed" 4)")
-        check "$branch falls by 20 dB at gain 0.1 ($value dB)" "$(between "$value" 17 23)"
-        value=$(drop "$changed" 1000 "$(window "$changed")" "$(after "$changed" 4 0.2)" 0.5)
-        check "$branch has fallen 200 ms after the change ($value dB)" "$(between "$value" 17 23)"
-        value=$(drop "$kept" 1000 "$(window "$kept")" "$(after "$kept" 4)")
-        check "$other keeps its level ($value dB)" "$(between "$value" -2 2)"
-        call="$work/$branch-volume-call.wav"
-        value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
+        playback playback-volume --once --volume 0.1 --playback-volume-after 4 1.0
+        # At gain 0.1 the tone is below the level that counts as its onset, so
+        # the onset found is the change itself, 2.5 s after the tone started.
+        for branch in call monitor; do
+            file="$work/playback-volume-$branch.wav"
+            value=$(drop "$file" 1000 "$(window "$file" -2)" "$(window "$file" 0.7)")
+            check "$branch rises by 20 dB from gain 0.1 to 1 ($value dB)" "$(between "$value" -23 -17)"
+            value=$(drop "$file" 1000 "$(window "$file" -0.7)" "$(window "$file" 0.2)" 0.5)
+            check "$branch has risen 200 ms after the change ($value dB)" "$(between "$value" -23 -17)"
+        done
+        call="$work/playback-volume-call.wav"
+        value=$(drop "$call" 440 "$(window "$call" -2)" "$(window "$call" 0.7)")
         check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
-    done
+    fi
 
-    echo "== playback volume"
-    files=("$long")
-    playback playback-volume --once --volume 0.1 --playback-volume-after 4 1.0
-    # At gain 0.1 the tone is below the level that counts as its onset, so
-    # the onset found is the change itself, 2.5 s after the tone started.
-    for branch in call monitor; do
-        file="$work/playback-volume-$branch.wav"
-        value=$(drop "$file" 1000 "$(window "$file" -2)" "$(window "$file" 0.7)")
-        check "$branch rises by 20 dB from gain 0.1 to 1 ($value dB)" "$(between "$value" -23 -17)"
-        value=$(drop "$file" 1000 "$(window "$file" -0.7)" "$(window "$file" 0.2)" 0.5)
-        check "$branch has risen 200 ms after the change ($value dB)" "$(between "$value" -23 -17)"
-    done
-    call="$work/playback-volume-call.wav"
-    value=$(drop "$call" 440 "$(window "$call" -2)" "$(window "$call" 0.7)")
-    check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
-
-    echo "== playback volume and branch volume"
-    files=("$long")
-    playback playback-branch-volume --once --volume 0.5 --call-volume-after 4 0.1
-    file="$work/playback-branch-volume-call.wav"
-    value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
-    check "call falls by 20 dB more ($value dB)" "$(between "$value" 17 23)"
-    file="$work/playback-branch-volume-monitor.wav"
-    value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
-    check "monitor keeps the playback gain ($value dB)" "$(between "$value" -2 2)"
+    if section "playback volume and branch volume"; then
+        files=("$long")
+        playback playback-branch-volume --once --volume 0.5 --call-volume-after 4 0.1
+        file="$work/playback-branch-volume-call.wav"
+        value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
+        check "call falls by 20 dB more ($value dB)" "$(between "$value" 17 23)"
+        file="$work/playback-branch-volume-monitor.wav"
+        value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
+        check "monitor keeps the playback gain ($value dB)" "$(between "$value" -2 2)"
+    fi
 
     # One second of tone with no silence around it. The voice is off in the
     # loop checks, so that silence on the call recording means a gap.
@@ -403,112 +445,121 @@ if [ "$mode" = rust ]; then
     ffmpeg -v error -y -f lavfi -i "sine=frequency=1000:duration=1" \
         -af "volume=-12dB,pan=stereo|c0=c0|c1=c0" -ar 48000 "$loop" || exit 1
 
-    echo "== loop"
-    files=("$loop") run_for=7
-    playback loop --no-voice --start-after 1 --loop --stop-after 3.5
-    for branch in call monitor; do
-        file="$work/loop-$branch.wav"
-        expect "$branch in the third pass" "$file" 1000 present "$(window "$file" 2)" 1
-        value=$(analyze gaps "$file" 0 "$(window "$file" 0.2)" "$(window "$file" 3)")
-        check "$branch has no gap at the seams (longest silence: $value ms)" "$(between "$value" 0 15)"
-        expect "$branch after the stop" "$file" 1000 absent "$(window "$file" 4.2)" 1
-    done
-    check "no end is reported while it loops" "$(grep -q '^finished playing' "$work/loop.log" || echo ok)"
-
-    echo "== loop off"
-    files=("$loop")
-    playback loop-off --no-voice --start-after 1 --once --loop --loop-off-after 1.5
-    check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
-    check "subject exited within 4 s of the start of the sound ($subject_seconds s with the 1 s wait)" \
-        "$(between "$subject_seconds" 0 5)"
-    check "the end is reported once" "$([ "$(grep -c '^finished playing' "$work/loop-off.log")" -eq 1 ] && echo ok)"
-    value=$(analyze span "$work/loop-off-call.wav" 0)
-    check "the tone lasts two passes ($value s)" "$(between "$value" 1.8 2.2)"
-
-    echo "== restart"
-    files=("$long")
-    playback restart --once --restart-after 4
-    for branch in call monitor; do
-        file="$work/restart-$branch.wav"
-        expect "$branch before the restart" "$file" 1000 present "$(window "$file")" 1.5
-        expect "$branch in the silence after the restart" "$file" 1000 absent "$(after "$file" 4 0.4)" 0.8
-        expect "$branch playing again" "$file" 1000 present "$(after "$file" 4 1.9)" 1.5
-    done
-    expect "call after the restart" "$work/restart-call.wav" 440 present "$(after "$work/restart-call.wav" 4 0.4)" 0.8
-
-    echo "== position"
-    files=("$long")
-    playback position --once --position-after 2
-    read -r _ elapsed duration < <(grep '^position ' "$work/position.log")
-    check "elapsed time 2 s into the playback (${elapsed:-none} ms)" "$(between "${elapsed:-0}" 1500 2500 2>/dev/null)"
-    check "duration of the file (${duration:-none} ms)" "$(between "${duration:-0}" 9400 9600 2>/dev/null)"
-
-    echo "== fade out"
-    files=("$long") run_for=8
-    playback fade --fade-out 0.3 --stop-after 4
-    for branch in call monitor; do
-        file="$work/fade-$branch.wav"
-        value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4 0.1)" 0.1)
-        check "$branch is fading 100 to 200 ms after the stop ($value dB down)" "$(between "$value" 1 15)"
-        expect "$branch 600 ms after the stop" "$file" 1000 absent "$(after "$file" 4 0.6)" 1.5
-    done
-    call="$work/fade-call.wav"
-    value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
-    check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
-    check "no end is reported for the stopped sound" "$(grep -q '^finished playing' "$work/fade.log" || echo ok)"
-
-    echo "== fade and exit"
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" --fade-out 2 --stop-all-after 4 "$long" \
-        </dev/null >"$work/fade-exit.log" 2>&1 &
-    subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 4.5; then
-        check "the sound is still fading" "$(streams | grep -q . && echo ok)"
-        kill -INT "$subject_pid"
-        check "nothing left after an exit during a fade" "$(gone_within_2s && [ -z "$(streams)" ] && echo ok)"
-    else
-        check "subject started for the fade and exit" fail
+    if section "loop"; then
+        files=("$loop") run_for=7
+        playback loop --no-voice --start-after 1 --loop --stop-after 3.5
+        for branch in call monitor; do
+            file="$work/loop-$branch.wav"
+            expect "$branch in the third pass" "$file" 1000 present "$(window "$file" 2)" 1
+            value=$(analyze gaps "$file" 0 "$(window "$file" 0.2)" "$(window "$file" 3)")
+            check "$branch has no gap at the seams (longest silence: $value ms)" "$(between "$value" 0 15)"
+            expect "$branch after the stop" "$file" 1000 absent "$(window "$file" 4.2)" 1
+        done
+        check "no end is reported while it loops" "$(grep -q '^finished playing' "$work/loop.log" || echo ok)"
     fi
-    wait "$subject_pid" 2>/dev/null
 
-    echo "== device list"
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" </dev/null >"$work/devices.log" 2>&1 &
-    subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR; then
-        sleep 0.5
-        extra=$(create_node vinheta-test-extra "Vinheta test extra" Audio/Sink "FL FR")
-        sleep 2
-        with_extra=$(device_blocks "$work/devices.log" | tail -n 1)
-        pw-cli destroy "$extra" >/dev/null
-        sleep 2
+    if section "loop off"; then
+        files=("$loop")
+        playback loop-off --no-voice --start-after 1 --once --loop --loop-off-after 1.5
+        check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
+        check "subject exited within 4 s of the start of the sound ($subject_seconds s with the 1 s wait)" \
+            "$(between "$subject_seconds" 0 5)"
+        check "the end is reported once" "$([ "$(grep -c '^finished playing' "$work/loop-off.log")" -eq 1 ] && echo ok)"
+        value=$(analyze span "$work/loop-off-call.wav" 0)
+        check "the tone lasts two passes ($value s)" "$(between "$value" 1.8 2.2)"
     fi
-    kill -INT "$subject_pid" 2>/dev/null
-    wait "$subject_pid" 2>/dev/null
-    first=$(device_blocks "$work/devices.log" | head -n 1)
-    last=$(device_blocks "$work/devices.log" | tail -n 1)
-    check "the fake microphone is listed with its description" \
-        "$([[ $first == *"microphone: $mic (Vinheta test microphone)"* ]] && echo ok)"
-    check "the fake sink is listed with its description" \
-        "$([[ $first == *"output: $monitor (Vinheta test monitor)"* ]] && echo ok)"
-    check "the virtual microphone is never listed" \
-        "$(grep -q '^microphone: vinheta (' "$work/devices.log" || echo ok)"
-    check "a sink plugged in shows up within 2 s" \
-        "$([[ $with_extra == *"output: vinheta-test-extra (Vinheta test extra)"* ]] && echo ok)"
-    check "a removed sink leaves the list" "$([[ $last != *vinheta-test-extra* ]] && echo ok)"
 
-    echo "== voice off and on"
-    files=("$long")
-    playback voice --once --voice-off-after 4 --voice-on-after 6.5
-    call="$work/voice-call.wav"
-    expect "call before the voice is off" "$call" 440 present "$(window "$call")" 1.5
-    expect "call while the voice is off" "$call" 440 absent "$(after "$call" 4 0.5)" 1.5
-    expect "call while the voice is off" "$call" 1000 present "$(after "$call" 4 0.5)" 1.5
-    expect "call after the voice is back" "$call" 440 present "$(after "$call" 6.5 0.5)" 1.5
+    if section "restart"; then
+        files=("$long")
+        playback restart --once --restart-after 4
+        for branch in call monitor; do
+            file="$work/restart-$branch.wav"
+            expect "$branch before the restart" "$file" 1000 present "$(window "$file")" 1.5
+            expect "$branch in the silence after the restart" "$file" 1000 absent "$(after "$file" 4 0.4)" 0.8
+            expect "$branch playing again" "$file" 1000 present "$(after "$file" 4 1.9)" 1.5
+        done
+        expect "call after the restart" "$work/restart-call.wav" 440 present "$(after "$work/restart-call.wav" 4 0.4)" 0.8
+    fi
 
-    echo "== voice off from the start"
-    playback no-voice --once --no-voice
-    start=$(window "$work/no-voice-call.wav")
-    expect "call" "$work/no-voice-call.wav" 440 absent "$start"
-    expect "call" "$work/no-voice-call.wav" 1000 present "$start"
+    if section "position"; then
+        files=("$long")
+        playback position --once --position-after 2
+        read -r _ elapsed duration < <(grep '^position ' "$work/position.log")
+        check "elapsed time 2 s into the playback (${elapsed:-none} ms)" "$(between "${elapsed:-0}" 1500 2500 2>/dev/null)"
+        check "duration of the file (${duration:-none} ms)" "$(between "${duration:-0}" 9400 9600 2>/dev/null)"
+    fi
+
+    if section "fade out"; then
+        files=("$long") run_for=8
+        playback fade --fade-out 0.3 --stop-after 4
+        for branch in call monitor; do
+            file="$work/fade-$branch.wav"
+            value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4 0.1)" 0.1)
+            check "$branch is fading 100 to 200 ms after the stop ($value dB down)" "$(between "$value" 1 15)"
+            expect "$branch 600 ms after the stop" "$file" 1000 absent "$(after "$file" 4 0.6)" 1.5
+        done
+        call="$work/fade-call.wav"
+        value=$(drop "$call" 440 "$(window "$call")" "$(after "$call" 4)")
+        check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
+        check "no end is reported for the stopped sound" "$(grep -q '^finished playing' "$work/fade.log" || echo ok)"
+    fi
+
+    if section "fade and exit"; then
+        "${subject[@]}" --mic "$mic" --monitor "$monitor" --fade-out 2 --stop-all-after 4 "$long" \
+            </dev/null >"$work/fade-exit.log" 2>&1 &
+        subject_pid=$!
+        if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 4.5; then
+            check "the sound is still fading" "$(streams | grep -q . && echo ok)"
+            kill -INT "$subject_pid"
+            check "nothing left after an exit during a fade" "$(gone_within_2s && [ -z "$(streams)" ] && echo ok)"
+        else
+            check "subject started for the fade and exit" fail
+        fi
+        wait "$subject_pid" 2>/dev/null
+    fi
+
+    if section "device list"; then
+        "${subject[@]}" --mic "$mic" --monitor "$monitor" </dev/null >"$work/devices.log" 2>&1 &
+        subject_pid=$!
+        if wait_for "the vinheta node" port_exists vinheta:capture_FR; then
+            sleep 0.5
+            extra=$(create_node vinheta-test-extra "Vinheta test extra" Audio/Sink "FL FR")
+            sleep 2
+            with_extra=$(device_blocks "$work/devices.log" | tail -n 1)
+            pw-cli destroy "$extra" >/dev/null
+            sleep 2
+        fi
+        kill -INT "$subject_pid" 2>/dev/null
+        wait "$subject_pid" 2>/dev/null
+        first=$(device_blocks "$work/devices.log" | head -n 1)
+        last=$(device_blocks "$work/devices.log" | tail -n 1)
+        check "the fake microphone is listed with its description" \
+            "$([[ $first == *"microphone: $mic (Vinheta test microphone)"* ]] && echo ok)"
+        check "the fake sink is listed with its description" \
+            "$([[ $first == *"output: $monitor (Vinheta test monitor)"* ]] && echo ok)"
+        check "the virtual microphone is never listed" \
+            "$(grep -q '^microphone: vinheta (' "$work/devices.log" || echo ok)"
+        check "a sink plugged in shows up within 2 s" \
+            "$([[ $with_extra == *"output: vinheta-test-extra (Vinheta test extra)"* ]] && echo ok)"
+        check "a removed sink leaves the list" "$([[ $last != *vinheta-test-extra* ]] && echo ok)"
+    fi
+
+    if section "voice off and on"; then
+        files=("$long")
+        playback voice --once --voice-off-after 4 --voice-on-after 6.5
+        call="$work/voice-call.wav"
+        expect "call before the voice is off" "$call" 440 present "$(window "$call")" 1.5
+        expect "call while the voice is off" "$call" 440 absent "$(after "$call" 4 0.5)" 1.5
+        expect "call while the voice is off" "$call" 1000 present "$(after "$call" 4 0.5)" 1.5
+        expect "call after the voice is back" "$call" 440 present "$(after "$call" 6.5 0.5)" 1.5
+    fi
+
+    if section "voice off from the start"; then
+        playback no-voice --once --no-voice
+        start=$(window "$work/no-voice-call.wav")
+        expect "call" "$work/no-voice-call.wav" 440 absent "$start"
+        expect "call" "$work/no-voice-call.wav" 1000 present "$start"
+    fi
 
     # A second fake microphone, with another tone, and a second fake sink.
     mic2_id=$(create_node "$mic2" "Vinheta test microphone 2" Audio/Source/Virtual MONO)
@@ -522,94 +573,99 @@ if [ "$mode" = rust ]; then
     wait_for "the second fake microphone tone" port_exists vinheta-test-tone2:output_MONO || exit 1
     pw-link vinheta-test-tone2:output_MONO "$mic2:input_MONO"
 
-    echo "== microphone switch"
-    files=("$long")
-    playback mic-switch --once --mic-after 4 "$mic2"
-    call="$work/mic-switch-call.wav"
-    expect "call before the switch" "$call" 440 present "$(window "$call")" 1.5
-    expect "call before the switch" "$call" 880 absent "$(window "$call")" 1.5
-    expect "call after the switch" "$call" 440 absent "$(after "$call" 4)" 1.5
-    expect "call after the switch" "$call" 880 present "$(after "$call" 4)" 1.5
-    expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
+    if section "microphone switch"; then
+        files=("$long")
+        playback mic-switch --once --mic-after 4 "$mic2"
+        call="$work/mic-switch-call.wav"
+        expect "call before the switch" "$call" 440 present "$(window "$call")" 1.5
+        expect "call before the switch" "$call" 880 absent "$(window "$call")" 1.5
+        expect "call after the switch" "$call" 440 absent "$(after "$call" 4)" 1.5
+        expect "call after the switch" "$call" 880 present "$(after "$call" 4)" 1.5
+        expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
+    fi
 
-    echo "== monitor switch"
-    files=("$long") record_monitor2=1
-    playback monitor-switch --once --monitor-after 4 "$monitor2"
-    first="$work/monitor-switch-monitor.wav"
-    second="$work/monitor-switch-monitor2.wav"
-    call="$work/monitor-switch-call.wav"
-    expect "first sink before the switch" "$first" 1000 present "$(window "$first")" 1.5
-    expect "first sink 1 s after the switch" "$first" 1000 absent "$(after "$first" 4 1)" 1.5
-    expect "second sink after the switch" "$second" 1000 present "$(window "$second")" 1.5
-    # The tone reaches the second sink when the stream is moved, 4 s into the
-    # playback, which is 2.5 s after it reached the first one.
-    moved=$(python3 -c 'import sys; print(f"{(float(sys.argv[2]) - float(sys.argv[1])) / 1000:.2f}")' \
-        "$(analyze onset "$first" 0 1000)" "$(analyze onset "$second" 0 1000)" 2>/dev/null)
-    check "the stream moved within 1 s of the request ($moved s after the tone started)" "$(between "${moved:-0}" 2 3.5)"
-    expect "call before the switch" "$call" 1000 present "$(window "$call")" 1.5
-    expect "call during the switch" "$call" 1000 present "$(after "$call" 4 -0.3)" 1
-    expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
+    if section "monitor switch"; then
+        files=("$long") record_monitor2=1
+        playback monitor-switch --once --monitor-after 4 "$monitor2"
+        first="$work/monitor-switch-monitor.wav"
+        second="$work/monitor-switch-monitor2.wav"
+        call="$work/monitor-switch-call.wav"
+        expect "first sink before the switch" "$first" 1000 present "$(window "$first")" 1.5
+        expect "first sink 1 s after the switch" "$first" 1000 absent "$(after "$first" 4 1)" 1.5
+        expect "second sink after the switch" "$second" 1000 present "$(window "$second")" 1.5
+        # The tone reaches the second sink when the stream is moved, 4 s into the
+        # playback, which is 2.5 s after it reached the first one.
+        moved=$(python3 -c 'import sys; print(f"{(float(sys.argv[2]) - float(sys.argv[1])) / 1000:.2f}")' \
+            "$(analyze onset "$first" 0 1000)" "$(analyze onset "$second" 0 1000)" 2>/dev/null)
+        check "the stream moved within 1 s of the request ($moved s after the tone started)" "$(between "${moved:-0}" 2 3.5)"
+        expect "call before the switch" "$call" 1000 present "$(window "$call")" 1.5
+        expect "call during the switch" "$call" 1000 present "$(after "$call" 4 -0.3)" 1
+        expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
+    fi
 
     # The output changes before the tone of the first playback starts, and
     # the files are played again after it ended. Without --once, which would
     # exit before that.
-    echo "== next sound uses the new output"
-    record_monitor2=1 run_for=12
-    playback next-output --monitor-after 0.5 "$monitor2" --replay-after 6.5
-    first="$work/next-output-monitor.wav"
-    second="$work/next-output-monitor2.wav"
-    check "nothing reaches the first sink" "$([ "$(analyze onset "$first" 0 1000)" = none ] && echo ok)"
-    expect "second sink, first playback" "$second" 1000 present "$(window "$second")"
-    # The second playback starts at 6.5 s, so its tone starts at 8 s.
-    expect "second sink, second playback" "$second" 1000 present "$(after "$second" 8 0.5)"
+    if section "next sound uses the new output"; then
+        record_monitor2=1 run_for=12
+        playback next-output --monitor-after 0.5 "$monitor2" --replay-after 6.5
+        first="$work/next-output-monitor.wav"
+        second="$work/next-output-monitor2.wav"
+        check "nothing reaches the first sink" "$([ "$(analyze onset "$first" 0 1000)" = none ] && echo ok)"
+        expect "second sink, first playback" "$second" 1000 present "$(window "$second")"
+        # The second playback starts at 6.5 s, so its tone starts at 8 s.
+        expect "second sink, second playback" "$second" 1000 present "$(after "$second" 8 0.5)"
+    fi
 
     # The fallback of a removed output is the real default sink, so this one
     # plays with the monitor volume at 0.
-    echo "== output removed while playing"
-    (
-        sleep 4.5
-        monitor_links >"$work/output-removed-before.txt"
-        pw-cli destroy "$monitor2_id" >/dev/null
-        sleep 1.5
-        monitor_links >"$work/output-removed-after.txt"
-    ) &
-    watcher=$!
-    files=("$long")
-    playback output-removed --once --monitor "$monitor2" --monitor-volume 0
-    wait "$watcher"
-    check "the monitor stream was on the chosen sink" \
-        "$(grep -q "$monitor2:playback_FL" "$work/output-removed-before.txt" && echo ok)"
-    check "the monitor stream moved to another sink" \
-        "$(grep '|->' "$work/output-removed-after.txt" | grep -qv "$monitor2:" && echo ok)"
-    check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
-    call="$work/output-removed-call.wav"
-    expect "call after the removal" "$call" 1000 present "$(window "$call" 4.5)" 1.5
+    if section "output removed while playing"; then
+        (
+            sleep 4.5
+            monitor_links >"$work/output-removed-before.txt"
+            pw-cli destroy "$monitor2_id" >/dev/null
+            sleep 1.5
+            monitor_links >"$work/output-removed-after.txt"
+        ) &
+        watcher=$!
+        files=("$long")
+        playback output-removed --once --monitor "$monitor2" --monitor-volume 0
+        wait "$watcher"
+        check "the monitor stream was on the chosen sink" \
+            "$(grep -q "$monitor2:playback_FL" "$work/output-removed-before.txt" && echo ok)"
+        check "the monitor stream moved to another sink" \
+            "$(grep '|->' "$work/output-removed-after.txt" | grep -qv "$monitor2:" && echo ok)"
+        check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
+        call="$work/output-removed-call.wav"
+        expect "call after the removal" "$call" 1000 present "$(window "$call" 4.5)" 1.5
+    fi
 
     # The fallback of a removed microphone is the real default source, so
     # this one plays nothing and records nothing.
-    echo "== microphone removed and back"
-    "${subject[@]}" --mic "$mic2" --monitor "$monitor" </dev/null >"$work/mic-removed.log" 2>&1 &
-    subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 1.5; then
-        check "the chosen microphone is linked" "$(voice_links FL | grep -q "$mic2:" && echo ok)"
-        pw-cli destroy "$mic2_id" >/dev/null
-        sleep 2
-        check "the missing microphone is reported" \
-            "$(grep -q "microphone \"$mic2\" not found" "$work/mic-removed.log" && echo ok)"
-        check "another microphone is linked as a fallback" \
-            "$(grep -q '^microphone linked as a fallback: ' "$work/mic-removed.log" && echo ok)"
-        check "the fallback feeds both inputs" \
-            "$(voice_links FL | grep -q . && voice_links FR | grep -q . && echo ok)"
-        mic2_id=$(create_node "$mic2" "Vinheta test microphone 2" Audio/Source/Virtual MONO)
-        nodes+=("$mic2_id")
-        sleep 2
-        check "the chosen microphone is linked again" \
-            "$(tail -n 3 "$work/mic-removed.log" | grep -q "^microphone linked: $mic2" && voice_links FL | grep -q "$mic2:" && echo ok)"
-    else
-        check "subject started for the microphone removal" fail
+    if section "microphone removed and back"; then
+        "${subject[@]}" --mic "$mic2" --monitor "$monitor" </dev/null >"$work/mic-removed.log" 2>&1 &
+        subject_pid=$!
+        if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 1.5; then
+            check "the chosen microphone is linked" "$(voice_links FL | grep -q "$mic2:" && echo ok)"
+            pw-cli destroy "$mic2_id" >/dev/null
+            sleep 2
+            check "the missing microphone is reported" \
+                "$(grep -q "microphone \"$mic2\" not found" "$work/mic-removed.log" && echo ok)"
+            check "another microphone is linked as a fallback" \
+                "$(grep -q '^microphone linked as a fallback: ' "$work/mic-removed.log" && echo ok)"
+            check "the fallback feeds both inputs" \
+                "$(voice_links FL | grep -q . && voice_links FR | grep -q . && echo ok)"
+            mic2_id=$(create_node "$mic2" "Vinheta test microphone 2" Audio/Source/Virtual MONO)
+            nodes+=("$mic2_id")
+            sleep 2
+            check "the chosen microphone is linked again" \
+                "$(tail -n 3 "$work/mic-removed.log" | grep -q "^microphone linked: $mic2" && voice_links FL | grep -q "$mic2:" && echo ok)"
+        else
+            check "subject started for the microphone removal" fail
+        fi
+        kill -INT "$subject_pid" 2>/dev/null
+        wait "$subject_pid" 2>/dev/null
     fi
-    kill -INT "$subject_pid" 2>/dev/null
-    wait "$subject_pid" 2>/dev/null
 fi
 
 # The shell subject uses lingering nodes, so SIGKILL does not apply to it, and
@@ -617,18 +673,19 @@ fi
 signals=(TERM)
 [ "$mode" = rust ] && signals=(INT KILL)
 for signal in "${signals[@]}"; do
-    echo "== cleanup after SIG$signal"
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" "$sound" </dev/null >"$work/sig$signal.log" 2>&1 &
-    subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 2.5; then
-        check "microphone linked before SIG$signal" \
-            "$(pw-link -l | grep -A2 "^$mic:capture_MONO" | grep -q 'vinheta:input_FL' && echo ok)"
-        kill "-$signal" "$subject_pid"
-        check "nothing left after SIG$signal" "$(gone_within_2s && echo ok)"
-    else
-        check "subject started for SIG$signal" fail
+    if section "cleanup after SIG$signal"; then
+        "${subject[@]}" --mic "$mic" --monitor "$monitor" "$sound" </dev/null >"$work/sig$signal.log" 2>&1 &
+        subject_pid=$!
+        if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 2.5; then
+            check "microphone linked before SIG$signal" \
+                "$(pw-link -l | grep -A2 "^$mic:capture_MONO" | grep -q 'vinheta:input_FL' && echo ok)"
+            kill "-$signal" "$subject_pid"
+            check "nothing left after SIG$signal" "$(gone_within_2s && echo ok)"
+        else
+            check "subject started for SIG$signal" fail
+        fi
+        wait "$subject_pid" 2>/dev/null
     fi
-    wait "$subject_pid" 2>/dev/null
 done
 
 cleanup
@@ -644,6 +701,7 @@ else
     check "default source and sink unchanged" "$([ "$(defaults)" = "$defaults_before" ] && echo ok)"
 fi
 
+[ -f "$work/onset-failures" ] && failures=$((failures + $(wc -l <"$work/onset-failures")))
 if [ "$failures" -eq 0 ]; then
     echo "ALL CHECKS PASSED"
 else
