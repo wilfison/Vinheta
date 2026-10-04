@@ -194,6 +194,7 @@ GObject conventions used here: each type has a `mod imp` holding the state struc
 When adding files:
 
 - New widgets go in `src/ui/` and are declared in `src/ui/mod.rs`.
+- Unit tests never sit in the implementation file: it ends with `#[cfg(test)] mod tests;` and the tests live in `tests.rs` of the directory named after the module (`src/pads.rs` and `src/pads/tests.rs`; `src/audio/tests.rs` for `src/audio/mod.rs`). They still see the private items and run with `cargo test --lib`.
 - Every new `.ui` file must be listed in `src/vinheta.gresource.xml` (prefix `/io/github/wilfison/Vinheta`) with an `alias` that drops the `ui/` directory, so resource paths stay flat (`/io/github/wilfison/Vinheta/window.ui`) and, if it has translatable strings, in `po/POTFILES.in`. `.rs` files that call `gettext()` must be listed there too.
 - `shortcuts-dialog.ui` is loaded automatically by libadwaita from the `resource-base-path`, which provides the `app.shortcuts` action; that is why it does not appear in `setup_gactions()`.
 
