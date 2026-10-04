@@ -41,7 +41,7 @@ scripts/check.sh               # the checks to run before a commit
 scripts/build-deb.sh           # builds the .deb under tmp/deb
 ```
 
-[AGENTS.md](AGENTS.md) describes the architecture, the checks, and the development tools in detail, and [docs/audio.md](docs/audio.md) the audio engine.
+The documentation is in [docs/](docs/): start with [docs/overview.md](docs/overview.md) and [docs/architecture.md](docs/architecture.md). [docs/development.md](docs/development.md) and [docs/checks.md](docs/checks.md) cover building and the checks, and [docs/audio.md](docs/audio.md) the audio engine.
 
 ## License
 

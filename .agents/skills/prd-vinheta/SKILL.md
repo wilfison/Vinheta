@@ -1,14 +1,14 @@
 ---
 name: prd-vinheta
-description: "Writes the PRD of a phase or feature of Vinheta (a GTK4/libadwaita soundboard in Rust), with acceptance criteria that the project's scripts can verify. Use it in this repository instead of the generic prd skill. Triggers: create a prd, prd for phase N, prd for the next roadmap phase, plan this feature, spec out, write prd for, plan this phase, criar um prd, prd da fase N, planejar essa feature, especificar."
+description: "Writes the PRD of a phase or feature of Vinheta (a GTK4/libadwaita soundboard in Rust), with acceptance criteria that the project's scripts can verify. Use it in this repository instead of the generic prd skill. Triggers: create a prd, prd for phase N, plan this feature, spec out, write prd for, plan this phase, criar um prd, prd da fase N, planejar essa feature, especificar."
 allowed-tools: Glob, Grep, Read, Bash, Write, Edit, AskUserQuestion
 ---
 
 # Vinheta PRD generator
 
-Writes the PRD of a phase of `ROADMAP.md` (or of a standalone feature), ready to be implemented.
+Writes the PRD of a phase of work or of a standalone feature, ready to be implemented.
 **Do NOT implement anything.** Only write the PRD to `tasks/prd-phase-N-[name].md` (kebab-case, Markdown).
-For a feature outside the roadmap, use `tasks/prd-[feature-name].md`.
+For a standalone feature, use `tasks/prd-[feature-name].md`.
 
 Project rules that apply to the PRD:
 
@@ -20,8 +20,8 @@ Project rules that apply to the PRD:
 
 Before asking anything, read:
 
-- `ROADMAP.md`: the items of the phase, the "Notes for the next phases" of earlier phases, and the risks.
-- `AGENTS.md`: architecture, conventions, and the verification scripts.
+- `AGENTS.md`: the rules and the index of the documentation.
+- `docs/overview.md` (what the app does and its open items), `docs/architecture.md`, `docs/checks.md` (the verification scripts), and the document of each area the phase touches.
 - The most recent PRD in `tasks/`, to keep the same structure, tone, and level of detail.
 - The mockups in `mockups/` that the phase mentions (they are SVG and can be read as text), and `docs/audio.md` when the phase touches the engine.
 - The code the phase will touch (`src/audio/mod.rs` for the engine API, `src/ui/` for the interface, the schema in `data/`).
@@ -36,10 +36,10 @@ recommended one first with "(Recommended)", and `multiSelect: true` when the cho
 Ambiguities that usually come up in this project:
 
 - **Mockup bigger than the phase:** the mockups show the final product. Ask what to do with the controls of later phases (omit, disable, bring forward).
-- **Roadmap item that depends on another phase:** confirm whether it is brought forward or postponed.
+- **Item that depends on later work:** confirm whether it is brought forward or postponed.
 - **libadwaita widget:** when more than one is reasonable, ask, stating the minimum version each one needs.
 - **Audio behavior with sounds already playing:** whether a new option applies immediately or only to the next sounds.
-- **Errors:** how much of the handling goes in now and how much stays for Phase 6.
+- **Errors:** how much of the handling goes in now and how much is left for later.
 
 Do not ask about what has an obvious default (the PRD language, the file name, how things are verified: they are defined here).
 
@@ -55,7 +55,7 @@ Every technical claim in the PRD must have been checked, not remembered. Use `Ba
 - For a PipeWire or WirePlumber behavior, try it with the command line tools before designing on top of it: a silent file played with `gst-launch-1.0 ... ! pipewiresink`, a fake device from `create_node` in `scripts/audio-common.sh`, then `pw-link -l`, `pw-metadata`, and `pw-cli destroy`. Name the test nodes without the `vinheta` prefix, and destroy them. `docs/audio.md` has the findings so far; read it first.
 - A claim about a crate API that the design depends on is worth a throwaway program in the scratchpad when reading the source is not enough.
 
-- A claim about how the desktop sees the app (a portal, the app ID, a D-Bus service of the session, autostart) is tested the way a user runs it, never from the terminal of the agent alone: start the test with `systemd-run --user --scope`, because a terminal started by the desktop has an app scope that a portal takes for the app. Test with the files the app really installs (its own desktop file, from the local prefix and as the package installs it), not with a probe made for the test: in Phase 5 a probe with a valid `Exec` passed while the desktop file of the local prefix (`Exec=vinheta`, not in `PATH`) was refused, and three stories were built on it.
+- A claim about how the desktop sees the app (a portal, the app ID, a D-Bus service of the session, autostart) is tested the way a user runs it, never from the terminal of the agent alone: start the test with `systemd-run --user --scope`, because a terminal started by the desktop has an app scope that a portal takes for the app. Test with the files the app really installs (its own desktop file, from the local prefix and as the package installs it), not with a probe made for the test: once a probe with a valid `Exec` passed while the desktop file of the local prefix (`Exec=vinheta`, not in `PATH`) was refused, and three stories were built on it.
 - Do not cut the output of a monitor (`dbus-monitor`, `pw-mon`) with `head` before looking for an error reply: filter by the sender of the app instead.
 - When the core of a feature cannot be scripted (a real key press on Wayland, a system dialog, a real call), its manual check is the first story of the PRD, done by the user before anything is built on it. A measurement by proxy does not replace it.
 
@@ -70,7 +70,7 @@ Sections:
 2. **Goals**: specific and measurable.
 3. **User Stories**: see below.
 4. **Functional Requirements**: numbered (`FR-1: ...`), grouped by area (Engine, Library, Interface, Application, Verification).
-5. **Non-Goals**: what is left out, naming the roadmap phase that owns each item.
+5. **Non-Goals**: what is left out, saying where each item is left ("Open items" of `docs/overview.md`, or nowhere).
 6. **Design Considerations**: reference mockups, what differs from them in this phase, widgets to reuse, accessibility.
 7. **Technical Considerations**: architecture decisions with their reasons, the verified starting state (with the date), the limits of the tools.
 8. **Success Metrics**
@@ -151,10 +151,9 @@ Limits the PRD must respect (do not write criteria that depend on them):
 
 The last story of every phase updates the documents and closes the verification:
 
-- `AGENTS.md`: "Current state", Architecture, and any instruction that is no longer true.
-- `ROADMAP.md`: the items of the phase ticked, with "What changed from the original plan" and "Notes for the next phases".
+- `AGENTS.md`: any rule that is no longer true.
+- `docs/`: the document of each area that changed, "What the app does" and "Open items" of `docs/overview.md`, and "Tested by hand only" of `docs/checks.md`.
 - `po/POTFILES.in` (every `.ui` and `.rs` file with translatable strings, in alphabetical order) and `src/vinheta.gresource.xml` (every new `.ui` file, with an `alias` that drops the `ui/` directory).
-- `docs/audio.md` when the engine or the diagnostic binary changed.
 - `scripts/check.sh --all` passes.
 - `tmp/screenshots/` is empty.
 

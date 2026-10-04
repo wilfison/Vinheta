@@ -1,6 +1,34 @@
 # The audio engine
 
-This document records what was learned while proving the audio path of Vinheta (Phase 0, a proof of concept with command line tools and then in Rust) and what the engine does since: a virtual microphone that carries the user's voice and the soundboard sounds, plus a local monitor on the headphones. The command lines below are the record of what was measured; the shell script that wrapped them was removed in Phase 6.
+This document describes the audio engine of Vinheta (`src/audio/`): a virtual microphone that carries the user's voice and the soundboard sounds, plus a local monitor on the headphones. It also records what was measured with command line tools before the engine was written; those command lines are kept as the record of the measurements.
+
+## Source layout
+
+- `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `PlayOptions`, `Position`, `Event`, `Error`, `PlaybackId`, `Device`, `slider_gain`); `graph.rs` owns the PipeWire thread (virtual microphone node, registry, links); `player.rs` builds one GStreamer pipeline per sound. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
+- `src/bin/vinheta-audio-test.rs`: diagnostic binary behind the `audio-test` cargo feature (`cargo run --features audio-test --bin vinheta-audio-test -- --help`). Meson does not build or install it.
+
+## Rules that are easy to get wrong
+
+- WirePlumber does not route playback into the virtual microphone. The call branch sink uses `node.autoconnect=false` and `graph.rs` links any stream whose node name starts with `vinheta-call-`.
+- The node and links are created without `object.linger`, so they vanish when the process ends. Do not add it.
+- A playback that was stopped on request never reports an event afterwards; the interface relies on that, and on events carrying the `PlaybackId`.
+- "Send sounds to call" mutes the `call-volume` element of each pipeline. The call stream and its links stay in place. The call volume is the `volume` property of the same element, independent of the mute.
+- The gain of a branch element is a product: branch × playback × fade (`effective_gain`). Never set a gain before the `tee`: it is heard a queue late. A branch volume change keeps each playback's own gain.
+- The queues of a pipeline hold 200 ms, so the end of a pass is known about 350 ms before it is heard.
+- Every playback runs in segment mode, looping or not: preroll, a flushing `SEGMENT` seek, then `PLAYING`; on each `SEGMENT_DONE` either a non-flushing seek (loop) or an EOS pushed into the sink pad of the `tee` (the only way it ends). These actions are queued with `call_async` from the bus handler, and skipped once the playback is retired.
+- `restart` is a flushing seek: the `PlaybackId` and the streams stay, and nothing is reported.
+- With a fade set, a stopped playback is forgotten at once (no events, unknown to every call that takes its id, untouched by volume changes) while a thread of the engine ramps it down in 10 ms steps and stops it 150 ms after the ramp. Dropping the engine stops fading playbacks at once.
+- The volumes and the mute are set by `player.rs` on the caller's thread; the microphone, the voice switch, and the monitor output are commands for the PipeWire thread.
+- The settings store slider positions (0 to 1); the engine takes gains. `slider_gain` (cubic) converts.
+- The monitor branch is routed by WirePlumber. A new playback gets the chosen output as `target-object`; a running one is moved by writing `target.object` for its stream (node name `vinheta-monitor-*`) in the default metadata. The system default is asked for with the value `-1`: removing the key would leave the target the stream was created with.
+- `Error` tells the fatal failures apart: `Unreachable` (PipeWire cannot be reached at the start), `ConnectionLost` (while running: the engine is of no use afterwards), `NodeExists`. `Error::kind` is a stable name for logs and scripts. An engine can be started again in the same process after the previous one was dropped, also after a lost connection.
+- A chosen device that does not exist is not an error to recover from in the interface. For the monitor, WirePlumber uses the default sink and moves the stream when the device shows up. For the microphone, `graph.rs` reports `MicNotFound` once, links the default source, and links the chosen one when it appears.
+- `Event::DevicesChanged` is only sent when a list really changed, and never lists the "Vinheta" node.
+- After changing audio code, run `scripts/verify-audio.sh`. Its sections on a second engine, a taken node name, and a lost connection (on a private PipeWire instance it starts and destroys) need no sound. While working on one behavior, `--only REGEX` runs only the sections whose title matches (`--list` prints the titles); run all of it before committing. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`. In a new check, place the measurements with `after FILE SECONDS [MARGIN]` (an action scheduled `SECONDS` into the playback) instead of hand-computed offsets. A sound with no silence at its start needs `--start-after 1`, so the recorders are ready, and `window` instead of `after`. `window` fails the run when it finds no onset: the tone must reach -40 dBFS in the recording, which a gain of 0.1 does not. A real device unplugged during the run is reported as a `NOTE`, not as a failure.
+- The call branch is muted, not dropped, so turning "Send sounds to call" back on is instant and applies to sounds already playing.
+- "Fade Out on Stop" is one global setting (300 ms, on by default). There is no fade in and no fade per pad, and a restart does not fade.
+- A volume change is heard within 200 ms and does not touch the other branch (measured by the harness).
+- The engine follows the system default source while it runs, and falls back to a physical source when the default is the "Vinheta" node itself.
 
 ## Environment and versions
 
@@ -60,7 +88,7 @@ pw-link vinheta-play:output_FR vinheta:input_FR
 - The links disappear with the stream when playback ends. Nothing has to be removed by hand.
 - `target-object` does work for the monitor branch, where the target is a regular `Audio/Sink`.
 
-## Moving the monitor branch (Phase 2)
+## Moving the monitor branch
 
 The monitor stream is routed by WirePlumber, which follows the `target.object` key of the default metadata, per stream:
 
@@ -84,7 +112,7 @@ pw-metadata 0 default.audio.source
 # value:'{"name":"alsa_input.usb-...mono-fallback"}'
 ```
 
-Rule, used by both the script and the engine:
+The rule:
 
 - A source with one output port (mono) is linked to both `input_FL` and `input_FR`. Otherwise the call hears the voice on one side only.
 - A source with several ports is linked channel by channel (`FL` to `FL`, `FR` to `FR`), matching on the `audio.channel` port property.
@@ -109,12 +137,12 @@ uridecodebin ! audioconvert ! audioresample ! tee name=t
 ```
 
 - Each branch has its own `queue` and `volume`. Setting one volume to 0 silences only that branch.
-- Since Phase 3 the queues hold 200 ms (`max-size-time`, with the buffer and byte limits off) instead of the default second, and the gain of each `volume` element is a product: branch × playback × fade.
+- The queues hold 200 ms (`max-size-time`, with the buffer and byte limits off) instead of the default second, and the gain of each `volume` element is a product: branch × playback × fade.
 - Both sinks set `state.restore-props=false`. Without it WirePlumber applies whatever volume it saved for an earlier stream of the same application, which made levels unpredictable during the tests.
 - The microphone is linked to the node, not to the pipeline, so it never reaches the monitor branch.
 - One pipeline per sound. Starting a second one while the first is playing works and both are mixed by PipeWire, but overlapping playback has not been verified beyond that.
 
-## Gain per playback, loop, restart, and fade (Phase 3)
+## Gain per playback, loop, restart, and fade
 
 Measured on 2026-10-03 with throwaway programs of the same pipeline shape, then checked on the real engine by the harness.
 
@@ -132,7 +160,7 @@ Measured on 2026-10-03 with throwaway programs of the same pipeline shape, then 
 
 Measured by the harness: one channel of each branch is recorded into the same stereo file and the moment the 1000 Hz tone appears on each side is compared.
 
-Over 8 runs (3 with the shell script of Phase 0, 5 with the Rust engine) the offset "call minus monitor" was either about 0 ms (0.0, 0.0, 0.0, 0.5, 0.5) or about -21 ms (-21.0, -21.0, -21.5). 21.3 ms is one PipeWire quantum (1024 samples at 48 kHz): depending on the order in which the graph processes the nodes, the monitor path picks the sound up one cycle later. There is no target for this value and it is far below what a call would notice.
+Over 8 runs (3 with command line tools, 5 with the Rust engine) the offset "call minus monitor" was either about 0 ms (0.0, 0.0, 0.0, 0.5, 0.5) or about -21 ms (-21.0, -21.0, -21.5). 21.3 ms is one PipeWire quantum (1024 samples at 48 kHz): depending on the order in which the graph processes the nodes, the monitor path picks the sound up one cycle later. There is no target for this value and it is far below what a call would notice.
 
 ## Cleanup
 
@@ -150,7 +178,7 @@ All three pass. A node made with `pw-cli` and `object.linger` (as the fake devic
 - **An unlinked call branch blocks the whole pipeline**, including the monitor branch, because the sink does not consume data until it is linked. The engine links the stream as soon as its ports show up in the registry, so in practice the delay is not noticeable.
 - **`pw-link` by port name failed once** with "No such file or directory" right after the node was created, and worked on retry and by port id. It was not reproduced.
 - **Noise suppression and echo have not been tested**; see the manual call checklist below.
-- **The server removes the engine's links together with a stream that ends.** When the engine then drops its own proxy for such a link, PipeWire reports "unknown resource" on the core. That error is harmless and must not be treated as a lost connection; only `EPIPE` on the core is. This was found in Phase 1, when stopping a sound while the process keeps running became possible.
+- **The server removes the engine's links together with a stream that ends.** When the engine then drops its own proxy for such a link, PipeWire reports "unknown resource" on the core. That error is harmless and must not be treated as a lost connection; only `EPIPE` on the core is. It shows up whenever a sound is stopped while the process keeps running.
 
 ## Running it
 
