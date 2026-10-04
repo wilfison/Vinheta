@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-04 12:18-0300\n"
+"POT-Creation-Date: 2026-10-04 12:32-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -41,7 +41,7 @@ msgstr "Pastas de sons"
 msgid "Absolute paths of the folders shown as tabs, in tab order."
 msgstr "Caminhos absolutos das pastas mostradas como abas, na ordem das abas."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:11 src/ui/window.ui:497
+#: data/io.github.wilfison.Vinheta.gschema.xml:11 src/ui/window.ui:521
 msgid "Send sounds to call"
 msgstr "Sons na chamada"
 
@@ -75,8 +75,8 @@ msgstr ""
 "a 1."
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:28
-#: src/ui/preferences-dialog.ui:14 src/ui/window.rs:330 src/ui/window.ui:456
-#: src/ui/window.ui:483
+#: src/ui/preferences-dialog.ui:14 src/ui/window.rs:333 src/ui/window.ui:456
+#: src/ui/window.ui:507
 msgid "Microphone"
 msgstr "Microfone"
 
@@ -486,7 +486,7 @@ msgstr "Um clique em um pad que está tocando o reinicia"
 msgid "Starting a pad stops every other sound"
 msgstr "Iniciar um pad para todos os outros sons"
 
-#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:324
+#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:327
 msgid "Not connected. Using the system default."
 msgstr "Não conectado. Usando o padrão do sistema."
 
@@ -628,7 +628,7 @@ msgid "Move to _Trash"
 msgstr "Mover para a _lixeira"
 
 #. Translators: {} is a volume, from 0 to 100.
-#: src/ui/sound_dialog.rs:132 src/ui/window.rs:154
+#: src/ui/sound_dialog.rs:132 src/ui/window.rs:156
 msgid "{}%"
 msgstr "{}%"
 
@@ -719,54 +719,54 @@ msgstr "Tocando, {} de {}"
 msgid "Playing, {}"
 msgstr "Tocando, {}"
 
-#: src/ui/window.rs:270
+#: src/ui/window.rs:273
 msgid "Audio is unavailable: PipeWire is not running"
 msgstr "Áudio indisponível: o PipeWire não está em execução"
 
-#: src/ui/window.rs:273
+#: src/ui/window.rs:276
 msgid "Audio stopped: the connection to PipeWire was lost"
 msgstr "O áudio parou: a conexão com o PipeWire foi perdida"
 
-#: src/ui/window.rs:276
+#: src/ui/window.rs:279
 msgid ""
 "Audio is unavailable: another program already has a “Vinheta” microphone"
 msgstr "Áudio indisponível: outro programa já tem um microfone “Vinheta”"
 
-#: src/ui/window.rs:278
+#: src/ui/window.rs:281
 msgid "Audio is unavailable"
 msgstr "Áudio indisponível"
 
 #. Translators: {} is how many sounds are playing.
-#: src/ui/window.rs:296
+#: src/ui/window.rs:299
 msgid "{} playing"
 msgid_plural "{} playing"
 msgstr[0] "{} tocando"
 msgstr[1] "{} tocando"
 
-#: src/ui/window.rs:757
+#: src/ui/window.rs:760
 msgid "Add Folder"
 msgstr "Adicionar pasta"
 
-#: src/ui/window.rs:766 src/ui/window.rs:797 src/ui/window.rs:942
-#: src/ui/window.rs:963
+#: src/ui/window.rs:769 src/ui/window.rs:800 src/ui/window.rs:1061
+#: src/ui/window.rs:1082
 msgid "This folder cannot be added"
 msgstr "Esta pasta não pode ser adicionada"
 
-#: src/ui/window.rs:772
+#: src/ui/window.rs:775
 msgid "Audio Files"
 msgstr "Arquivos de áudio"
 
-#: src/ui/window.rs:779
+#: src/ui/window.rs:782
 msgid "Add Sounds"
 msgstr "Adicionar sons"
 
-#: src/ui/window.rs:836
+#: src/ui/window.rs:839
 msgid "{} sound added"
 msgid_plural "{} sounds added"
 msgstr[0] "{} som adicionado"
 msgstr[1] "{} sons adicionados"
 
-#: src/ui/window.rs:838
+#: src/ui/window.rs:841
 msgid "{} file skipped"
 msgid_plural "{} files skipped"
 msgstr[0] "{} arquivo ignorado"
@@ -774,36 +774,36 @@ msgstr[1] "{} arquivos ignorados"
 
 #. Translators: the first {} is "2 sounds added", the second is
 #. "1 file skipped".
-#: src/ui/window.rs:846
+#: src/ui/window.rs:849
 msgid "{}, {}"
 msgstr "{}, {}"
 
-#: src/ui/window.rs:855
+#: src/ui/window.rs:858
 msgid "No supported audio files"
 msgstr "Nenhum arquivo de áudio compatível"
 
 #. Translators: {} is the name of a tab.
-#: src/ui/window.rs:900
+#: src/ui/window.rs:1019
 msgid "Removed “{}”"
 msgstr "“{}” foi removida"
 
-#: src/ui/window.rs:901
+#: src/ui/window.rs:1020
 msgid "Undo"
 msgstr "Desfazer"
 
-#: src/ui/window.rs:934
+#: src/ui/window.rs:1053
 msgid "Locate Folder"
 msgstr "Localizar pasta"
 
-#: src/ui/window.rs:959
+#: src/ui/window.rs:1078
 msgid "This folder is already in the library"
 msgstr "Esta pasta já está na biblioteca"
 
-#: src/ui/window.rs:1044
+#: src/ui/window.rs:1163
 msgid "Favorites"
 msgstr "Favoritos"
 
-#: src/ui/window.rs:1128
+#: src/ui/window.rs:1247
 msgid "Sounds"
 msgstr "Sons"
 
@@ -880,54 +880,54 @@ msgstr "Fones"
 msgid "Call"
 msgstr "Chamada"
 
-#: src/ui/window.ui:521
+#: src/ui/window.ui:545
 msgid "Add _Sounds…"
 msgstr "Adicionar _sons…"
 
-#: src/ui/window.ui:525
+#: src/ui/window.ui:549
 msgid "Add _Folder…"
 msgstr "Adicionar _pasta…"
 
-#: src/ui/window.ui:532
+#: src/ui/window.ui:556
 msgid "Sort By"
 msgstr "Ordenar por"
 
-#: src/ui/window.ui:534
+#: src/ui/window.ui:558
 msgid "_Name"
 msgstr "_Nome"
 
-#: src/ui/window.ui:539
+#: src/ui/window.ui:563
 msgid "Recently _Added"
 msgstr "_Adicionados recentemente"
 
-#: src/ui/window.ui:546
-msgid "Re_name Tab…"
-msgstr "_Renomear aba…"
-
-#: src/ui/window.ui:550
-msgid "Move Tab _Left"
-msgstr "Mover aba para a _esquerda"
-
-#: src/ui/window.ui:554
-msgid "Move Tab _Right"
-msgstr "Mover aba para a _direita"
-
-#: src/ui/window.ui:558
-msgid "Remo_ve Folder"
-msgstr "Remo_ver pasta"
-
-#: src/ui/window.ui:564
+#: src/ui/window.ui:570
 msgid "_Preferences"
 msgstr "_Preferências"
 
-#: src/ui/window.ui:568
+#: src/ui/window.ui:574
 msgid "_Call Setup Guide"
 msgstr "_Guia de configuração de chamada"
 
-#: src/ui/window.ui:572
+#: src/ui/window.ui:578
 msgid "_Keyboard Shortcuts"
 msgstr "A_talhos de teclado"
 
-#: src/ui/window.ui:576
+#: src/ui/window.ui:582
 msgid "_About Vinheta"
 msgstr "_Sobre o Vinheta"
+
+#: src/ui/window.ui:590
+msgid "Re_name Tab…"
+msgstr "_Renomear aba…"
+
+#: src/ui/window.ui:596
+msgid "Move Tab _Left"
+msgstr "Mover aba para a _esquerda"
+
+#: src/ui/window.ui:600
+msgid "Move Tab _Right"
+msgstr "Mover aba para a _direita"
+
+#: src/ui/window.ui:606
+msgid "Remo_ve Folder"
+msgstr "Remo_ver pasta"

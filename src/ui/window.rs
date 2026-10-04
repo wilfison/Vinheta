@@ -92,6 +92,8 @@ mod imp {
         pub microphone: TemplateChild<gtk::DropDown>,
         #[template_child]
         pub microphone_icon: TemplateChild<gtk::Image>,
+        #[template_child]
+        pub tab_menu: TemplateChild<gio::MenuModel>,
         pub settings: OnceCell<gio::Settings>,
         pub sound_dialog: glib::WeakRef<SoundDialog>,
         /// The order of the pads in every view.
@@ -189,6 +191,7 @@ mod imp {
             obj.setup_search();
             obj.setup_drop();
             obj.setup_pad_keys();
+            obj.setup_tab_menu();
             obj.setup_gactions();
             obj.setup_settings();
 
@@ -855,6 +858,121 @@ impl VinhetaWindow {
             gettext("No supported audio files")
         };
         self.toast(&message);
+    }
+
+    /// The context menu of a folder tab: a secondary click, a long press, or
+    /// the Menu key on the tab row.
+    fn setup_tab_menu(&self) {
+        let switcher = &self.imp().switcher;
+
+        let click = gtk::GestureClick::builder()
+            .button(gdk::BUTTON_SECONDARY)
+            .build();
+        click.connect_pressed(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |click, _, x, y| {
+                if window.open_tab_menu(Some((x, y))) {
+                    click.set_state(gtk::EventSequenceState::Claimed);
+                }
+            }
+        ));
+        switcher.add_controller(click);
+
+        let long_press = gtk::GestureLongPress::builder().touch_only(true).build();
+        long_press.connect_pressed(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |long_press, x, y| {
+                if window.open_tab_menu(Some((x, y))) {
+                    long_press.set_state(gtk::EventSequenceState::Claimed);
+                }
+            }
+        ));
+        switcher.add_controller(long_press);
+
+        let open_menu = gtk::CallbackAction::new(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, _| {
+                if window.open_tab_menu(None) {
+                    glib::Propagation::Stop
+                } else {
+                    glib::Propagation::Proceed
+                }
+            }
+        ));
+        let keys = gtk::ShortcutController::new();
+        keys.add_shortcut(gtk::Shortcut::new(
+            gtk::ShortcutTrigger::parse_string("Menu|<Shift>F10"),
+            Some(open_menu),
+        ));
+        switcher.add_controller(keys);
+    }
+
+    /// The buttons of the tab row with the content of their tabs. The
+    /// switcher has one toggle button per visible page, in the same order.
+    fn tab_buttons(&self) -> Vec<(gtk::Widget, gtk::Widget)> {
+        let imp = self.imp();
+        let group = imp.switcher.first_child();
+        let first = group.and_then(|group| group.first_child());
+        let buttons = std::iter::successors(first, |widget| widget.next_sibling())
+            .filter(|widget| widget.is::<gtk::ToggleButton>());
+        let pages = imp.tabs.pages();
+        let children = pages
+            .iter::<adw::ViewStackPage>()
+            .flatten()
+            .filter(|page| page.is_visible())
+            .map(|page| page.child());
+        buttons.zip(children).collect()
+    }
+
+    /// Opens the menu of the folder tab at a position of the tab row, or of
+    /// the tab being shown. The tab is shown first: the tab actions are for
+    /// the tab being shown. Says whether there was a folder tab there.
+    fn open_tab_menu(&self, at: Option<(f64, f64)>) -> bool {
+        let imp = self.imp();
+        let switcher = &*imp.switcher;
+        let shown = imp.tabs.visible_child();
+        let tab = self.tab_buttons().into_iter().find_map(|(button, child)| {
+            let bounds = button.compute_bounds(switcher)?;
+            let hit = match at {
+                Some((x, y)) => {
+                    bounds.contains_point(&gtk::graphene::Point::new(x as f32, y as f32))
+                }
+                None => shown.as_ref() == Some(&child),
+            };
+            let page = child.downcast::<FolderPage>().ok()?;
+            hit.then_some((bounds, page))
+        });
+        let Some((bounds, page)) = tab else {
+            return false;
+        };
+        imp.tabs.set_visible_child(&page);
+
+        let popover = gtk::PopoverMenu::from_model(Some(&*imp.tab_menu));
+        popover.set_parent(switcher);
+        let rectangle = match at {
+            Some((x, y)) => gdk::Rectangle::new(x as i32, y as i32, 1, 1),
+            None => gdk::Rectangle::new(
+                bounds.x() as i32,
+                bounds.y() as i32,
+                bounds.width() as i32,
+                bounds.height() as i32,
+            ),
+        };
+        popover.set_pointing_to(Some(&rectangle));
+        popover.set_has_arrow(false);
+        popover.set_halign(gtk::Align::Start);
+        // The item that was chosen still needs the popover for a moment.
+        popover.connect_closed(|popover| {
+            let popover = popover.clone();
+            glib::idle_add_local_once(move || popover.unparent());
+        });
+        popover.popup();
+        true
     }
 
     fn new_page(&self, path: &str) -> FolderPage {

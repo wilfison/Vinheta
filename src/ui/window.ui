@@ -475,6 +475,30 @@
       </object>
     </property>
   </template>
+  <menu id="tab_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Re_name Tab…</attribute>
+        <attribute name="action">win.rename-folder</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Move Tab _Left</attribute>
+        <attribute name="action">win.move-folder-left</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Move Tab _Right</attribute>
+        <attribute name="action">win.move-folder-right</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Remo_ve Folder</attribute>
+        <attribute name="action">win.remove-folder</attribute>
+      </item>
+    </section>
+  </menu>
 </interface>
 ]]></property>
                           </object>
@@ -543,24 +567,6 @@
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">Re_name Tab…</attribute>
-        <attribute name="action">win.rename-folder</attribute>
-      </item>
-      <item>
-        <attribute name="label" translatable="yes">Move Tab _Left</attribute>
-        <attribute name="action">win.move-folder-left</attribute>
-      </item>
-      <item>
-        <attribute name="label" translatable="yes">Move Tab _Right</attribute>
-        <attribute name="action">win.move-folder-right</attribute>
-      </item>
-      <item>
-        <attribute name="label" translatable="yes">Remo_ve Folder</attribute>
-        <attribute name="action">win.remove-folder</attribute>
-      </item>
-    </section>
-    <section>
-      <item>
         <attribute name="label" translatable="yes">_Preferences</attribute>
         <attribute name="action">app.preferences</attribute>
       </item>
@@ -575,6 +581,30 @@
       <item>
         <attribute name="label" translatable="yes">_About Vinheta</attribute>
         <attribute name="action">app.about</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="tab_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Re_name Tab…</attribute>
+        <attribute name="action">win.rename-folder</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Move Tab _Left</attribute>
+        <attribute name="action">win.move-folder-left</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Move Tab _Right</attribute>
+        <attribute name="action">win.move-folder-right</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Remo_ve Folder</attribute>
+        <attribute name="action">win.remove-folder</attribute>
       </item>
     </section>
   </menu>
