@@ -72,6 +72,11 @@
 			<summary>Sounds folder</summary>
 			<description>Absolute path of the folder that receives the copies of loose files. Empty means "sounds" inside the data directory of the app.</description>
 		</key>
+		<key name="audio-editor" type="s">
+			<default>''</default>
+			<summary>Audio editor</summary>
+			<description>Name of the desktop file of the app that opens a sound for editing. Empty means the first audio editor that is installed.</description>
+		</key>
 		<key name="call-guide-shown" type="b">
 			<default>false</default>
 			<summary>Call setup guide shown</summary>

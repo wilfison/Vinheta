@@ -236,6 +236,20 @@ impl FolderPage {
                 store.remove(position);
             }
         }
+        // A file that was written again: its place in the "recent" order.
+        let mut modified = false;
+        for sound in self.sounds() {
+            let file = files
+                .iter()
+                .flatten()
+                .find(|file| file.path == Path::new(&sound.path()));
+            if let Some(file) = file {
+                modified |= sound.set_modified_time(file.modified);
+            }
+        }
+        if let Some(app) = app.as_ref().filter(|_| modified) {
+            app.sounds_modified();
+        }
         // The actions take the path of a sound as a string.
         let added: Vec<_> = diff
             .added

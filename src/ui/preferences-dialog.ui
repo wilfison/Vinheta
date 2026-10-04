@@ -95,6 +95,11 @@
                 </child>
               </object>
             </child>
+            <child>
+              <object class="AdwComboRow" id="audio_editor">
+                <property name="title" translatable="yes">Audio Editor</property>
+              </object>
+            </child>
           </object>
         </child>
       </object>

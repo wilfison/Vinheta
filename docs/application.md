@@ -26,6 +26,11 @@
 - The sounds folder is the `sounds-folder` key, or `sounds` inside the data directory of the app (`sounds_folder`). `app.trash-sound` moves a file to the system trash only when it is directly inside that folder; the "Move to Trash" item of a pad is hidden elsewhere.
 - Changing the sounds folder moves nothing: the old folder stays as a normal tab.
 
+## The audio editor
+
+- `app.open-in-editor` (parameter: the path) opens the file of a sound in another app, for editing. There is no default audio editor in the system (the default app of an audio file is a player), so `audio_editor` picks one: the app of the `audio-editor` key (the name of a desktop file) while it is installed, otherwise the first audio editor among the apps registered for the formats of the library (`audio_apps`). `is_editor` of `src/editors.rs` says what an audio editor is: the category `AudioVideoEditing` or `X-AudioEditing`, with `Audio` and without `Video` (Kdenlive has the editing category too). Without one the action shows a toast.
+- The editor writes the file of the user: nothing is copied. The folder page sees the change like any other, keeps the pad and its settings, and updates the modification time of its `Sound` (`sounds_modified` tells the window, for the "Recently Added" order).
+
 ## The call setup guide
 
 - The application opens it in `activate` on the first run: see [interface.md](interface.md), "Dialogs".

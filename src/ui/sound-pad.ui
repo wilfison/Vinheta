@@ -112,6 +112,11 @@
         <attribute name="action">pad.edit</attribute>
       </item>
       <item>
+        <attribute name="label" translatable="yes">_Open in Audio Editor</attribute>
+        <attribute name="action">pad.open-editor</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
         <attribute name="label" translatable="yes">_Loop</attribute>
         <attribute name="action">pad.loop</attribute>
       </item>

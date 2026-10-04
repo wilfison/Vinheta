@@ -24,6 +24,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
+use vinheta::editors;
 use vinheta::pads::TriggerMode;
 
 use super::device_selector;
@@ -54,6 +55,8 @@ mod imp {
         pub open_folder: TemplateChild<gtk::Button>,
         #[template_child]
         pub choose_folder: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub audio_editor: TemplateChild<adw::ComboRow>,
     }
 
     #[glib::object_subclass]
@@ -199,7 +202,69 @@ impl PreferencesDialog {
                 });
             }
         ));
+        dialog.setup_audio_editor(app);
         dialog
+    }
+
+    /// The "Audio Editor" row: "Automatic", then the installed apps that
+    /// open sounds. It is the only place that writes `audio-editor`.
+    fn setup_audio_editor(&self, app: &VinhetaApplication) {
+        let row = self.imp().audio_editor.get();
+        let settings = gio::Settings::new(APP_ID);
+        let apps: Vec<_> = app.audio_apps().into_iter().map(|(app, _)| app).collect();
+        let (entries, selected) =
+            editors::selector_entries(&apps, &settings.string("audio-editor"));
+        let automatic = gettext("Automatic");
+        let labels: Vec<&str> = std::iter::once(automatic.as_str())
+            .chain(entries.iter().map(|app| app.name.as_str()))
+            .collect();
+        row.set_model(Some(&gtk::StringList::new(&labels)));
+        row.set_selected(selected as u32);
+
+        // What "Automatic" opens.
+        let detected = editors::pick(&apps, "").map(|app| app.name.clone());
+        let show = move |row: &adw::ComboRow| {
+            let subtitle = match (row.selected(), &detected) {
+                // Translators: {} is the name of an app, as in "Uses Audacity".
+                (0, Some(name)) => gettext("Uses {}").replace("{}", name),
+                (0, None) => gettext("No audio editor was found"),
+                _ => String::new(),
+            };
+            row.set_subtitle(&glib::markup_escape_text(&subtitle));
+        };
+        show(&row);
+
+        let ids: Vec<String> = entries.into_iter().map(|app| app.id).collect();
+        row.connect_selected_notify({
+            let settings = settings.clone();
+            let ids = ids.clone();
+            move |row| {
+                show(row);
+                let id = match row.selected() as usize {
+                    0 => "",
+                    position => ids.get(position - 1).map_or("", String::as_str),
+                };
+                if settings.string("audio-editor") != id {
+                    if let Err(error) = settings.set_string("audio-editor", id) {
+                        glib::g_warning!("vinheta", "could not save the audio editor: {error}");
+                    }
+                }
+            }
+        });
+        // The row follows the key while the dialog is open. An app that is
+        // not installed is shown as "Automatic", which is what it does.
+        settings.connect_changed(
+            Some("audio-editor"),
+            glib::clone!(
+                #[weak]
+                row,
+                move |settings, key| {
+                    let chosen = settings.string(key);
+                    let position = ids.iter().position(|id| *id == chosen.as_str());
+                    row.set_selected(position.map_or(0, |position| position as u32 + 1));
+                }
+            ),
+        );
     }
 
     /// The path, with the home directory as `~`.

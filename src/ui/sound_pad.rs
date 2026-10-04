@@ -357,6 +357,7 @@ impl SoundPad {
         let actions = &self.imp().actions;
         actions.add_action_entries([
             forward("edit", "win.edit-sound"),
+            forward("open-editor", "app.open-in-editor"),
             forward("stop", "app.stop-sound"),
             forward("reset", "app.reset-sound"),
             forward("trash", "app.trash-sound"),
@@ -372,12 +373,18 @@ impl SoundPad {
         let Some(sound) = self.sound() else {
             return;
         };
-        // Only the copies in the sounds folder can be trashed.
+        // Only the copies in the sounds folder can be trashed, and the
+        // editor item needs an editor.
         let app = gio::Application::default().and_downcast::<VinhetaApplication>();
-        let imported = app.is_some_and(|app| app.is_imported(&sound.path()));
-        if let Some(action) = imp.actions.lookup_action("trash") {
-            if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
-                action.set_enabled(imported);
+        let imported = app
+            .as_ref()
+            .is_some_and(|app| app.is_imported(&sound.path()));
+        let editor = app.is_some_and(|app| app.audio_editor().is_some());
+        for (name, enabled) in [("trash", imported), ("open-editor", editor)] {
+            if let Some(action) = imp.actions.lookup_action(name) {
+                if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
+                    action.set_enabled(enabled);
+                }
             }
         }
         if let Some(old) = imp.popover.take() {

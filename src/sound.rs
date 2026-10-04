@@ -57,7 +57,7 @@ mod imp {
         #[property(get)]
         pub shortcut: RefCell<String>,
         /// When the file was last modified, in seconds since the epoch.
-        #[property(get, construct_only)]
+        #[property(get, set, construct)]
         modified: Cell<i64>,
         /// Milliseconds into the playback, -1 while not known.
         #[property(get)]
@@ -108,15 +108,17 @@ glib::wrapper! {
     pub struct Sound(ObjectSubclass<imp::Sound>);
 }
 
+fn seconds(time: SystemTime) -> i64 {
+    time.duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |time| i64::try_from(time.as_secs()).unwrap_or(i64::MAX))
+}
+
 impl Sound {
     pub fn new(path: &str, name: &str, modified: SystemTime, settings: &PadSettings) -> Self {
-        let modified = modified
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map_or(0, |time| i64::try_from(time.as_secs()).unwrap_or(i64::MAX));
         let sound: Self = glib::Object::builder()
             .property("path", path)
             .property("name", name)
-            .property("modified", modified)
+            .property("modified", seconds(modified))
             .build();
         sound.set_settings(settings);
         sound
@@ -127,6 +129,16 @@ impl Sound {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default()
+    }
+
+    /// Says whether the time is another one.
+    pub fn set_modified_time(&self, modified: SystemTime) -> bool {
+        let modified = seconds(modified);
+        let changed = self.modified() != modified;
+        if changed {
+            self.set_modified(modified);
+        }
+        changed
     }
 
     pub fn modified_time(&self) -> SystemTime {

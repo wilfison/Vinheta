@@ -28,9 +28,11 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use glib::subclass::Signal;
-use gtk::{gio, glib};
+use gtk::{gdk, gio, glib};
 use vinheta::audio::{self, AudioEngine, Config, Device, Event, PlayOptions, PlaybackId};
 use vinheta::devices::{self, Entry};
+use vinheta::editors;
+use vinheta::library;
 use vinheta::pads::{self, PadSettings, PadStore, Trigger, TriggerMode};
 
 use crate::config::VERSION;
@@ -282,6 +284,7 @@ impl VinhetaApplication {
             app.update_sound(sound, settings);
         });
         let trash_sound_action = sound_action("trash-sound", Self::trash_sound);
+        let open_in_editor_action = sound_action("open-in-editor", Self::open_in_editor);
         let toggle_loop_action = sound_action("toggle-loop", |app, sound| {
             let mut settings = sound.settings();
             settings.looping = !settings.looping;
@@ -336,6 +339,7 @@ impl VinhetaApplication {
             toggle_loop_action,
             toggle_favorite_action,
             trash_sound_action,
+            open_in_editor_action,
             reset_sound_action,
             set_shortcut_action,
             trigger_shortcut_action,
@@ -698,6 +702,71 @@ impl VinhetaApplication {
         };
         if let Some(window) = self.window() {
             window.toast(&message.replace("{}", &sound.display_name()));
+        }
+    }
+
+    /// The installed apps that open the formats of the library, each with
+    /// what launches it.
+    pub fn audio_apps(&self) -> Vec<(editors::App, gio::AppInfo)> {
+        let mut apps: Vec<(editors::App, gio::AppInfo)> = Vec::new();
+        for extension in library::EXTENSIONS {
+            let (content_type, _) = gio::content_type_guess(Some(format!("a.{extension}")), &[]);
+            for info in gio::AppInfo::all_for_type(&content_type) {
+                let Some(id) = info.id() else { continue };
+                if id == format!("{APP_ID}.desktop") || apps.iter().any(|(app, _)| app.id == id) {
+                    continue;
+                }
+                let desktop = info.downcast_ref::<gio::DesktopAppInfo>();
+                let categories = desktop.and_then(|desktop| desktop.categories());
+                let categories = categories
+                    .iter()
+                    .flat_map(|categories| categories.split(';'))
+                    .filter(|category| !category.is_empty())
+                    .map(str::to_owned)
+                    .collect();
+                let app = editors::App {
+                    id: id.into(),
+                    name: info.name().into(),
+                    categories,
+                };
+                apps.push((app, info));
+            }
+        }
+        apps
+    }
+
+    /// The app that opens a sound for editing: the `audio-editor` key, or
+    /// the first audio editor that is installed.
+    pub fn audio_editor(&self) -> Option<gio::AppInfo> {
+        let apps = self.audio_apps();
+        let (list, mut infos): (Vec<_>, Vec<_>) = apps.into_iter().unzip();
+        let chosen = self.settings().string("audio-editor");
+        let picked = editors::pick(&list, &chosen)?;
+        let position = list.iter().position(|app| app == picked)?;
+        Some(infos.swap_remove(position))
+    }
+
+    fn open_in_editor(&self, sound: &Sound) {
+        let path = sound.path();
+        let context = gdk::Display::default().map(|display| display.app_launch_context());
+        let launched = match self.audio_editor() {
+            Some(editor) => editor
+                .launch(&[gio::File::for_path(&path)], context.as_ref())
+                .map_err(|error| error.to_string()),
+            None => Err("no audio editor is installed".to_owned()),
+        };
+        if let Err(error) = launched {
+            glib::g_warning!("vinheta", "could not open {path} in an editor: {error}");
+            if let Some(window) = self.window() {
+                window.toast(&gettext("Could not open the audio editor"));
+            }
+        }
+    }
+
+    /// The file of a sound changed: the order of the pads may depend on it.
+    pub fn sounds_modified(&self) {
+        if let Some(window) = self.window() {
+            window.sound_changed(true, false);
         }
     }
 

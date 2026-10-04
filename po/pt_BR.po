@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-04 12:32-0300\n"
+"POT-Creation-Date: 2026-10-04 12:44-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -23,7 +23,7 @@ msgid "Vinheta"
 msgstr "Vinheta"
 
 #: data/io.github.wilfison.Vinheta.desktop.in:3
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1028
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1097
 msgid "Play sounds into your calls"
 msgstr "Toque sons nas suas chamadas"
 
@@ -167,10 +167,22 @@ msgstr ""
 "significa “sounds” dentro do diretório de dados do aplicativo."
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:77
+msgid "Audio editor"
+msgstr "Editor de áudio"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:78
+msgid ""
+"Name of the desktop file of the app that opens a sound for editing. Empty "
+"means the first audio editor that is installed."
+msgstr ""
+"Nome do arquivo desktop do aplicativo que abre um som para edição. Vazio "
+"significa o primeiro editor de áudio instalado."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:82
 msgid "Call setup guide shown"
 msgstr "Guia de configuração de chamada mostrado"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:78
+#: data/io.github.wilfison.Vinheta.gschema.xml:83
 msgid ""
 "Whether the call setup guide was shown on the first run. While false, the "
 "guide opens by itself when the app starts with working audio."
@@ -236,11 +248,11 @@ msgstr ""
 "tecla, favoritos, pesquisa e um microfone virtual que envia os sons para as "
 "suas chamadas."
 
-#: src/application.rs:476
+#: src/application.rs:480
 msgid "No microphone found. Your voice is not sent to the call."
 msgstr "Nenhum microfone encontrado. Sua voz não é enviada para a chamada."
 
-#: src/application.rs:505
+#: src/application.rs:509
 msgid ""
 "Pad settings could not be read and were reset. The old file was kept as "
 "“pads.json.corrupt”."
@@ -248,43 +260,47 @@ msgstr ""
 "Não foi possível ler as configurações dos pads, e elas foram redefinidas. O "
 "arquivo antigo foi mantido como “pads.json.corrupt”."
 
-#: src/application.rs:510
+#: src/application.rs:514
 msgid "Pad settings could not be read. Changes to pads will not be saved."
 msgstr ""
 "Não foi possível ler as configurações dos pads. As alterações nos pads não "
 "serão salvas."
 
-#: src/application.rs:531
+#: src/application.rs:535
 msgid "Pad settings could not be saved"
 msgstr "Não foi possível salvar as configurações dos pads"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:692
+#: src/application.rs:696
 msgid "Moved “{}” to the trash"
 msgstr "“{}” foi movido para a lixeira"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:696
+#: src/application.rs:700
 msgid "Could not move “{}” to the trash"
 msgstr "Não foi possível mover “{}” para a lixeira"
 
+#: src/application.rs:761
+msgid "Could not open the audio editor"
+msgstr "Não foi possível abrir o editor de áudio"
+
 #. Translators: {} is the name of a microphone.
-#: src/application.rs:925
+#: src/application.rs:994
 msgid "Microphone “{}” is not connected. Using the system default."
 msgstr "O microfone “{}” não está conectado. Usando o padrão do sistema."
 
 #. Translators: {} is the name of an audio output.
-#: src/application.rs:930
+#: src/application.rs:999
 msgid "Output “{}” is not connected. Using the system default."
 msgstr "A saída “{}” não está conectada. Usando o padrão do sistema."
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:1011
+#: src/application.rs:1080
 msgid "Could not play “{}”"
 msgstr "Não foi possível tocar “{}”"
 
 #. Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
-#: src/application.rs:1034
+#: src/application.rs:1103
 msgid "translator-credits"
 msgstr "wilfison"
 
@@ -462,7 +478,7 @@ msgstr "Evita cortes bruscos ao parar um som"
 msgid "Library"
 msgstr "Biblioteca"
 
-#: src/ui/preferences-dialog.ui:68 src/ui/preferences_dialog.rs:242
+#: src/ui/preferences-dialog.ui:68 src/ui/preferences_dialog.rs:307
 msgid "Sounds Folder"
 msgstr "Pasta de sons"
 
@@ -474,23 +490,40 @@ msgstr "Abrir pasta"
 msgid "Choose Folder…"
 msgstr "Escolher pasta…"
 
-#: src/ui/preferences_dialog.rs:93
+#: src/ui/preferences-dialog.ui:100
+msgid "Audio Editor"
+msgstr "Editor de áudio"
+
+#: src/ui/preferences_dialog.rs:96
 msgid "Sounds play together; a click on a playing pad stops it"
 msgstr "Os sons tocam juntos; um clique em um pad que está tocando o para"
 
-#: src/ui/preferences_dialog.rs:95
+#: src/ui/preferences_dialog.rs:98
 msgid "A click on a playing pad starts it again"
 msgstr "Um clique em um pad que está tocando o reinicia"
 
-#: src/ui/preferences_dialog.rs:96
+#: src/ui/preferences_dialog.rs:99
 msgid "Starting a pad stops every other sound"
 msgstr "Iniciar um pad para todos os outros sons"
 
-#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:327
+#: src/ui/preferences_dialog.rs:148 src/ui/window.rs:327
 msgid "Not connected. Using the system default."
 msgstr "Não conectado. Usando o padrão do sistema."
 
-#: src/ui/preferences_dialog.rs:235
+#: src/ui/preferences_dialog.rs:217
+msgid "Automatic"
+msgstr "Automático"
+
+#. Translators: {} is the name of an app, as in "Uses Audacity".
+#: src/ui/preferences_dialog.rs:229
+msgid "Uses {}"
+msgstr "Usa {}"
+
+#: src/ui/preferences_dialog.rs:230
+msgid "No audio editor was found"
+msgstr "Nenhum editor de áudio foi encontrado"
+
+#: src/ui/preferences_dialog.rs:300
 msgid "Could not open the folder"
 msgstr "Não foi possível abrir a pasta"
 
@@ -608,22 +641,26 @@ msgid "_Edit…"
 msgstr "_Editar…"
 
 #: src/ui/sound-pad.ui:115
+msgid "_Open in Audio Editor"
+msgstr "_Abrir no editor de áudio"
+
+#: src/ui/sound-pad.ui:120
 msgid "_Loop"
 msgstr "_Repetir"
 
-#: src/ui/sound-pad.ui:119
+#: src/ui/sound-pad.ui:124
 msgid "_Favorite"
 msgstr "_Favorito"
 
-#: src/ui/sound-pad.ui:123
+#: src/ui/sound-pad.ui:128
 msgid "_Stop"
 msgstr "_Parar"
 
-#: src/ui/sound-pad.ui:129
+#: src/ui/sound-pad.ui:134
 msgid "_Reset"
 msgstr "Re_definir"
 
-#: src/ui/sound-pad.ui:133
+#: src/ui/sound-pad.ui:138
 msgid "Move to _Trash"
 msgstr "Mover para a _lixeira"
 
@@ -747,8 +784,8 @@ msgstr[1] "{} tocando"
 msgid "Add Folder"
 msgstr "Adicionar pasta"
 
-#: src/ui/window.rs:769 src/ui/window.rs:800 src/ui/window.rs:1061
-#: src/ui/window.rs:1082
+#: src/ui/window.rs:769 src/ui/window.rs:800 src/ui/window.rs:1060
+#: src/ui/window.rs:1081
 msgid "This folder cannot be added"
 msgstr "Esta pasta não pode ser adicionada"
 
@@ -783,27 +820,27 @@ msgid "No supported audio files"
 msgstr "Nenhum arquivo de áudio compatível"
 
 #. Translators: {} is the name of a tab.
-#: src/ui/window.rs:1019
+#: src/ui/window.rs:1018
 msgid "Removed “{}”"
 msgstr "“{}” foi removida"
 
-#: src/ui/window.rs:1020
+#: src/ui/window.rs:1019
 msgid "Undo"
 msgstr "Desfazer"
 
-#: src/ui/window.rs:1053
+#: src/ui/window.rs:1052
 msgid "Locate Folder"
 msgstr "Localizar pasta"
 
-#: src/ui/window.rs:1078
+#: src/ui/window.rs:1077
 msgid "This folder is already in the library"
 msgstr "Esta pasta já está na biblioteca"
 
-#: src/ui/window.rs:1163
+#: src/ui/window.rs:1162
 msgid "Favorites"
 msgstr "Favoritos"
 
-#: src/ui/window.rs:1247
+#: src/ui/window.rs:1246
 msgid "Sounds"
 msgstr "Sons"
 

@@ -30,6 +30,7 @@
 - Times are shown only while a pad plays. Idle pads show no duration.
 - The trigger mode (overlap, restart, or stop the others) is one global setting, not a per-pad one. "Stop" is always in the context menu, since in the "Restart" mode a click no longer stops a pad.
 - A favorite is a star on the pad, flipped from its context menu. The "Favorites" tab is last in the row and hidden while there is no favorite.
+- "Open in Audio Editor" is in the context menu only while there is an editor to open (`audio_editor` of the application, asked when the menu opens).
 - "Move to Trash" is in the context menu only for the copies in the sounds folder. There is no confirmation and no undo in the app: the system trash is the undo.
 
 ## Search and sorting
@@ -55,7 +56,7 @@
 ## Dialogs
 
 - `src/ui/preferences_dialog.rs` + `src/ui/preferences-dialog.ui`: the `AdwPreferencesDialog`.
-- `Ctrl+,` opens the preferences. The "Sounds Folder" row has two buttons: one opens the folder, one chooses another.
+- `Ctrl+,` opens the preferences. The "Sounds Folder" row has two buttons: one opens the folder, one chooses another. The "Audio Editor" row offers "Automatic" (its subtitle names the editor that was found) and every installed app that opens sounds, the editors first; it is the only place that writes `audio-editor`. The list is read when the dialog opens.
 - The call setup guide (`src/ui/call_guide_dialog.rs` + `call-guide-dialog.ui`) opens by itself in `activate` while the `call-guide-shown` key is false and audio works; the key is set when the dialog closes, however it closes.
 - The shortcuts dialog and the pad keys are described in [shortcuts.md](shortcuts.md).
 

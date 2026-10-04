@@ -54,6 +54,7 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 
 ## Limits of the scripted checks
 
+- The app sees the apps installed in the system, so `app.open-in-editor` in a scripted session would start a real editor. Run it with a fake one: a desktop file (with `MimeType=audio/x-wav;` and the categories `Audio;AudioVideoEditing;`) in an `applications` directory of its own, `update-desktop-database` on that directory (GIO reads the types from `mimeinfo.cache`), and `XDG_DATA_DIRS=DIR/share:/usr/share` in front of the script, which also hides the Flatpak apps.
 - If another Vinheta instance is open, the engine fails because the node name is taken. For the same reason two checks that start the app (screenshots, `verify-app.sh`) cannot run at the same time.
 - The fallback of a removed or missing device is the real default device. A check of that fallback must play nothing audible (monitor volume at 0, or a silent file) and record nothing from the real microphone.
 - A noisy real microphone hides quiet test tones on the virtual microphone; turn "Include My Voice" off before measuring.
@@ -63,6 +64,7 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 
 - The folder and file choosers ("Add Folder…", "Add Sounds…", "Locate Folder…", choosing the sounds folder), and the button that opens the sounds folder.
 - The "Undo" of a removed tab.
+- A real audio editor: "Open in Audio Editor", exporting over the file (the pad keeps its settings and moves in the "Recently Added" order), and picking an entry of the "Audio Editor" row.
 - Dropping files and folders on the window, and the drop highlight.
 - Dragging a volume slider with the mouse, in the bottom bar and in the pad dialog while the sound plays, and the controls of the narrow bottom bar.
 - Switching between two real outputs.

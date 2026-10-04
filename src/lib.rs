@@ -20,5 +20,6 @@
 
 pub mod audio;
 pub mod devices;
+pub mod editors;
 pub mod library;
 pub mod pads;

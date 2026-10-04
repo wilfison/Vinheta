@@ -11,6 +11,7 @@ A map of the source tree. Each area has its own document.
 | `src/library.rs` | Folder scan, diff, pad names, import of loose files | [library.md](library.md) |
 | `src/pads.rs` | Pad settings and their file, keys, trigger rule, search match, sort order | [library.md](library.md) |
 | `src/devices.rs` | The entries of a device selector | [interface.md](interface.md) |
+| `src/editors.rs` | Which installed app opens a sound for editing | [application.md](application.md) |
 | `src/audio/` | The audio engine (PipeWire and GStreamer) | [audio.md](audio.md) |
 | `src/bin/vinheta-audio-test.rs` | Diagnostic binary of the engine | [audio.md](audio.md) |
 | `data/` | Desktop file, metainfo, GSettings schema, D-Bus service, icons | [packaging.md](packaging.md) |
@@ -20,7 +21,7 @@ A map of the source tree. Each area has its own document.
 
 ## Two crates in one package
 
-- `src/lib.rs`: library target that exposes `audio`, `devices`, `library`, and `pads`, so other binaries and the tests can use them. The app modules above stay in `main.rs`.
+- `src/lib.rs`: library target that exposes `audio`, `devices`, `editors`, `library`, and `pads`, so other binaries and the tests can use them. The app modules above stay in `main.rs`.
 - The modules of the library have no GTK types and are covered by unit tests. The tests of a module live in a `tests.rs` file of the directory named after it (`src/pads.rs` and `src/pads/tests.rs`).
 
 ## Threads
