@@ -27,6 +27,8 @@ A release is a tag: `.github/workflows/release.yml` runs on a pushed `v*` tag (o
 
 1. Bump the version in the four places, with the same date in `debian/changelog` and in the metainfo, and add a `## [VERSION]` section to `CHANGELOG.md`.
 2. Run `scripts/check.sh --all` (the CI does not run the audio and app checks) and, when the packaging changed, `scripts/ci-container.sh`.
-3. Commit, push `main`, wait for the CI, then `git tag vVERSION && git push origin vVERSION`.
+3. Commit, push `main`, wait for the CI, then `git tag -a vVERSION -m "Release VERSION" && git push origin vVERSION`.
+
+The project skill `release` (`.agents/skills/release/`) drives these steps, and its `scripts/bump.sh {major|minor|patch}` writes the new version to the four places.
 
 There is no PPA: the `.deb` of a GitHub release is the only channel.
