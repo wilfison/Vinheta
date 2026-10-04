@@ -116,6 +116,9 @@ mod imp {
             obj.set_accels_for_action("win.search-mode", &["<control>f"]);
             obj.set_accels_for_action("win.move-folder-left", &["<control><shift>Page_Up"]);
             obj.set_accels_for_action("win.move-folder-right", &["<control><shift>Page_Down"]);
+            obj.set_accels_for_action("app.stop-all", &["<control><shift>s"]);
+            obj.set_accels_for_action("app.send-sounds-to-call", &["<control><shift>l"]);
+            obj.set_accels_for_action("app.include-my-voice", &["<control><shift>m"]);
         }
 
         fn signals() -> &'static [Signal] {
@@ -227,6 +230,27 @@ impl VinhetaApplication {
         let reset_sound_action = sound_action("reset-sound", |app, sound| {
             app.update_sound(sound, PadSettings::default());
         });
+        // The parameter is the path of a sound of the library and its key,
+        // or an empty text for no key.
+        let set_shortcut_action = gio::ActionEntry::builder("set-shortcut")
+            .parameter_type(Some(glib::VariantTy::new("(ss)").unwrap()))
+            .activate(move |app: &Self, _, parameter| {
+                let parameter = parameter.and_then(|parameter| parameter.get::<(String, String)>());
+                if let Some((path, key)) = parameter {
+                    app.set_shortcut(&path, &key);
+                }
+            })
+            .build();
+        // The parameter is a pad key: what a key press in the window does.
+        let trigger_shortcut_action = gio::ActionEntry::builder("trigger-shortcut")
+            .parameter_type(Some(glib::VariantTy::STRING))
+            .activate(move |app: &Self, _, key| {
+                let mut chars = key.and_then(|key| key.str()).unwrap_or_default().chars();
+                if let (Some(key), None) = (chars.next(), chars.next()) {
+                    app.trigger_shortcut(key);
+                }
+            })
+            .build();
         let stop_all_action = gio::ActionEntry::builder("stop-all")
             .activate(move |app: &Self, _, _| app.stop_all())
             .build();
@@ -244,6 +268,8 @@ impl VinhetaApplication {
             toggle_favorite_action,
             trash_sound_action,
             reset_sound_action,
+            set_shortcut_action,
+            trigger_shortcut_action,
             stop_all_action,
         ]);
         self.update_playing();
@@ -303,6 +329,9 @@ impl VinhetaApplication {
                 }
             ),
         );
+        // Stateful actions that flip a key, for the accelerators.
+        self.add_action(&settings.create_action("send-sounds-to-call"));
+        self.add_action(&settings.create_action("include-my-voice"));
         self.imp().settings.set(settings).unwrap();
     }
 
@@ -388,11 +417,23 @@ impl VinhetaApplication {
     pub fn update_sound(&self, sound: &Sound, settings: PadSettings) {
         let imp = self.imp();
         let path = sound.path();
-        let settings = {
+        let (settings, taken) = {
             let mut pads = imp.pads.borrow_mut();
             pads.set(&path, settings);
-            pads.get(&path)
+            let settings = pads.get(&path);
+            // A key belongs to one pad.
+            let taken = settings.shortcut.map(|key| pads.take_shortcut(key, &path));
+            (settings, taken.unwrap_or_default())
         };
+        for other in &taken {
+            self.schedule_save();
+            if let Some(other) = self.find_sound(other) {
+                if let (Some(window), Some(key)) = (self.window(), settings.shortcut) {
+                    window.shortcut_taken(sound, key, &other);
+                }
+                other.set_settings(&self.pad_settings(&other.path()));
+            }
+        }
         let old = sound.settings();
         if settings == old {
             return;
@@ -407,6 +448,36 @@ impl VinhetaApplication {
         if let Some(window) = self.window() {
             window.sound_changed(old.name != settings.name, old.favorite != settings.favorite);
         }
+    }
+
+    /// Gives a sound of the library its key, or none for an empty text.
+    /// Anything that is not a letter or a digit is ignored.
+    fn set_shortcut(&self, path: &str, key: &str) {
+        let mut chars = key.chars();
+        let key = match (chars.next(), chars.next()) {
+            (None, _) => None,
+            (Some(key), None) if pads::shortcut_key(key).is_some() => Some(key),
+            _ => return,
+        };
+        if let Some(sound) = self.find_sound(path) {
+            let mut settings = sound.settings();
+            settings.shortcut = key;
+            self.update_sound(&sound, settings);
+        }
+    }
+
+    /// Does what a click on the pad with this key does. Returns whether a
+    /// pad of the library has the key.
+    pub fn trigger_shortcut(&self, key: char) -> bool {
+        let owner = {
+            let pads = self.imp().pads.borrow();
+            pads.shortcut_owner(key).map(str::to_owned)
+        };
+        let Some(sound) = owner.and_then(|path| self.find_sound(&path)) else {
+            return false;
+        };
+        self.trigger_sound(&sound, pads::trigger(self.trigger_mode(), sound.playing()));
+        true
     }
 
     /// Moves the settings of a file that was renamed or moved.

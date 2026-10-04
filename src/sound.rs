@@ -53,6 +53,9 @@ mod imp {
         pub looping: Cell<bool>,
         #[property(get)]
         pub favorite: Cell<bool>,
+        /// The key that triggers the pad, or empty.
+        #[property(get)]
+        pub shortcut: RefCell<String>,
         /// When the file was last modified, in seconds since the epoch.
         #[property(get, construct_only)]
         modified: Cell<i64>,
@@ -75,6 +78,7 @@ mod imp {
                 volume: Cell::new(1.0),
                 looping: Cell::new(false),
                 favorite: Cell::new(false),
+                shortcut: RefCell::default(),
                 modified: Cell::new(0),
                 elapsed: Cell::new(-1),
                 duration: Cell::new(-1),
@@ -138,6 +142,7 @@ impl Sound {
             volume: imp.volume.get(),
             looping: imp.looping.get(),
             favorite: imp.favorite.get(),
+            shortcut: imp.shortcut.borrow().chars().next(),
         }
     }
 
@@ -159,6 +164,10 @@ impl Sound {
         }
         if imp.favorite.replace(settings.favorite) != settings.favorite {
             self.notify_favorite();
+        }
+        let shortcut = settings.shortcut.map(String::from).unwrap_or_default();
+        if imp.shortcut.replace(shortcut.clone()) != shortcut {
+            self.notify_shortcut();
         }
     }
 

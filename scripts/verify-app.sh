@@ -3,8 +3,8 @@
 # microphone, playing and stopping through actions and through real clicks, the
 # "Send sounds to call" switch and the call volume measured on a recording, the
 # voice switch, the monitor output, the pad settings (volume, loop), the
-# trigger modes, files removed and renamed while the app runs, and the cleanup
-# on exit.
+# trigger modes, files removed and renamed while the app runs, a pad key, and
+# the cleanup on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
 # output for a few seconds, and the real microphone is linked as usual.
 set -uo pipefail
@@ -34,7 +34,7 @@ cp "$tone" "$kept"
 pads="$work/config/data/vinheta/pads.json"
 mkdir -p "$(dirname "$pads")"
 cat >"$pads" <<JSON
-{"version": 1, "pads": {"$quiet": {"volume": 0.5}, "$looped": {"loop": true}, "$kept": {"color": "red"}}}
+{"version": 1, "pads": {"$tone": {"shortcut": "q"}, "$quiet": {"volume": 0.5}, "$looped": {"loop": true}, "$kept": {"color": "red"}}}
 JSON
 test_sink=vinheta-app-test-sink
 
@@ -233,6 +233,18 @@ session() {
     sleep 1
     check "clicking it again stops it" not call_linked
 
+    # A real key press; the pointer is over the window since the clicks.
+    echo "== pad key"
+    gsettings set "$app_id" include-my-voice false
+    key q
+    sleep 1
+    on=$(call_level key-on)
+    key q
+    sleep 1
+    off=$(call_level key-off)
+    gsettings set "$app_id" include-my-voice true
+    check "a pad key starts and stops a sound ($on dBFS, then $off dBFS)" at_least "$on" "$off" 20
+
     echo "== exit"
     quit_app
     sleep 0.5
@@ -241,6 +253,7 @@ session() {
     check "a loop set through an action was saved" loop_saved
     check "a reset pad has no entry in the file" entry_removed
     check "moved settings" settings_moved
+
 }
 
 {

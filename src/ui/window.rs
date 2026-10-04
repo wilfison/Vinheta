@@ -19,7 +19,7 @@
  */
 
 use std::cell::{Cell, OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -163,6 +163,7 @@ mod imp {
             obj.setup_models();
             obj.setup_search();
             obj.setup_drop();
+            obj.setup_pad_keys();
             obj.setup_gactions();
             obj.setup_settings();
 
@@ -290,6 +291,15 @@ impl VinhetaWindow {
                 .get()
                 .unwrap()
                 .changed(gtk::FilterChange::Different);
+        }
+    }
+
+    /// The key given to `sound` belonged to `from`: its dialog says so.
+    pub fn shortcut_taken(&self, sound: &Sound, key: char, from: &Sound) {
+        if let Some(dialog) = self.imp().sound_dialog.upgrade() {
+            if dialog.sound().as_ref() == Some(sound) {
+                dialog.shortcut_taken(key, from);
+            }
         }
     }
 
@@ -432,6 +442,57 @@ impl VinhetaWindow {
                 .set_visible(drop.current_drop().is_some())
         ));
         self.add_controller(drop);
+    }
+
+    /// A letter or a digit pressed in the window triggers the pad that has
+    /// it, in any tab. Text fields, menus, and dialogs keep their keys: they
+    /// handle them before the window does.
+    fn setup_pad_keys(&self) {
+        // The keys that triggered a pad and are still down: a held key
+        // repeats, and only its first press counts.
+        let down: Rc<RefCell<HashSet<u32>>> = Rc::default();
+        let keys = gtk::EventControllerKey::new();
+        keys.connect_key_pressed(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[strong]
+            down,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, keyval, keycode, state| {
+                let modifiers = gdk::ModifierType::SHIFT_MASK
+                    | gdk::ModifierType::CONTROL_MASK
+                    | gdk::ModifierType::ALT_MASK
+                    | gdk::ModifierType::SUPER_MASK
+                    | gdk::ModifierType::META_MASK
+                    | gdk::ModifierType::HYPER_MASK;
+                let key = keyval.to_unicode().and_then(pads::shortcut_key);
+                let key = key.filter(|_| !state.intersects(modifiers));
+                let (Some(key), None) = (key, window.visible_dialog()) else {
+                    return glib::Propagation::Proceed;
+                };
+                if down.borrow().contains(&keycode) {
+                    return glib::Propagation::Stop;
+                }
+                if app().is_some_and(|app| app.trigger_shortcut(key)) {
+                    down.borrow_mut().insert(keycode);
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            }
+        ));
+        keys.connect_key_released(glib::clone!(
+            #[strong]
+            down,
+            move |_, _, keycode, _| {
+                down.borrow_mut().remove(&keycode);
+            }
+        ));
+        self.add_controller(keys);
+        // A release that goes elsewhere is never seen here.
+        let forget = move |_: &Self| down.borrow_mut().clear();
+        self.connect_is_active_notify(forget.clone());
+        self.connect_visible_dialog_notify(forget);
     }
 
     fn setup_settings(&self) {

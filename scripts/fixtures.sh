@@ -56,6 +56,13 @@ cat >"$fixtures/favorites.json" <<JSON
   "$fixtures/Fixture/Crickets.wav": {"name": "Zebra"}
 }}
 JSON
+cat >"$fixtures/shortcuts.json" <<JSON
+{"version": 1, "pads": {
+  "$fixtures/Fixture/Air Horn.wav": {"shortcut": "1"},
+  "$fixtures/Fixture/Applause.wav": {"shortcut": "q"},
+  "$fixtures/Effects/Bell.wav": {"shortcut": "w"}
+}}
+JSON
 
 cat <<LIST
 $fixtures/Fixture       Air Horn, Applause, Crickets (20 s, silent)
@@ -65,4 +72,5 @@ $fixtures/Many          Sound 01 to Sound 60 (5 s, silent), enough to scroll
 $fixtures/Effects       Applause Short, Bell, Drum Roll (5 s, silent)
 $fixtures/dialog.json   Applause with a name, purple, volume 0.54, and loop
 $fixtures/favorites.json  Applause and Bell are favorites, Crickets is named "Zebra"
+$fixtures/shortcuts.json  the keys 1 (Air Horn), Q (Applause), and W (Bell)
 LIST

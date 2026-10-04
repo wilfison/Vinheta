@@ -28,6 +28,17 @@ gridview.pads > child {
   opacity: 0.5;
 }
 
+/* The key of a pad, on the pad and in the dialog that edits it. Built from
+   the text color, so it reads on every palette color in both styles. */
+.keycap {
+  min-width: 12px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 0.8em;
+  font-weight: bold;
+  background-color: color-mix(in srgb, currentColor 14%, transparent);
+}
+
 .pad .loop-mark {
   opacity: 0.7;
 }

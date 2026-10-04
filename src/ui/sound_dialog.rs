@@ -24,8 +24,8 @@ use std::path::Path;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
-use gtk::glib;
-use vinheta::pads::{PadColor, PadSettings};
+use gtk::{gdk, glib};
+use vinheta::pads::{self, PadColor, PadSettings};
 
 use crate::application::VinhetaApplication;
 use crate::sound::Sound;
@@ -48,6 +48,19 @@ mod imp {
         pub volume_percent: TemplateChild<gtk::Label>,
         #[template_child]
         pub looping: TemplateChild<adw::SwitchRow>,
+        #[template_child]
+        pub shortcut_row: TemplateChild<adw::ActionRow>,
+        #[template_child]
+        pub shortcut_key: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub shortcut_set: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub shortcut_remove: TemplateChild<gtk::Button>,
+        /// Set while the next key pressed becomes the key of the pad.
+        pub listening: Cell<bool>,
+        /// The key taken from another pad while the dialog is open, and the
+        /// name of that pad.
+        pub taken: RefCell<Option<(char, String)>>,
         /// "No color" first, then the palette.
         pub colors: RefCell<Vec<(Option<PadColor>, gtk::ToggleButton)>>,
         pub sound: RefCell<Option<(Sound, glib::SignalHandlerId)>>,
@@ -126,6 +139,31 @@ mod imp {
                 obj,
                 move |looping| obj.change(|settings| settings.looping = looping.is_active())
             ));
+
+            self.shortcut_set.connect_clicked(glib::clone!(
+                #[weak]
+                obj,
+                move |_| obj.set_listening(!obj.imp().listening.get())
+            ));
+            self.shortcut_remove.connect_clicked(glib::clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    obj.set_listening(false);
+                    obj.change(|settings| settings.shortcut = None);
+                }
+            ));
+            // Before the dialog itself, which closes on Escape.
+            let keys = gtk::EventControllerKey::new();
+            keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+            keys.connect_key_pressed(glib::clone!(
+                #[weak]
+                obj,
+                #[upgrade_or]
+                glib::Propagation::Proceed,
+                move |_, keyval, _, state| obj.key_pressed(keyval, state)
+            ));
+            obj.add_controller(keys);
         }
 
         fn dispose(&self) {
@@ -196,6 +234,77 @@ impl SoundDialog {
         sound.as_ref().map(|(sound, _)| sound.clone())
     }
 
+    /// The key of this pad belonged to `from` until now.
+    pub fn shortcut_taken(&self, key: char, from: &Sound) {
+        let taken = (key, from.display_name());
+        self.imp().taken.replace(Some(taken));
+    }
+
+    fn set_listening(&self, listening: bool) {
+        self.imp().listening.set(listening);
+        if let Some(sound) = self.sound() {
+            self.show_shortcut(sound.settings().shortcut);
+        }
+    }
+
+    /// While listening, every key is for the row.
+    fn key_pressed(&self, keyval: gdk::Key, state: gdk::ModifierType) -> glib::Propagation {
+        if !self.imp().listening.get() {
+            return glib::Propagation::Proceed;
+        }
+        let modifiers = gdk::ModifierType::CONTROL_MASK
+            | gdk::ModifierType::ALT_MASK
+            | gdk::ModifierType::SUPER_MASK;
+        let key = keyval.to_unicode().and_then(pads::shortcut_key);
+        match keyval {
+            gdk::Key::Escape => self.set_listening(false),
+            gdk::Key::BackSpace | gdk::Key::Delete | gdk::Key::KP_Delete => {
+                self.set_listening(false);
+                self.change(|settings| settings.shortcut = None);
+            }
+            _ => {
+                if let Some(key) = key.filter(|_| !state.intersects(modifiers)) {
+                    self.set_listening(false);
+                    self.change(|settings| settings.shortcut = Some(key));
+                }
+            }
+        }
+        glib::Propagation::Stop
+    }
+
+    fn show_shortcut(&self, key: Option<char>) {
+        let imp = self.imp();
+        let listening = imp.listening.get();
+        match key {
+            Some(key) => {
+                imp.shortcut_key.set_label(&pads::shortcut_label(key));
+                imp.shortcut_key.remove_css_class("dim-label");
+                imp.shortcut_key.add_css_class("keycap");
+            }
+            None => {
+                imp.shortcut_key.set_label(&gettext("None"));
+                imp.shortcut_key.remove_css_class("keycap");
+                imp.shortcut_key.add_css_class("dim-label");
+            }
+        }
+        imp.shortcut_remove.set_visible(key.is_some() && !listening);
+        imp.shortcut_set.set_label(&match (listening, key) {
+            (true, _) => gettext("Cancel"),
+            (false, Some(_)) => gettext("Change…"),
+            (false, None) => gettext("Set…"),
+        });
+        let taken = imp.taken.borrow();
+        let taken = taken.as_ref().filter(|(taken, _)| Some(*taken) == key);
+        let subtitle = match (listening, taken) {
+            (true, _) => gettext("Press a letter or a digit"),
+            // Translators: {} is the name of the pad that had the key before.
+            (false, Some((_, name))) => gettext("Taken from “{}”").replace("{}", name),
+            (false, None) => gettext("Plays this pad while the window is focused"),
+        };
+        imp.shortcut_row
+            .set_subtitle(&glib::markup_escape_text(&subtitle));
+    }
+
     fn fill(&self, settings: &PadSettings) {
         let imp = self.imp();
         imp.filling.set(true);
@@ -213,6 +322,7 @@ impl SoundDialog {
         imp.volume.set_value(settings.volume);
         imp.volume.emit_by_name::<()>("value-changed", &[]);
         imp.looping.set_active(settings.looping);
+        self.show_shortcut(settings.shortcut);
         imp.filling.set(false);
     }
 

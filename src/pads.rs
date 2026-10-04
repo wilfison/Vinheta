@@ -99,6 +99,9 @@ pub struct PadSettings {
     pub looping: bool,
     #[serde(skip_serializing_if = "is_false")]
     pub favorite: bool,
+    /// The key that triggers the pad: a lower case letter or a digit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shortcut: Option<char>,
 }
 
 impl Default for PadSettings {
@@ -109,6 +112,7 @@ impl Default for PadSettings {
             volume: 1.0,
             looping: false,
             favorite: false,
+            shortcut: None,
         }
     }
 }
@@ -126,6 +130,7 @@ impl PadSettings {
         } else {
             self.volume.clamp(0.0, 1.0)
         };
+        self.shortcut = self.shortcut.and_then(shortcut_key);
         self
     }
 
@@ -143,9 +148,28 @@ impl PadSettings {
                 .get("favorite")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            shortcut: value
+                .get("shortcut")
+                .and_then(Value::as_str)
+                .and_then(single_char),
         }
         .normalized()
     }
+}
+
+fn single_char(text: &str) -> Option<char> {
+    let mut chars = text.chars();
+    chars.next().filter(|_| chars.next().is_none())
+}
+
+/// The pad key a character stands for: letters in lower case and digits.
+pub fn shortcut_key(c: char) -> Option<char> {
+    c.is_ascii_alphanumeric().then(|| c.to_ascii_lowercase())
+}
+
+/// The key as a pad shows it.
+pub fn shortcut_label(key: char) -> String {
+    key.to_ascii_uppercase().to_string()
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -212,6 +236,32 @@ impl PadStore {
         self.pads.is_empty()
     }
 
+    /// The path of the entry that has the key.
+    pub fn shortcut_owner(&self, key: char) -> Option<&str> {
+        let key = shortcut_key(key)?;
+        let mut pads = self.pads.iter();
+        pads.find(|(_, settings)| settings.shortcut == Some(key))
+            .map(|(path, _)| path.as_str())
+    }
+
+    /// Clears the key from every entry but `except`, so that a key belongs
+    /// to one pad. Returns the paths that lost it.
+    pub fn take_shortcut(&mut self, key: char, except: &str) -> Vec<String> {
+        let Some(key) = shortcut_key(key) else {
+            return Vec::new();
+        };
+        let owners = self.pads.iter();
+        let owners = owners
+            .filter(|(path, settings)| settings.shortcut == Some(key) && path.as_str() != except);
+        let paths: Vec<String> = owners.map(|(path, _)| path.clone()).collect();
+        for path in &paths {
+            let mut settings = self.get(path);
+            settings.shortcut = None;
+            self.set(path, settings);
+        }
+        paths
+    }
+
     /// A missing file is an empty store.
     pub fn load(file: &Path) -> Result<Self, LoadError> {
         match std::fs::read_to_string(file) {
@@ -238,6 +288,18 @@ impl PadStore {
                 store.set(path, PadSettings::from_json(value));
             }
         }
+        // A key belongs to the first path that has it.
+        let mut keys = Vec::new();
+        for settings in store.pads.values_mut() {
+            match settings.shortcut {
+                Some(key) if keys.contains(&key) => settings.shortcut = None,
+                Some(key) => keys.push(key),
+                None => {}
+            }
+        }
+        store
+            .pads
+            .retain(|_, settings| *settings != PadSettings::default());
         Ok(store)
     }
 
@@ -441,8 +503,106 @@ mod tests {
                 volume: 0.8,
                 looping: true,
                 favorite: false,
+                shortcut: None,
             }
         );
+    }
+
+    #[test]
+    fn the_shortcut_is_read_and_left_out_when_none() {
+        assert_eq!(pad(r#""shortcut": "q""#).shortcut, Some('q'));
+        assert_eq!(pad(r#""shortcut": "Q""#).shortcut, Some('q'));
+        assert_eq!(pad(r#""shortcut": "7""#).shortcut, Some('7'));
+        assert_eq!(pad(r#""loop": true"#).shortcut, None);
+        assert_eq!(pad(r#""shortcut": 7, "loop": true"#).shortcut, None);
+        assert_eq!(pad(r#""shortcut": "qw", "loop": true"#).shortcut, None);
+        assert_eq!(pad(r#""shortcut": "", "loop": true"#).shortcut, None);
+        assert_eq!(pad(r#""shortcut": "-", "loop": true"#).shortcut, None);
+
+        let mut store = PadStore::default();
+        let keyed = PadSettings {
+            shortcut: Some('q'),
+            ..Default::default()
+        };
+        store.set("/a.wav", keyed.clone());
+        let looping = PadSettings {
+            looping: true,
+            ..Default::default()
+        };
+        store.set("/b.wav", looping);
+        let text = serde_json::to_string(&File {
+            version: VERSION,
+            pads: &store.pads,
+        })
+        .unwrap();
+        assert_eq!(text.matches("\"shortcut\":\"q\"").count(), 1);
+        assert_eq!(text.matches("shortcut").count(), 1);
+        assert_eq!(parse(&text).get("/a.wav"), keyed);
+    }
+
+    #[test]
+    fn shortcut_keys() {
+        assert_eq!(shortcut_key('q'), Some('q'));
+        assert_eq!(shortcut_key('Q'), Some('q'));
+        assert_eq!(shortcut_key('7'), Some('7'));
+        assert_eq!(shortcut_key('é'), None);
+        assert_eq!(shortcut_key(' '), None);
+        assert_eq!(shortcut_key('-'), None);
+        assert_eq!(shortcut_label('q'), "Q");
+        assert_eq!(shortcut_label('7'), "7");
+    }
+
+    fn keyed(key: char) -> PadSettings {
+        PadSettings {
+            shortcut: Some(key),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_shortcut_is_taken_from_the_others() {
+        let mut store = PadStore::default();
+        assert_eq!(store.shortcut_owner('q'), None);
+        assert!(store.take_shortcut('q', "/a.wav").is_empty());
+
+        store.set("/b.wav", keyed('q'));
+        assert_eq!(store.shortcut_owner('Q'), Some("/b.wav"));
+        assert_eq!(store.take_shortcut('q', "/a.wav"), ["/b.wav"]);
+        assert_eq!(store.shortcut_owner('q'), None);
+        // The entry had nothing else.
+        assert!(store.is_empty());
+
+        store.set("/a.wav", keyed('q'));
+        assert!(store.take_shortcut('q', "/a.wav").is_empty());
+        assert_eq!(store.shortcut_owner('q'), Some("/a.wav"));
+    }
+
+    #[test]
+    fn load_keeps_a_shortcut_unique() {
+        let store = parse(
+            r#"{"version": 1, "pads": {
+                "/c.wav": {"shortcut": "q"},
+                "/a.wav": {"shortcut": "Q", "loop": true},
+                "/b.wav": {"shortcut": "q", "loop": true},
+                "/d.wav": {"shortcut": "w"}
+            }}"#,
+        );
+        assert_eq!(store.get("/a.wav").shortcut, Some('q'));
+        assert_eq!(store.get("/b.wav").shortcut, None);
+        assert!(store.get("/b.wav").looping);
+        assert_eq!(store.get("/d.wav").shortcut, Some('w'));
+        // Nothing is left of an entry that only had the key.
+        assert_eq!(store.pads.len(), 3);
+    }
+
+    #[test]
+    fn rename_carries_the_shortcut() {
+        let mut store = PadStore::default();
+        store.set("/a.wav", keyed('q'));
+        store.set("/b.wav", keyed('w'));
+        assert!(store.rename("/a.wav", "/b.wav"));
+        assert_eq!(store.shortcut_owner('q'), Some("/b.wav"));
+        assert_eq!(store.shortcut_owner('w'), None);
     }
 
     #[test]
@@ -560,6 +720,7 @@ mod tests {
                 volume: 0.25,
                 looping: true,
                 favorite: true,
+                shortcut: Some('q'),
             },
         );
         store.set(

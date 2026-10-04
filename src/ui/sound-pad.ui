@@ -25,6 +25,18 @@
           </object>
         </property>
         <child type="overlay">
+          <object class="GtkLabel" id="shortcut">
+            <property name="halign">start</property>
+            <property name="valign">start</property>
+            <property name="visible">False</property>
+            <property name="can-target">False</property>
+            <property name="accessible-role">presentation</property>
+            <style>
+              <class name="keycap"/>
+            </style>
+          </object>
+        </child>
+        <child type="overlay">
           <object class="GtkBox">
             <property name="spacing">6</property>
             <property name="halign">end</property>

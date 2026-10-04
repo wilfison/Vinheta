@@ -195,12 +195,25 @@ Notes for the next phases:
 - A window with an `AdwBreakpoint` does not know its application while it is being built; `window.rs` uses the default application.
 - Not exercised by the scripted checks, test them by hand: the file chooser of "Add Sounds…", dropping files and folders and the drop highlight, typing in the search and pressing Enter, typing a tab name, both buttons of "Sounds Folder", the controls of the narrow bottom bar, the "Undo" of a removed tab, and the blink with animations turned off in the system.
 
-### Phase 5: shortcuts
+### Phase 5: shortcuts ✅
 
-- ⬜ Local shortcuts first, with the window focused (keys 1 to 9, etc.), as in the mockup.
-- ⬜ Global shortcuts next, through the `GlobalShortcuts` portal (`ashpd` crate).
-- ⬜ With the portal, the user picks the key in the system dialog; the app can only suggest one. The shortcuts page in the preferences has to respect that.
-- ⬜ Test early whether the portal identifies the app by its app ID outside a sandbox.
+- ✅ Local shortcuts first, with the window focused (keys 1 to 9, etc.), as in the mockup.
+- ❌ Global shortcuts next, through the `GlobalShortcuts` portal. Built, then dropped: shortcuts only work while the window has the focus.
+- ❌ With the portal, the user picks the key in the system dialog; the app can only suggest one. The shortcuts page in the preferences has to respect that. Dropped with the item above.
+- ✅ Test early whether the portal identifies the app by its app ID outside a sandbox.
+
+What changed from the original plan:
+
+- A pad key is chosen per pad in its dialog and is unique in the whole library; keys are not given by position. Giving a key to a pad takes it from the pad that had it.
+- Pad keys are letters and digits only, with no modifier. They act like a click (the trigger mode applies), from any tab, and never while a text field, a menu, or a dialog has the keys. A held key triggers once.
+- "Stop All", "Send Sounds to Call", and "Include My Voice" got local accelerators: Ctrl+Shift+S, Ctrl+Shift+L, Ctrl+Shift+M.
+- Global shortcuts were implemented (a portal client over `gio`, a "Shortcuts" group in the preferences, a fake portal for the checks) and then removed by decision of the user, after the first try on the real session failed. The "Shortcuts" group of `mockups/preferences.svg` does not exist.
+- Tooling: `scripts/fixtures.sh` gained `shortcuts.json`, and `scripts/verify-app.sh` presses a pad key.
+
+Notes for the next phases:
+
+- If global shortcuts come back, what was measured on GNOME 50 (xdg-desktop-portal 1.21.1): GTK registers the app ID by itself at startup and ignores the answer; the portal only accepts the ID when a desktop file named after it is installed and its `Exec` program is found (the installed package qualifies, the local prefix does not), and otherwise refuses the session with "An app id is required" unless the launcher has an app scope of its own; the system dialog comes with the suggested keys (`CTRL+SHIFT+s`) filled in; "Add" answers 0 with a text such as "Press <Shift><Control>s" per shortcut, "Cancel" answers 2; an accepted list is granted again with no dialog; `ConfigureShortcuts` is not implemented. A real global key press cannot be simulated on Wayland, so that part is always a manual check.
+- Not exercised by the scripted checks, test them by hand: listening for a pad key with the keyboard only (Tab to the button, Enter, a key, Escape, Backspace), and a keyboard layout where digits need Shift.
 
 ### Phase 6: polish and release
 

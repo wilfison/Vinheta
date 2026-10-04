@@ -46,6 +46,8 @@ mod imp {
         #[template_child]
         pub favorite_icon: TemplateChild<gtk::Image>,
         #[template_child]
+        pub shortcut: TemplateChild<gtk::Label>,
+        #[template_child]
         pub progress: TemplateChild<gtk::Box>,
         #[template_child]
         pub bar: TemplateChild<gtk::ProgressBar>,
@@ -159,7 +161,6 @@ impl SoundPad {
         self.end_blink();
         let Some(sound) = sound else { return };
         imp.described.set(i64::MIN);
-        self.set_tooltip_text(Some(&sound.file_name()));
 
         let handler = sound.connect_notify_local(
             None,
@@ -212,6 +213,20 @@ impl SoundPad {
         imp.label.set_label(&sound.display_name());
         imp.loop_icon.set_visible(sound.looping());
         imp.favorite_icon.set_visible(sound.favorite());
+        let key = sound.shortcut().chars().next().map(pads::shortcut_label);
+        imp.shortcut.set_visible(key.is_some());
+        imp.shortcut.set_label(key.as_deref().unwrap_or_default());
+        let tooltip = match &key {
+            // Translators: the first {} is the file name of a sound, the
+            // second {} is the key that plays it, as in "Applause.wav, key Q".
+            Some(key) => gettext("{}, key {}")
+                .replacen("{}", &sound.file_name(), 1)
+                .replacen("{}", key, 1),
+            None => sound.file_name(),
+        };
+        self.set_tooltip_text(Some(&tooltip));
+        // The description names the key.
+        imp.described.set(i64::MIN);
         let color = sound.color();
         for other in PadColor::ALL {
             if other.name() == color {
@@ -274,8 +289,15 @@ impl SoundPad {
         if imp.described.replace(second) == second {
             return;
         }
+        let key = sound.shortcut().chars().next().map(|key| {
+            // Translators: {} is the key that plays a sound, as in "Key Q".
+            gettext("Key {}").replace("{}", &pads::shortcut_label(key))
+        });
         if !sound.playing() {
-            self.reset_property(gtk::AccessibleProperty::Description);
+            match key {
+                Some(key) => self.update_property(&[gtk::accessible::Property::Description(&key)]),
+                None => self.reset_property(gtk::AccessibleProperty::Description),
+            }
             return;
         }
         let description = if !known {
@@ -289,6 +311,10 @@ impl SoundPad {
         } else {
             // Translators: {} is the elapsed time of a sound, as in "Playing, 00:23".
             gettext("Playing, {}").replace("{}", &pads::format_time(time(elapsed)))
+        };
+        let description = match key {
+            Some(key) => format!("{key}, {description}"),
+            None => description,
         };
         self.update_property(&[gtk::accessible::Property::Description(&description)]);
     }
