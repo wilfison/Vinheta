@@ -50,6 +50,7 @@ Every technical claim in the PRD must have been checked, not remembered. Use `Ba
 - Confirm that the API exists in the version in use: the crate feature in `Cargo.toml` and in the crate source under `~/.cargo/registry` or `build/cargo-home`, the symbol in the installed library (`pkg-config --modversion`, `strings`), the GStreamer element (`gst-inspect-1.0 --exists`) and the package that ships it (`dpkg -S`).
 - Check that the minimum version in `debian/control` covers what the phase uses.
 - Run `scripts/check.sh --all` (several minutes; run it in the background while writing) and record the starting state under "Technical Considerations". If something already fails before the phase, the first story fixes it.
+- Check each interface story against the states the app already has (audio unavailable, an empty folder, a missing folder): a rule of an earlier phase, such as pads being disabled without audio, can make a new criterion impossible.
 - Test cheap hypotheses on the spot (an environment variable, an action over D-Bus, a screenshot of the current app) instead of writing them down as facts.
 - For a PipeWire or WirePlumber behavior, try it with the command line tools before designing on top of it: a silent file played with `gst-launch-1.0 ... ! pipewiresink`, a fake device from `create_node` in `scripts/audio-poc-common.sh`, then `pw-link -l`, `pw-metadata`, and `pw-cli destroy`. Name the test nodes without the `vinheta` prefix, and destroy them. `docs/audio-poc.md` has the findings so far; read it first.
 - A claim about a crate API that the design depends on is worth a throwaway program in the scratchpad when reading the source is not enough.
@@ -113,8 +114,9 @@ There is no browser and no Playwright here. Every story ends with the criterion 
 
 When writing a "Screenshot check", say how the state is reached. The tools of `scripts/screenshot.sh`:
 
-- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--pads FILE` gives the app a `pads.json` (the pad settings) to start with; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--right-click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
-- `--capture NAME` takes a picture in the middle of the sequence and `--crop WxH+X+Y` crops the ones that follow, so one run can check several states.
+- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--pads FILE` gives the app a `pads.json` (the pad settings) to start with; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--right-click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, `--restart` (quits and starts the app again, to check what is restored), and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
+- `--capture NAME` takes a picture in the middle of the sequence and `--crop WxH+X+Y` crops the ones that follow, so one run can check several states; `--sheet` stacks them in one picture.
+- `scripts/fixtures.sh` creates the sound folders and pad settings for these checks in `tmp/fixtures`. Name its paths in the criteria instead of describing a fixture to build.
 - `--fake-mic 'NODE DESCRIPTION'` and `--fake-sink 'NODE DESCRIPTION'` create a fake device before the app starts; the steps `--plug-mic`, `--plug-sink`, and `--unplug NODE` do it while the app runs. Use them whenever a criterion names a device: the real device list differs between machines.
 - Dialogs opened by an action and open popovers (menus, drop-downs) are captured.
 - A state stored in GSettings is reached with `--setting`. A new state that can only be reached by a click that is hard to place deserves an action (`app.*` or `win.*`) in the story itself; actions also serve the shortcuts.
@@ -129,6 +131,8 @@ Limits the PRD must respect (do not write criteria that depend on them):
 - Real clicks on a list entry, drags, and typing are not simulated reliably. Write the criterion on the state (the setting, the action) and mark the gesture for manual testing.
 - Screenshots go to `tmp/screenshots/` and are deleted at the end of the story.
 - The audio harness only uses fake devices; nothing in it needs a person listening. A test on a real call is always optional.
+- A harness criterion with a new sound or a new level is rehearsed before its numbers are written: the recorders are ready 0.2 to 0.3 seconds after the subject starts (a sound with no silence at its start needs `--start-after 1`), and a tone below -40 dBFS in the recording has no onset for `window` and `after` (a gain of 0.1 puts the test tone at -50).
+- A screenshot criterion that names times must count the half second the script waits after each step and the time a capture takes.
 
 ### Closing story
 

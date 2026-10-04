@@ -57,16 +57,18 @@ build/install/bin/vinheta
 Run `scripts/check.sh` before committing. It prints one `PASS` or `FAIL` line per check and keeps the logs in `tmp/check/`.
 
 ```sh
-scripts/check.sh           # clippy without warnings, a single glib version, no em dash, meson test
-scripts/check.sh --audio   # plus the audio engine harness (fake devices, about 1 minute)
+scripts/check.sh           # rustfmt, clippy without warnings, a single glib version, no em dash, meson test
+scripts/check.sh --audio   # plus the audio engine harness (fake devices, about 4 minutes)
 scripts/check.sh --app     # plus scripts/verify-app.sh on the installed app
 scripts/check.sh --deb     # plus the package build
 scripts/check.sh --all
 ```
 
 - `scripts/verify-app.sh` checks the installed app end to end on a virtual display: the virtual microphone, playing and stopping through actions and through real clicks, the "Send sounds to call" switch and the call volume measured on a recording, the voice switch, the monitor output (with a fake sink), the pad volume and loop, the trigger modes, the saved pad settings, and the cleanup on exit. It uses the real PipeWire and plays a quiet tone on the default output for a few seconds. The levels are measured with the voice off, because a noisy real microphone hides the tone.
+- `scripts/check.sh --all` takes more than 10 minutes. An agent whose commands time out before that runs it in the background and reads `tmp/check/` or its output when it ends.
+- The code is formatted with `cargo fmt` (default settings); the check fails when it would change something.
 - `scripts/build-deb.sh` builds the package from a copy under `tmp/deb`, so nothing is written to the working tree or to its parent directory.
-- `scripts/dev-common.sh` holds what these scripts share (the local prefix environment, the virtual session, test sounds). New development scripts should source it (from bash: under zsh it computes the wrong root).
+- `scripts/dev-common.sh` holds what these scripts share (the local prefix environment, the virtual session, test sounds). New development scripts should source it from bash (it refuses any other shell, where it would compute the wrong root).
 - Scripted checks never touch the user's settings or pad settings: `virtual_session` points `XDG_CONFIG_HOME` at its own directory and `XDG_DATA_HOME` at the `data` directory inside it.
 
 ### Checking the interface
@@ -78,11 +80,13 @@ meson install -C build
 scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.wav'"
 ```
 
-- It writes `tmp/screenshots/NAME.png`. Screenshots are temporary: read them, then delete them.
+- It writes `tmp/screenshots/NAME.png`. Screenshots are temporary: read them, then delete them (`scripts/screenshot.sh --clean`).
+- `scripts/fixtures.sh` creates the folders these checks use in `tmp/fixtures` and prints them: `Fixture` (three silent pads), `Palette` with `palette.json` (one pad per color), `Loop` with `loop.json` (a 3 second pad that loops), and `dialog.json` (one pad with every setting).
 - `--folder` fills the library, `--setting 'KEY VALUE'` sets any other key of the app's settings before it starts (`VALUE` is a GVariant: `0.5`, `false`, `"'name'"`), `--no-audio` makes the engine fail to start, `--light` uses the light style.
 - `--pads FILE` gives the app a pad settings file to start with: `{"version": 1, "pads": {"/abs/sound.wav": {"name": "Intro", "color": "purple", "volume": 0.8, "loop": true}}}`. The one the app wrote during the run stays in `tmp/screenshot-config/data/vinheta/pads.json`.
-- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y`, `--right-click X,Y`, and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits, `--exec COMMAND` runs a shell command.
-- One run can take several pictures: the step `--capture NAME` writes `tmp/screenshots/NAME.png` at that point, and `--crop WxH+X+Y` crops the captures that follow (`--crop full` undoes it). Prefer that to starting the app once per state.
+- Steps run in the given order before the capture: `--action` activates an `app.*` or `win.*` action, `--click X,Y`, `--right-click X,Y`, and `--key KEYS` simulate the user (`xdotool`), `--size W,H` resizes the window, `--wait SECONDS` waits, `--restart` quits the app and starts it again with the same settings (to check what is restored), `--exec COMMAND` runs a shell command (a status other than 0 is reported as a failed step).
+- One run can take several pictures: the step `--capture NAME` writes `tmp/screenshots/NAME.png` at that point, and `--crop WxH+X+Y` crops the captures that follow (`--crop full` undoes it). Prefer that to starting the app once per state. `--sheet` also writes `NAME-sheet.png`, every capture of the run stacked, to review them in one look.
+- Warnings and criticals logged by the app are printed at the end of the run; treat them as findings. `--debug` also prints the app's debug messages (for example how long starting a sound took).
 - Dialogs opened by an action (`--action preferences`) and open popovers are captured.
 - The device lists come from the real PipeWire, so they differ between machines. For a known entry use a fake device: `--fake-mic 'NODE DESCRIPTION'` and `--fake-sink 'NODE DESCRIPTION'` create one before the app starts, the steps `--plug-mic`, `--plug-sink`, and `--unplug NODE` do it while the app runs. Name the nodes `vinheta-shot-*`. The script destroys them when it ends.
 - Portal dialogs (the folder chooser) do not work on the virtual display and cannot be captured; test them by hand.
@@ -151,7 +155,7 @@ Audio behavior that is easy to get wrong (details in `docs/audio-poc.md`):
 - The monitor branch is routed by WirePlumber. A new playback gets the chosen output as `target-object`; a running one is moved by writing `target.object` for its stream (node name `vinheta-monitor-*`) in the default metadata. The system default is asked for with the value `-1`: removing the key would leave the target the stream was created with.
 - A chosen device that does not exist is not an error to recover from in the interface. For the monitor, WirePlumber uses the default sink and moves the stream when the device shows up. For the microphone, `graph.rs` reports `MicNotFound` once, links the default source, and links the chosen one when it appears.
 - `Event::DevicesChanged` is only sent when a list really changed, and never lists the "Vinheta" node.
-- After changing audio code, run `scripts/verify-audio-poc.sh rust`. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`. In a new check, place the measurements with `after FILE SECONDS [MARGIN]` (an action scheduled `SECONDS` into the playback) instead of hand-computed offsets. A sound with no silence at its start needs `--start-after 1`, so the recorders are ready, and `window` instead of `after`. A real device unplugged during the run is reported as a `NOTE`, not as a failure.
+- After changing audio code, run `scripts/verify-audio-poc.sh rust`. While working on one behavior, `--only REGEX` runs only the sections whose title matches (`--list` prints the titles); run all of it before committing. It uses fake devices only (no real microphone or headphones) and needs `ffmpeg` and `python3`. In a new check, place the measurements with `after FILE SECONDS [MARGIN]` (an action scheduled `SECONDS` into the playback) instead of hand-computed offsets. A sound with no silence at its start needs `--start-after 1`, so the recorders are ready, and `window` instead of `after`. `window` fails the run when it finds no onset: the tone must reach -40 dBFS in the recording, which a gain of 0.1 does not. A real device unplugged during the run is reported as a `NOTE`, not as a failure.
 
 GObject conventions used here: each type has a `mod imp` holding the state struct and the subclass `impl`s, plus a public `glib::wrapper!`. UI is declared in XML (`.ui`), not built in code.
 
