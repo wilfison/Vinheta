@@ -17,6 +17,10 @@ if command -v asdf >/dev/null && [ -z "${ASDF_RUST_VERSION:-}" ]; then
     ASDF_RUST_VERSION=$(rustc --version | cut -d' ' -f2)
     export ASDF_RUST_VERSION
 fi
+# The shim also looks for the installs under HOME.
+if command -v asdf >/dev/null && [ -z "${ASDF_DATA_DIR:-}" ]; then
+    export ASDF_DATA_DIR="$HOME/.asdf"
+fi
 
 if ! (cd "$work/vinheta" && dpkg-buildpackage -us -uc -b) >"$work/build.log" 2>&1; then
     tail -n 30 "$work/build.log" >&2
