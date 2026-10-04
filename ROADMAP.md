@@ -122,21 +122,44 @@ What changed from the original plan:
 Notes for the next phases:
 
 - A volume change is heard within 200 ms and does not touch the other branch (measured by the harness).
-- Phase 3 (per-pad volume) can multiply into the same `volume` elements, or add one before the `tee`.
+- Phase 3 (per-pad volume) can multiply into the same `volume` elements, or add one before the `tee` (it multiplies: before the `tee` a change is heard a queue late).
 - Phase 4: the bottom bar needs an adaptive layout before the window can be narrow again.
 - Phase 5: consider a shortcut for "Include My Voice".
 - Phase 6: show which device is really in use behind "System Default" or an unavailable choice. The engine reports the linked microphone (`MicLinked`) but not the default output. The label of an unavailable device is ellipsized in the preferences rows, which can hide the "(unavailable)" part.
 - A noisy real microphone hides quiet test tones on the virtual microphone; turn the voice off before measuring.
 - Dragging a slider with the mouse and switching between two real outputs were not exercised by the scripted checks; test them by hand.
 
-### Phase 3: per-pad features
+### Phase 3: per-pad features ✅
 
-- ⬜ Loop, fade in/out, individual volume.
-- ⬜ Editable color and name.
-- ⬜ Elapsed and remaining time, and a highlighted border while playing.
-- ⬜ Indicator of how many sounds are playing.
-- ⬜ Trigger mode: overlap, restart, or stop the others. Overlap is what the engine does today (one pipeline per sound).
-- ⬜ JSON file for per-pad metadata.
+- ✅ Loop, individual volume, and a global "Fade Out on Stop" (fade in and per-pad fades were dropped, see below).
+- ✅ Editable color and name, from a context menu on the pad and a dialog.
+- ✅ Elapsed and remaining time, a progress bar, and a highlighted border while playing.
+- ✅ Indicator of how many sounds are playing.
+- ✅ Trigger mode: overlap, restart, or stop the others, in the new "Playback" group of the preferences.
+- ✅ JSON file for per-pad metadata (`pads.json` in the user's data directory).
+
+What changed from the original plan:
+
+- No fade in and no fade per pad: only the global "Fade Out on Stop" of the mockup (300 ms, on by default). A restart does not fade.
+- Times are shown only while a pad plays. Idle pads show no duration, since durations are only known from a running pipeline.
+- The color comes from a fixed palette of seven colors plus "no color", stored by name. No free color picker.
+- The pad volume goes from 0% to 100% (no amplification), stored as a slider position with the same cubic curve as the bottom bar. It multiplies into the two branch `volume` elements; nothing was added before the `tee`, where a change is heard a queue late.
+- The trigger mode is one global setting, not a per-pad one. "Stop" is always in the context menu, since in the "Restart" mode a click no longer stops a pad.
+- The queues of the pipeline went from 1 second to 200 ms, so that a loop turned off ends with the pass being heard (unless less than about 350 ms of it remain).
+- Every playback runs in segment mode. WAV and Ogg Vorbis loop without a gap; MP3 loops have a gap of 20 to 30 ms at each seam (decoder padding).
+- Without audio the pads are dimmed but still open their menu, instead of being insensitive.
+- The package now asks for GTK 4.20: the dark style overrides of the palette use a CSS media query.
+- Tooling: scripted checks use their own data directory, `scripts/screenshot.sh` gained `--pads` and `--right-click`, `vinheta-audio-poc` gained the options for the new engine calls and `--start-after`.
+
+Notes for the next phases:
+
+- Metadata is keyed by the absolute path of the file, so a renamed or moved file loses it. Phase 4 (file monitor) should follow renames.
+- Phase 4: if the default sounds folder goes into the same data directory (`~/.local/share/vinheta`), it must not collide with `pads.json` and `pads.json.corrupt`.
+- Phase 4: durations on idle pads, if still wanted, need a scan of the folder (for example with `GstDiscoverer`).
+- Phase 5: the per-pad shortcut is one more field of the pad entry in the file (unknown fields are ignored by older versions, and the file has a `version`).
+- Phase 6: a corrupt `pads.json` is only set aside and logged; tell the user.
+- Typing a name, clicking a swatch, dragging the pad volume while the sound plays, the long press, the Menu key, and picking an entry of the trigger mode row were not exercised by the scripted checks; test them by hand.
+- The real call test of Phase 0 is still pending. Loops and long background sounds make its noise suppression part more relevant.
 
 ### Phase 4: organization
 

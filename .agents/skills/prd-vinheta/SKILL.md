@@ -113,7 +113,7 @@ There is no browser and no Playwright here. Every story ends with the criterion 
 
 When writing a "Screenshot check", say how the state is reached. The tools of `scripts/screenshot.sh`:
 
-- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
+- `--folder DIR` fills the library; `--setting 'KEY VALUE'` sets any other GSettings key before the app starts; `--pads FILE` gives the app a `pads.json` (the pad settings) to start with; `--action` activates `app.*` and `win.*` actions; `--click X,Y`, `--right-click X,Y`, `--key KEYS`, `--size W,H`, `--wait SECONDS`, and `--exec COMMAND` run in the given order; `--no-audio` takes the engine down; `--light` switches the style.
 - `--capture NAME` takes a picture in the middle of the sequence and `--crop WxH+X+Y` crops the ones that follow, so one run can check several states.
 - `--fake-mic 'NODE DESCRIPTION'` and `--fake-sink 'NODE DESCRIPTION'` create a fake device before the app starts; the steps `--plug-mic`, `--plug-sink`, and `--unplug NODE` do it while the app runs. Use them whenever a criterion names a device: the real device list differs between machines.
 - Dialogs opened by an action and open popovers (menus, drop-downs) are captured.

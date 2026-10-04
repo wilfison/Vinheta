@@ -109,9 +109,24 @@ uridecodebin ! audioconvert ! audioresample ! tee name=t
 ```
 
 - Each branch has its own `queue` and `volume`. Setting one volume to 0 silences only that branch.
+- Since Phase 3 the queues hold 200 ms (`max-size-time`, with the buffer and byte limits off) instead of the default second, and the gain of each `volume` element is a product: branch × playback × fade.
 - Both sinks set `state.restore-props=false`. Without it WirePlumber applies whatever volume it saved for an earlier stream of the same application, which made levels unpredictable during the tests.
 - The microphone is linked to the node, not to the pipeline, so it never reaches the monitor branch.
 - One pipeline per sound. Starting a second one while the first is playing works and both are mixed by PipeWire, but overlapping playback has not been verified beyond that.
+
+## Gain per playback, loop, restart, and fade (Phase 3)
+
+Measured on 2026-10-03 with throwaway programs of the same pipeline shape, then checked on the real engine by the harness.
+
+- **Where a gain goes.** A `volume` element before the `tee` is heard about 1 second after it is changed, because the queue of each branch is always full (the decoder is faster than the sink). The same change on the elements after the queues is heard within 100 ms. So the gain of a playback and the fade multiply into the two branch elements, and `player.rs` keeps the factors.
+- **Gapless loop.** After the preroll the pipeline gets a flushing seek to 0 with the `SEGMENT` flag; at the end of the file it then posts `SEGMENT_DONE` instead of `EOS`, and a non-flushing `SEGMENT` seek to 0 starts the next pass. A 1 second WAV tone loops with no 10 ms window below -50 dBFS at the seams. Ogg Vorbis showed one 20 ms gap at the first seam in about half of the runs, and MP3 a gap of 20 to 30 ms at every seam (decoder padding); both are accepted. A flushing seek on `EOS` instead leaves gaps of 10 to 40 ms and is not used.
+- **Every playback is in segment mode**, so the loop can be switched while it plays. The cost at the start is about 5 ms. `play` only sets `PAUSED`; the bus handler issues the seek on the first `ASYNC_DONE` and sets `PLAYING` on the second.
+- **Ending.** A pipeline in segment mode never posts `EOS` by itself, and an EOS event sent to the pipeline is not enough. An EOS event pushed into the sink pad of the `tee` on `SEGMENT_DONE` ends it after the last sample.
+- **`SEGMENT_DONE` comes early**: when the source has read the file, which is one queue before the end is heard. With 200 ms queues that is 280 to 360 ms, so a loop turned off ends with the pass being heard unless it is in its last 350 ms or so.
+- **Seeks from the bus handler** go through `pipeline.call_async`: the sync handler runs on a streaming thread, which must not seek or change the state of its own pipeline. A queued action is skipped once the playback was retired, so it cannot revive a stopped pipeline.
+- **Restart** is a flushing seek to 0 on the playing pipeline: a gap of about 50 ms, the same streams and links.
+- **Position.** `query_position` and `query_duration` on the pipeline; the position starts again on each pass.
+- **Fade out.** A thread of the engine steps the gain of both branch elements every 10 ms. The artifacts of the steps are 58 dB below the tone (64 dB for a sample-accurate ramp), so no controller is used. The sinks still hold 60 to 80 ms when the ramp ends: setting `Null` right away cuts the ramp about 13 dB down, so the pipeline stays silent for 150 ms first. A fading playback is already out of the map of playbacks, which is what keeps it from reporting events.
 
 ## Branch offset
 
@@ -162,6 +177,11 @@ cargo run --features audio-poc --bin vinheta-audio-poc -- [OPTIONS] [FILE...]
 - `--no-voice`: starts without the microphone link. `--voice-off-after SECONDS`, `--voice-on-after SECONDS`: remove and restore it.
 - `--mic-after SECONDS NODE_NAME`, `--monitor-after SECONDS NODE_NAME`: switch the microphone and the monitor output; the name `default` follows the system default.
 - `--replay-after SECONDS`: plays the files again.
+- `--volume GAIN`: the gain of every file (0 to 1). `--playback-volume-after SECONDS GAIN`: changes the gain of the first file.
+- `--loop`: every file loops. `--loop-off-after SECONDS`: ends the loop of the first file. `--restart-after SECONDS`: starts the first file again.
+- `--position-after SECONDS`: prints `position ELAPSED_MS DURATION_MS` for the first file (`unknown` for a missing duration, `position none` when it is over).
+- `--fade-out SECONDS`: how long a stopped file takes to fade out (0 by default).
+- `--start-after SECONDS`: waits before the first playback, so the recorders of the harness are ready for a sound with no silence at its start.
 - The device lists are printed after the start and whenever they change (`devices changed`, then `microphone: NAME (DESCRIPTION)` and `output: NAME (DESCRIPTION)` lines).
 - `--mic`, `--monitor`, `--call-volume`, `--monitor-volume`: same meaning as in the script.
 - `--version`: prints the PipeWire and GStreamer library versions.
@@ -182,6 +202,13 @@ It never uses the real microphone or headphones. A fake microphone (a mono virtu
 - (Rust only) muting the call branch silences the sound in the call recording only, keeps the voice there, and unmuting brings the sound back,
 - (Rust only) with `--no-call` the sound never reaches the call recording,
 - (Rust only) a gain of 0.1 on one branch lowers it by 20 dB within 200 ms and leaves the other branch and the voice alone,
+- (Rust only) a stop without a fade is silent 150 ms later,
+- (Rust only) a playback gain raised from 0.1 to 1 raises both branches by 20 dB within 200 ms and leaves the voice alone, and a branch volume change keeps the playback gain,
+- (Rust only) a looping 1 second tone is still there in its third pass with no silence longer than 15 ms at the seams (voice off, so silence means a gap), and reports no end,
+- (Rust only) a loop turned off in the second pass ends after two passes, with one "finished" line and exit status 0,
+- (Rust only) a restart goes back to the silence at the start of the file and plays again, with the voice untouched,
+- (Rust only) the position 2 seconds in and the duration of the file are reported,
+- (Rust only) a stop with a fade of 0.3 s is 1 to 15 dB down 100 to 200 ms later and silent after 600 ms, and reports no end; an exit in the middle of a 2 second fade leaves nothing behind,
 - (Rust only) the device lists name the fake devices, never the virtual microphone, and follow a sink that is created and destroyed,
 - (Rust only) turning the voice off removes it from the call recording and keeps the sound, and `--no-voice` starts that way,
 - (Rust only) switching to a second fake microphone (880 Hz) replaces the voice in the call recording,
