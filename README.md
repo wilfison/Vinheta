@@ -2,7 +2,7 @@
 
 A soundboard for GNOME that plays sounds into your calls.
 
-![The main window of Vinheta](data/screenshots/main.png)
+![Vinheta, a soundboard for GNOME that plays sounds into your calls](data/screenshots/preview.png)
 
 Add your folders of sounds, and each one becomes a tab with a pad per sound. Click a pad, or press its key, to play it. While Vinheta runs it provides a virtual microphone named "Vinheta" that carries your voice together with the sounds, so the other side of a call hears both, and you hear the sounds on your own headphones.
 
