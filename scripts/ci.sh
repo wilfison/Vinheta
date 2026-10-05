@@ -4,13 +4,21 @@
 # It installs packages, so it is not meant for a developer machine: use
 # scripts/ci-container.sh there.
 # --lintian also runs lintian on the package and fails on an error.
+# --setup stops after installing and configuring: the workflow runs each check
+# as a step of its own.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
-lintian=
-[ "${1:-}" = --lintian ] && lintian=lintian
+lintian= setup=
+for arg in "$@"; do
+    case $arg in
+        --lintian) lintian=lintian ;;
+        --setup) setup=1 ;;
+        *) echo "usage: ci.sh [--lintian] [--setup]" >&2; exit 2 ;;
+    esac
+done
 
 sudo=
 [ "$(id -u)" -eq 0 ] || sudo=sudo
@@ -27,9 +35,12 @@ $sudo apt-get build-dep -y ./
 # The Rust of the distribution, also where the image ships a newer one: the
 # same compiler a user who rebuilds the package gets.
 export PATH="/usr/bin:$PATH"
+# And for the next steps of the workflow.
+[ -z "${GITHUB_PATH:-}" ] || echo /usr/bin >>"$GITHUB_PATH"
 cargo --version
 
 [ -d build ] || meson setup build --prefix="$root/build/install"
+[ -z "$setup" ] || exit 0
 scripts/check.sh --deb
 
 deb=$(ls tmp/deb/vinheta_*.deb)

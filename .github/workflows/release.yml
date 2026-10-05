@@ -11,21 +11,22 @@ on:
         default: ""
 
 permissions:
-  contents: write
-  # To cancel the CI of the tagged commit.
-  actions: write
+  contents: read
+
+env:
+  TAG: ${{ inputs.ref || github.ref_name }}
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-26.04
-    env:
-      TAG: ${{ inputs.ref || github.ref_name }}
+    permissions:
+      contents: read
+      # To cancel the CI of the tagged commit.
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.ref }}
-          # The earlier tags, for the "Full diff" link of the notes.
-          fetch-depth: 0
 
       # The release runs the CI gate itself, so the CI of the same commit (main
       # pushed together with the tag) would only repeat it.
@@ -40,9 +41,31 @@ jobs:
       - name: The tag matches the version
         run: scripts/version.sh "$TAG"
 
-      # The full CI gate again, so a tag never ships what main would reject.
-      - name: Checks and package (scripts/check.sh --deb)
-        run: scripts/ci.sh
+  # The full CI gate again, so a tag never ships what main would reject. It
+  # also builds the package that the release publishes.
+  ci:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.ref || github.ref }}
+
+  release:
+    needs: ci
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          # The earlier tags, for the "Full diff" link of the notes.
+          fetch-depth: 0
+
+      - name: Get the package
+        uses: actions/download-artifact@v4
+        with:
+          name: vinheta-deb
+          path: tmp/deb
 
       - name: Create or update the GitHub release
         env:

@@ -142,7 +142,7 @@ Limits the PRD must respect (do not write criteria that depend on them):
 - A level is measured on what a fake call app records from a silent fake microphone (`call_app` and `call_level` of `scripts/verify-app.sh`), with `call-target` set to that app. Every app as the target would reach the real apps that are recording: check that case on the links, with the call volume at 0.
 - Real clicks on a list entry, drags, and typing are not simulated reliably. Write the criterion on the state (the setting, the action) and mark the gesture for manual testing.
 - Screenshots go to `tmp/screenshots/` and are deleted at the end of the story.
-- The CI (GitHub Actions, `scripts/ci.sh`) only runs `scripts/check.sh --deb`: it has no PipeWire session and no display, so the audio harness and `scripts/verify-app.sh` stay local.
+- The CI (GitHub Actions, `.github/workflows/ci.yml`) only runs the checks of `scripts/check.sh --deb`: it has no PipeWire session and no display, so the audio harness and `scripts/verify-app.sh` stay local.
 - The audio harness only uses fake devices; nothing in it needs a person listening. A test on a real call is always optional.
 - A harness criterion with a new sound or a new level is rehearsed before its numbers are written: the recorders are ready 0.2 to 0.3 seconds after the subject starts (a sound with no silence at its start needs `--start-after 1`), and a tone below -40 dBFS in the recording has no onset for `window` and `after` (a gain of 0.1 puts the test tone at -50).
 - A screenshot criterion that names times must count the half second the script waits after each step and the time a capture takes.

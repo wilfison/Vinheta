@@ -4,17 +4,70 @@ on:
   pull_request:
   push:
     branches: [main]
+  # The release runs the same gate on the tag.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
+# Each check of scripts/check.sh is a step, so the page of a run shows what
+# passed and what is left. A check added to check.sh needs its step here.
 jobs:
-  check:
+  checks:
     # The package needs GTK 4.20 and libadwaita 1.8, which Ubuntu 24.04
     # (ubuntu-latest) does not have.
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
-      - name: Checks and package (scripts/check.sh --deb)
-        run: scripts/ci.sh
+      - name: Install the build dependencies
+        run: scripts/ci.sh --setup
+
+      - name: rustfmt has nothing to change
+        run: scripts/check.sh --only '^rustfmt has nothing to change$'
+
+      - name: clippy without warnings
+        run: scripts/check.sh --only '^clippy without warnings$'
+
+      - name: a single glib version
+        run: scripts/check.sh --only '^a single glib version$'
+
+      - name: no em dash
+        run: scripts/check.sh --only '^no em dash in (tracked|new) files$'
+
+      - name: one version everywhere
+        run: scripts/check.sh --only '^one version everywhere$'
+
+      - name: translations are complete
+        run: scripts/check.sh --only '^translations are complete$'
+
+      - name: meson test
+        run: scripts/check.sh --only '^meson test$'
+
+  # A job of its own, so it builds while the checks run.
+  package:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install the build dependencies
+        run: scripts/ci.sh --setup
+
+      - name: debian package
+        run: scripts/check.sh --deb --only '^debian package$'
+
+      - name: Keep the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinheta-deb
+          path: tmp/deb/vinheta_*.deb
+          if-no-files-found: error
+          retention-days: 14

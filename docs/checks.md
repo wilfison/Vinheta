@@ -9,6 +9,7 @@ scripts/check.sh --app     # plus scripts/verify-app.sh on the installed app
 scripts/check.sh --deb     # plus the package build (in the background, while the other checks run)
 scripts/check.sh --all
 scripts/check.sh --all --force   # runs the audio harness even when nothing it tests changed
+scripts/check.sh --only REGEX    # only the checks whose label matches (fails when none does)
 ```
 
 - `scripts/verify-app.sh` checks the installed app end to end on a virtual display: playing and stopping through actions and through real clicks, the "Send sounds to call" switch and the call volume measured on what a fake call app records, the app the sounds are sent to, the monitor output (with a fake sink), the pad volume and loop, the trigger modes, a file removed while it plays, the settings of a renamed file, the saved pad settings, a pad key pressed for real, audio coming back after "Try Again", and the cleanup on exit. It uses the real PipeWire and plays a quiet tone on the default output for a few seconds. The fake call app is a `pw-record` of a silent fake microphone, and `call-target` is set to it, so no real app and no real microphone takes part. "Try Again" is reached with a private PipeWire instance that is started after the app.
@@ -18,7 +19,7 @@ scripts/check.sh --all --force   # runs the audio harness even when nothing it t
 - The code is formatted with `cargo fmt` (default settings); the check fails when it would change something.
 - `scripts/build-deb.sh` builds the package from a copy under `tmp/deb`, so nothing is written to the working tree or to its parent directory.
 - `scripts/version.sh` prints the version when its four places agree (see [packaging.md](packaging.md)), and `scripts/check-translations.sh` fails when a file with strings is missing from `po/POTFILES.in`, when a `gettext` call of a `.rs` file did not reach the template, or when a language of `po/LINGUAS` is incomplete. Both are checks of `scripts/check.sh`.
-- `scripts/ci.sh` is what GitHub Actions runs (`scripts/check.sh --deb`), and `scripts/ci-container.sh` rehearses it in a clean container: see [packaging.md](packaging.md). The audio and app checks need a PipeWire session and a display, so they never run on the CI.
+- GitHub Actions runs the checks of `scripts/check.sh --deb` as steps of their own (`scripts/check.sh --only LABEL`), after `scripts/ci.sh --setup`, and `scripts/ci-container.sh` rehearses the whole gate in a clean container: see [packaging.md](packaging.md). A check added to `scripts/check.sh` needs its step in `.github/workflows/ci.yml`. The audio and app checks need a PipeWire session and a display, so they never run on the CI.
 - `scripts/dev-common.sh` holds what these scripts share (the local prefix environment, the virtual session, test sounds). New development scripts should source it from bash (it refuses any other shell, where it would compute the wrong root).
 - Scripted checks never touch the user's settings or pad settings: `virtual_session` points `XDG_CONFIG_HOME` at its own directory and `XDG_DATA_HOME` at the `data` directory inside it.
 

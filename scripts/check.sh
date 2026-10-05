@@ -6,7 +6,7 @@ set -uo pipefail
 
 usage() {
     cat >&2 <<'USAGE'
-usage: check.sh [--audio] [--app] [--deb] [--all] [--force]
+usage: check.sh [--audio] [--app] [--deb] [--all] [--force] [--only REGEX]
 
 Always: rustfmt, clippy without warnings, a single glib version, no em dash,
 one version everywhere (scripts/version.sh), complete translations
@@ -20,27 +20,38 @@ schema, Rust tests).
          while the other checks run
 --all    all of the above
 --force  runs the audio harness even when nothing it tests changed
+--only   runs only the checks whose label matches REGEX (one step of the CI
+         each), and fails when none does
 USAGE
     exit 2
 }
 
-audio= app= deb= force=
-for arg in "$@"; do
-    case $arg in
+audio= app= deb= force= only=
+while [ $# -gt 0 ]; do
+    case $1 in
         --audio) audio=1 ;;
         --app) app=1 ;;
         --deb) deb=1 ;;
         --all) audio=1 app=1 deb=1 ;;
         --force) force=1 ;;
+        --only) [ $# -ge 2 ] || usage; only=$2; shift ;;
         *) usage ;;
     esac
+    shift
 done
 
 cd "$root" || exit 1
 mkdir -p tmp/check
 failures=0
+matched=0
 
 log_of() { echo "tmp/check/$(echo "$1" | tr -c 'a-z0-9\n' '-').log"; }
+
+# wanted LABEL: whether --only selects the check, counted for the final test.
+wanted() {
+    [ -z "$only" ] || [[ $1 =~ $only ]] || return 1
+    matched=$((matched + 1))
+}
 
 # report LABEL STATUS, and returns STATUS.
 report() {
@@ -58,6 +69,7 @@ report() {
 run() {
     local label=$1
     shift
+    wanted "$label" || return 0
     "$@" >"$(log_of "$label")" 2>&1
     report "$label" $?
 }
@@ -69,10 +81,12 @@ declare -A started
 start() {
     local label=$1
     shift
+    wanted "$label" || return 0
     setsid "$@" >"$(log_of "$label")" 2>&1 &
     started[$label]=$!
 }
 finish() {
+    [ -n "${started[$1]+set}" ] || return 0
     wait "${started[$1]}"
     report "$1" $?
     unset "started[$1]"
@@ -101,6 +115,7 @@ audio_inputs() {
 # it is skipped when those inputs are the ones of its last pass.
 audio_harness() {
     local passed=tmp/check/audio-harness.passed fingerprint
+    wanted "audio engine harness" || return 0
     fingerprint=$(audio_inputs 2>&1 | sha256sum | cut -d' ' -f1)
     if [ -z "$force" ] && [ "$(cat "$passed" 2>/dev/null)" = "$fingerprint" ]; then
         echo "SKIP audio engine harness (nothing it tests changed since it passed, --force runs it)"
@@ -142,6 +157,10 @@ if [ -n "$app" ]; then
 fi
 [ -n "$deb" ] && finish "debian package"
 
+if [ -n "$only" ] && [ "$matched" -eq 0 ]; then
+    echo "no check matches --only $only" >&2
+    exit 2
+fi
 if [ "$failures" -eq 0 ]; then
     echo "ALL CHECKS PASSED"
 else
