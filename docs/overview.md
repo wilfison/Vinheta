@@ -1,6 +1,6 @@
 # Overview
 
-Vinheta is a soundboard for GNOME: Rust, GTK4 + libadwaita, PipeWire, and GStreamer. It is distributed as a `.deb` package for Ubuntu 26.04 and is not sandboxed. The current version is 1.0.0.
+Vinheta is a soundboard for GNOME: Rust, GTK4 + libadwaita, PipeWire, and GStreamer. It is distributed as a `.deb` package for Ubuntu 26.04 and is not sandboxed.
 
 The hard part of the app is the audio, not the interface: see [audio.md](audio.md).
 
