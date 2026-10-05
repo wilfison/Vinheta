@@ -290,6 +290,14 @@ pub fn slider_gain(position: f64) -> f64 {
     position.clamp(0.0, 1.0).powi(3)
 }
 
+/// How long to wait before starting an engine again after `attempt` failed
+/// starts in a row: 1 s, doubling, at most 30 s.
+pub fn retry_delay(attempt: u32) -> Duration {
+    const LONGEST: u64 = 30;
+    let seconds = 1u64.checked_shl(attempt).unwrap_or(LONGEST);
+    Duration::from_secs(seconds.min(LONGEST))
+}
+
 impl Drop for AudioEngine {
     fn drop(&mut self) {
         self.player.shutdown();

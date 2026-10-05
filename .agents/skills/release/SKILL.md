@@ -112,6 +112,10 @@ edit it; the commit log is the raw material, not the final prose.
    ```
    [<version>]: https://github.com/wilfison/Vinheta/releases/tag/v<version>
    ```
+   When the file already has an `## [Unreleased]` section, start from its
+   entries (merged with what the commits add), rename that heading to the
+   version, and replace the `[Unreleased]: .../compare/...` link with the link
+   of the version.
 5. **Show the drafted entry and the summary of Step 2 to the user and ask them
    to confirm or edit both** before moving on. This is the one part that needs
    human judgment.

@@ -47,6 +47,9 @@ const FADE_OUT: Duration = Duration::from_millis(300);
 const POSITION_INTERVAL: Duration = Duration::from_millis(100);
 /// Changes of the pad settings are written at most this often.
 const SAVE_DELAY: Duration = Duration::from_millis(500);
+/// An engine that ran this long before it failed starts the retries from
+/// the shortest delay again.
+const HEALTHY_RUN: Duration = Duration::from_secs(10);
 
 /// The two selectors: the settings key of each, and its list. `CallApp`
 /// is the app the sounds are sent to, among the ones that are recording.
@@ -126,6 +129,11 @@ mod imp {
         pub engine: RefCell<Option<AudioEngine>>,
         pub playing: RefCell<HashMap<PlaybackId, Sound>>,
         pub audio_error: Cell<Option<AudioFailure>>,
+        pub engine_started: Cell<Option<Instant>>,
+        /// Only exists while an automatic start of the engine waits.
+        pub retry_timer: RefCell<Option<glib::SourceId>>,
+        /// The failed starts in a row, for the delay of the next one.
+        pub retry_attempt: Cell<u32>,
         /// Counts the engines started, so that what an old one still reports
         /// is ignored.
         pub generation: Cell<u32>,
@@ -199,6 +207,9 @@ mod imp {
                 self.obj().save_pads();
             }
             if let Some(timer) = self.position_timer.take() {
+                timer.remove();
+            }
+            if let Some(timer) = self.retry_timer.take() {
                 timer.remove();
             }
             self.playing.borrow_mut().clear();
@@ -408,6 +419,7 @@ impl VinhetaApplication {
             Ok((engine, events)) => {
                 imp.engine.replace(Some(engine));
                 imp.audio_error.set(None);
+                imp.engine_started.set(Some(Instant::now()));
                 glib::spawn_future_local(glib::clone!(
                     #[weak(rename_to = app)]
                     self,
@@ -435,9 +447,12 @@ impl VinhetaApplication {
         started
     }
 
-    /// What "Try Again" does. A failure leaves the banner with the new
-    /// reason.
+    /// What "Try Again" and the automatic retries do. A failure leaves the
+    /// banner with the new reason and schedules the next retry.
     fn retry_audio(&self) {
+        if let Some(timer) = self.imp().retry_timer.take() {
+            timer.remove();
+        }
         if self.audio_available() || !self.start_audio() {
             return;
         }
@@ -920,8 +935,17 @@ impl VinhetaApplication {
     }
 
     fn set_audio_error(&self, error: &audio::Error) {
-        glib::g_warning!("vinheta", "audio is unavailable: {error}");
         let imp = self.imp();
+        let started = imp.engine_started.take();
+        if started.is_some_and(|started| started.elapsed() >= HEALTHY_RUN) {
+            imp.retry_attempt.set(0);
+        }
+        // Once per outage, not once per failed retry.
+        if started.is_some() || imp.retry_attempt.get() == 0 {
+            glib::g_warning!("vinheta", "audio is unavailable: {error}");
+        } else {
+            glib::g_debug!("vinheta", "audio is still unavailable: {error}");
+        }
         let failure = AudioFailure::from(error);
         if let Some(window) = self.window() {
             window.set_audio_error(Some(failure));
@@ -939,6 +963,30 @@ impl VinhetaApplication {
         imp.call_apps.take();
         imp.outputs.take();
         self.emit_by_name::<()>("devices-changed", &[]);
+        self.schedule_retry();
+    }
+
+    fn schedule_retry(&self) {
+        let imp = self.imp();
+        let mut timer = imp.retry_timer.borrow_mut();
+        if timer.is_some() {
+            return;
+        }
+        let attempt = imp.retry_attempt.get();
+        imp.retry_attempt.set(attempt.saturating_add(1));
+        let delay = audio::retry_delay(attempt);
+        glib::g_debug!("vinheta", "retrying audio in {delay:?}");
+        *timer = Some(glib::timeout_add_local_once(
+            delay,
+            glib::clone!(
+                #[weak(rename_to = app)]
+                self,
+                move || {
+                    app.imp().retry_timer.take();
+                    app.retry_audio();
+                }
+            ),
+        ));
     }
 
     fn remember(&self, devices: &[Device]) {

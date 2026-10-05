@@ -8,7 +8,7 @@
 - `src/ui/window.rs` + `src/ui/window.ui`: `adw::ApplicationWindow` subclass using a composite template; widgets from the `.ui` file are bound with `#[template_child]`. It owns the tabs (`AdwViewStack` with an `AdwInlineViewSwitcher`), the playing counter next to them, the `directories` setting (always written from the pages, in tab order), and the bottom bar. Without audio the pads are dimmed, not insensitive, so their menu still works.
 - The window owns what every view of pads shares: one `GtkCustomSorter` (`compare` in `src/pads.rs` with the `sort-order` key, exposed as `win.sort-order`), and a `GtkFlattenListModel` over the stores of the folder pages, in tab order. The "Favorites" tab (page name `favorites`, always last, hidden while empty) and the search results are a `GtkFilterListModel` of it, sorted by the same sorter, so every view shows the same `Sound` objects.
 - The window does not know its application while it is constructed (`application` is set afterwards); `window.rs` uses the default application.
-- When the engine cannot start, the window opens with a banner that says why and has "Try Again"; playback failures are toasts.
+- When the engine cannot start, the window opens with a banner that says why and has "Try Again"; the banner goes away by itself when the application gets audio back. Playback failures are toasts.
 
 ## Tabs and folder pages
 

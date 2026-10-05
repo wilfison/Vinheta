@@ -9,8 +9,8 @@
 
 ## Audio that is unavailable
 
-- Audio that is unavailable: `start_audio` starts an engine with the current settings and returns whether it did; on a failure, and when the engine reports `ConnectionLost` or `PipeWire`, `set_audio_error` drops the engine and keeps the reason as an `AudioFailure`, from which the window picks the sentence of its banner (never the `Display` text of the engine, which only goes to the log). `app.retry-audio` (the "Try Again" button of the banner, enabled only while audio is unavailable) calls `start_audio` again; there is no automatic retry. Each engine has a generation number, so what an old one still reports is ignored.
-- The engine tells its failures apart (`Unreachable`, `ConnectionLost`) and can be started again in the same process, which is what "Try Again" does.
+- Audio that is unavailable: `start_audio` starts an engine with the current settings and returns whether it did; on a failure, and when the engine reports `ConnectionLost` or `PipeWire`, `set_audio_error` drops the engine and keeps the reason as an `AudioFailure`, from which the window picks the sentence of its banner (never the `Display` text of the engine, which only goes to the log). `app.retry-audio` (the "Try Again" button of the banner, enabled only while audio is unavailable) calls `start_audio` again at once. Each engine has a generation number, so what an old one still reports is ignored.
+- The engine tells its failures apart (`Unreachable`, `ConnectionLost`) and can be started again in the same process, so the application also retries by itself: `set_audio_error` schedules `retry_audio` after `audio::retry_delay` (1 s, doubling up to 30 s, with no limit on the attempts), and "Try Again" cancels the waiting timer. The delay starts from 1 s again only after an engine that ran for 10 s (`HEALTHY_RUN`), so an engine that fails right after it starts does not retry every second. The first failure of an outage is a warning in the log, the next ones are debug messages. The timer is removed in `shutdown`.
 
 ## Notices
 

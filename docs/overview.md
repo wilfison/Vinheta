@@ -15,7 +15,7 @@ The hard part of the app is the audio, not the interface: see [audio.md](audio.m
 - A pad key (a letter or a digit) triggers its pad from any tab while the window has the focus. "Stop All" and "Send Sounds to Call" have accelerators (Ctrl+Shift+S, L). There are no global shortcuts: see [shortcuts.md](shortcuts.md).
 - The preferences dialog has the "Audio" group (monitor output, send sounds to call, the app the sounds are sent to), the "Playback" group (trigger mode, fade out on stop), and the "Library" group (sounds folder).
 - The call setup guide opens on the first run and from the primary menu.
-- Failures are told to the user: audio that is unavailable has a banner with the reason and "Try Again", a chosen device that is not connected and a pad file that could not be read or saved have a toast, and a missing folder has "Locate Folder…" and "Remove Folder" on its page.
+- Failures are told to the user: audio that is unavailable has a banner with the reason and "Try Again" (the app also retries by itself, and the banner goes away when audio is back), a chosen device that is not connected and a pad file that could not be read or saved have a toast, and a missing folder has "Locate Folder…" and "Remove Folder" on its page.
 - The interface is translated to Brazilian Portuguese.
 - The package is built and published by GitHub Actions from a `v*` tag.
 
@@ -53,7 +53,6 @@ The SVGs in `mockups/` are the visual reference:
 - A chosen app that was never seen recording in this run is named by its binary ("chrome (not recording)"), since only the name of the binary is stored.
 - The tabs of a browser are one app: the sounds cannot be sent to one tab only.
 - The label of an unavailable device is ellipsized in the preferences rows, which can hide the "(unavailable)" part.
-- An automatic reconnection to PipeWire (today the user presses "Try Again").
 - A PPA or another channel with updates, package signing, and other distributions.
 - More languages.
 - Global shortcuts ([shortcuts.md](shortcuts.md) has what was measured).

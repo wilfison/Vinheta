@@ -4,7 +4,8 @@
 # switch and the call volume measured on what a fake call app records, the
 # app the sounds are sent to, the monitor output, the pad settings (volume,
 # loop), the trigger modes, files removed and renamed while the app runs, a
-# pad key, audio coming back after "Try Again", and the cleanup on exit.
+# pad key, audio coming back after "Try Again" and by itself after a lost
+# connection, and the cleanup on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
 # output for a few seconds. The sounds are sent to the fake call app only,
 # which records a fake microphone, so no real app and no real microphone
@@ -342,6 +343,35 @@ session() {
         within 5 test -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$private"
         activate retry-audio
         check "the node of the engine exists after the retry" within 3 \
+            eval "PIPEWIRE_REMOTE=$private pw-dump | grep -q '\"node.name\": \"vinheta-drain-'"
+        quit_app
+        kill "$private_pid" 2>/dev/null
+        wait "$private_pid" 2>/dev/null
+        rm -f "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$private"{,.lock,-manager,-manager.lock}
+        start_app || echo "FAIL the app starts again"
+    fi
+
+    # The private PipeWire goes away while the app uses it and comes back a
+    # moment later: the app starts its engine again without any action.
+    if section "audio returns by itself after a lost connection"; then
+        quit_app
+        within 2 not node_exists
+        private="verify-app-pipewire-$$"
+        PIPEWIRE_CORE=$private pipewire >"$work/private-pipewire.log" 2>&1 &
+        private_pid=$!
+        within 5 test -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$private"
+        PIPEWIRE_REMOTE=$private start_app || echo "FAIL the app starts with the private PipeWire"
+        check "the node of the engine exists on the private PipeWire" within 3 \
+            eval "PIPEWIRE_REMOTE=$private pw-dump | grep -q '\"node.name\": \"vinheta-drain-'"
+        kill "$private_pid" 2>/dev/null
+        wait "$private_pid" 2>/dev/null
+        rm -f "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$private"{,.lock,-manager,-manager.lock}
+        sleep 1.5
+        check "the app survives the lost connection" kill -0 "$app_pid"
+        PIPEWIRE_CORE=$private pipewire >>"$work/private-pipewire.log" 2>&1 &
+        private_pid=$!
+        within 5 test -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$private"
+        check "the engine comes back by itself" within 8 \
             eval "PIPEWIRE_REMOTE=$private pw-dump | grep -q '\"node.name\": \"vinheta-drain-'"
         quit_app
         kill "$private_pid" 2>/dev/null
