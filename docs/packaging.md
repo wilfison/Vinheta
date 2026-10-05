@@ -23,7 +23,7 @@ Prefer `scripts/build-deb.sh`: run in the working tree, `dpkg-buildpackage` leav
 
 ## Releasing
 
-A release is a tag: `.github/workflows/release.yml` runs on a pushed `v*` tag (or by hand, with the tag as input), checks the tag against the version, runs the CI gate again, and creates the GitHub release with the `.deb`, its `.sha256`, and notes made by `scripts/release-notes.sh` from `CHANGELOG.md`. A second run for the same tag updates the release.
+A release is a tag: `.github/workflows/release.yml` runs on a pushed `v*` tag (or by hand, with the tag as input), cancels the CI of the same commit while it has not finished (main pushed together with the tag), checks the tag against the version, runs the CI gate again, and creates the GitHub release with the `.deb`, its `.sha256`, and notes made by `scripts/release-notes.sh` from `CHANGELOG.md`. A second run for the same tag updates the release.
 
 1. Bump the version in the four places, with the same date in `debian/changelog` and in the metainfo, and add a `## [VERSION]` section to `CHANGELOG.md`.
 2. Run `scripts/check.sh --all` (the CI does not run the audio and app checks) and, when the packaging changed, `scripts/ci-container.sh`.

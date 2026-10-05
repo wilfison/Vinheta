@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: write
+  # To cancel the CI of the tagged commit.
+  actions: write
 
 jobs:
   release:
@@ -24,6 +26,16 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
           # The earlier tags, for the "Full diff" link of the notes.
           fetch-depth: 0
+
+      # The release runs the CI gate itself, so the CI of the same commit (main
+      # pushed together with the tag) would only repeat it.
+      - name: Cancel the CI of this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --workflow ci.yml --commit "$(git rev-parse HEAD)" \
+              --json databaseId,status --jq '.[] | select(.status != "completed") | .databaseId' |
+            while read -r run; do gh run cancel "$run" || true; done
 
       - name: The tag matches the version
         run: scripts/version.sh "$TAG"
