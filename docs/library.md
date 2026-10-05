@@ -33,7 +33,8 @@
 - The settings are keyed by the absolute path of the file. Fields that are not known are ignored, and the file has a `version`.
 - A pad key is one more field of the entry, and belongs to one entry only ([shortcuts.md](shortcuts.md)).
 - The volume is a slider position from 0 to 1 (no amplification), with the same cubic curve as the bottom bar.
-- A file moved to a folder that is not in the library loses the link to its settings: they stay under the old path and are used again if the file comes back. The same holds for a trashed file.
+- A file moved to a folder that is not in the library loses the link to its settings: they stay under the old path and are used again if the file comes back before the app starts again. The same holds for a trashed file.
+- When the app starts, the entries of files that are gone from a folder that still exists are removed (`prune_missing`), and the file is saved if any was. The entries of a folder that is missing stay, so a drive that is not mounted or "Locate Folder…" finds them again. A file or folder that cannot be read counts as present.
 - The sounds folder lives in the same data directory by default, so nothing there may collide with `pads.json` and `pads.json.corrupt`.
 - What happens to a file that cannot be parsed or saved is in [application.md](application.md), "Pad settings".
 

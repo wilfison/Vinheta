@@ -3,9 +3,10 @@
 # stopping through actions and through real clicks, the "Send sounds to call"
 # switch and the call volume measured on what a fake call app records, the
 # app the sounds are sent to, the monitor output, the pad settings (volume,
-# loop), the trigger modes, files removed and renamed while the app runs, a
-# pad key, audio coming back after "Try Again" and by itself after a lost
-# connection, and the cleanup on exit.
+# loop), the trigger modes, files removed and renamed while the app runs,
+# the settings of deleted files dropped at the start, a pad key, audio
+# coming back after "Try Again" and by itself after a lost connection, and
+# the cleanup on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
 # output for a few seconds. The sounds are sent to the fake call app only,
 # which records a fake microphone, so no real app and no real microphone
@@ -50,10 +51,14 @@ gone="$work/Tones/tone-gone.wav"
 kept="$work/Tones/tone-kept.wav"
 moved="$work/Tones/tone-moved.wav"
 cp "$tone" "$kept"
+# Settings of a file deleted from the folder, removed when the app starts,
+# and of a file in a folder that is missing, which stay.
+deleted="$work/Tones/tone-deleted.wav"
+unmounted="$work/Missing/tone.wav"
 pads="$work/config/data/vinheta/pads.json"
 mkdir -p "$(dirname "$pads")"
 cat >"$pads" <<JSON
-{"version": 1, "pads": {"$tone": {"shortcut": "q"}, "$quiet": {"volume": 0.5}, "$looped": {"loop": true}, "$kept": {"color": "red"}}}
+{"version": 1, "pads": {"$tone": {"shortcut": "q"}, "$quiet": {"volume": 0.5}, "$looped": {"loop": true}, "$kept": {"color": "red"}, "$deleted": {"loop": true}, "$unmounted": {"loop": true}}}
 JSON
 test_sink=vinheta-app-test-sink
 test_mic=vinheta-app-test-mic
@@ -91,6 +96,7 @@ print("no entry" if pad is None else json.dumps(pad.get(sys.argv[3])))' "$pads" 
 }
 loop_saved() { [ "$(pad_field "$tone" loop)" = true ]; }
 entry_removed() { [ "$(pad_field "$quiet" volume)" = "no entry" ]; }
+missing_pruned() { [ "$(pad_field "$deleted" loop)" = "no entry" ] && [ "$(pad_field "$unmounted" loop)" = true ]; }
 settings_moved() { [ "$(pad_field "$moved" color)" = '"red"' ] && [ "$(pad_field "$kept" color)" = "no entry" ]; }
 
 # call_app APP FILE: a recorder of the fake microphone, as a call app is
@@ -386,6 +392,7 @@ session() {
     pw-cli destroy "$mic" >/dev/null
     check "nothing is left after the app quits" not node_exists
     check "the folders were saved" grep -q "directories=.*Tones" "$work/config/glib-2.0/settings/keyfile"
+    check "settings of a deleted file are dropped, of a missing folder kept" missing_pruned
     if [ -n "$saved" ]; then
         check "a loop set through an action was saved" loop_saved
         check "a reset pad has no entry in the file" entry_removed
@@ -396,10 +403,10 @@ session() {
 {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-common.sh'"
-    declare -p work tone quiet looped gone kept moved pads test_sink test_mic test_app other_app only
+    declare -p work tone quiet looped gone kept moved deleted unmounted pads test_sink test_mic test_app other_app only
     declare -f check node_exists call_linked not call_app call_level sent_to at_least \
         monitor_on monitor_linked falls_by call_streams one_call_stream within pad_field \
-        loop_saved entry_removed settings_moved section session
+        loop_saved entry_removed settings_moved missing_pruned section session
     echo session
 } >"$work/session.sh"
 

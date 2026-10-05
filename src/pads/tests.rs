@@ -297,6 +297,30 @@ fn a_broken_file_is_an_error() {
 }
 
 #[test]
+fn prune_removes_only_files_gone_from_a_folder_that_exists() {
+    let directory = std::env::temp_dir().join(format!("vinheta-test-prune-{}", std::process::id()));
+    let folder = directory.join("Sounds");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("here.wav"), "").unwrap();
+    let path = |name: &str| folder.join(name).to_str().unwrap().to_owned();
+    let elsewhere = directory
+        .join("Missing/away.wav")
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let mut store = PadStore::default();
+    for entry in [path("here.wav"), path("deleted.wav"), elsewhere.clone()] {
+        store.set(&entry, pad(r#""loop": true"#));
+    }
+    let removed = store.prune_missing();
+    std::fs::remove_dir_all(&directory).unwrap();
+    assert_eq!(removed, 1);
+    assert_eq!(store.get(&path("deleted.wav")), PadSettings::default());
+    assert!(store.get(&path("here.wav")).looping);
+    assert!(store.get(&elsewhere).looping);
+}
+
+#[test]
 fn a_saved_store_loads_back() {
     let directory = std::env::temp_dir().join(format!("vinheta-test-{}", std::process::id()));
     let file = directory.join("nested/pads.json");

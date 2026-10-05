@@ -496,8 +496,10 @@ impl VinhetaApplication {
     fn load_pads(&self) {
         let imp = self.imp();
         let file = glib::user_data_dir().join("vinheta").join("pads.json");
+        let mut pruned = 0;
         match PadStore::load(&file) {
-            Ok(pads) => {
+            Ok(mut pads) => {
+                pruned = pads.prune_missing();
                 imp.pads.replace(pads);
             }
             // The file is set aside, so that the next save does not destroy it.
@@ -523,6 +525,10 @@ impl VinhetaApplication {
             }
         }
         imp.pads_file.set(file).unwrap();
+        if pruned > 0 {
+            glib::g_debug!("vinheta", "removed the settings of {pruned} missing files");
+            self.save_pads();
+        }
     }
 
     fn save_pads(&self) {

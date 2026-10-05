@@ -256,6 +256,16 @@ impl PadStore {
         self.pads.is_empty()
     }
 
+    /// Removes the entries of files that are gone from a folder that is
+    /// still there. The entries of a missing folder stay: it may be on a
+    /// drive that is not mounted, or come back with "Locate Folder…".
+    /// Returns how many entries were removed.
+    pub fn prune_missing(&mut self) -> usize {
+        let before = self.pads.len();
+        self.pads.retain(|path, _| !is_gone(Path::new(path)));
+        before - self.pads.len()
+    }
+
     /// The path of the entry that has the key.
     pub fn shortcut_owner(&self, key: char) -> Option<&str> {
         let key = shortcut_key(key)?;
@@ -339,6 +349,12 @@ impl PadStore {
         std::fs::write(&temporary, text)?;
         std::fs::rename(&temporary, file)
     }
+}
+
+/// Only a definite answer counts: a file or folder that cannot be read is
+/// not gone.
+fn is_gone(path: &Path) -> bool {
+    path.parent().is_some_and(Path::is_dir) && matches!(path.try_exists(), Ok(false))
 }
 
 /// What a click on a pad does, a global setting.

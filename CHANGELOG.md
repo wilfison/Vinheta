@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Audio comes back by itself when PipeWire stops or restarts: the app tries again on its own, at growing intervals, and "Try Again" still tries at once.
 
+### Changed
+
+- The settings of sounds deleted from their folder are forgotten when the app starts. Those of a folder that is missing, such as one on a drive that is not connected, are kept.
+
 ## [1.1.0] - 2026-10-05
 
 ### Changed
