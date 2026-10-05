@@ -46,7 +46,7 @@
 
 ## The bottom bar and the device selectors
 
-- `src/ui/device_selector.rs`: not a widget. `bind` keeps a `GtkDropDown` or an `AdwComboRow` in sync with a device list of the application and with the key that stores the chosen device. It is the only place that writes `microphone` and `monitor-output`. A change of the key rebuilds the list in an idle callback, never at once: the key may be changing from inside the activation of an entry, and replacing the model there makes GTK log a critical.
+- `src/ui/device_selector.rs`: not a widget. `bind` keeps a `GtkDropDown` or an `AdwComboRow` in sync with a device list of the application and with the key that stores the chosen device. It is the only place that writes `microphone` and `monitor-output`. A change of the key or a `devices-changed` signal (which the application emits at once when the key changes) rebuilds the list in an idle callback, never at once: the key may be changing from inside the activation of an entry, and replacing the model there frees the list GTK is still using (a crash when choosing a microphone).
 - `src/devices.rs`: the entries of a device selector (system default, devices, a chosen device that is not connected), and whether a chosen device is missing. No GTK types, covered by unit tests.
 - The sliders go from 0% to 100% (no amplification) with a cubic curve from position to gain. The settings store the position.
 - The monitor selector lives only in the preferences; the microphone selector is in the bottom bar and in the preferences.

@@ -104,8 +104,9 @@ pub fn bind(selector: &impl IsA<gtk::Widget>, app: &VinhetaApplication, kind: De
         }
     });
 
+    // Also emitted at once when the key changes, so it is deferred as well.
     let handler = app.connect_local("devices-changed", false, move |_| {
-        refresh();
+        glib::idle_add_local_once(refresh.clone());
         None
     });
     let app = app.downgrade();
