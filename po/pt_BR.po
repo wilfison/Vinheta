@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-05 14:58-0300\n"
+"POT-Creation-Date: 2026-10-05 16:43-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -207,14 +207,11 @@ msgstr ""
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:12
 msgid ""
-"For a call, turn off the noise suppression of the call app (it treats sounds "
-"as noise) and use headphones. Sending sounds to the call can be switched off "
-"at any time, leaving only your own output."
+"Sending sounds to the call can be switched off at any time, leaving only "
+"your own output."
 msgstr ""
-"Para uma chamada, desative a supressão de ruído do aplicativo de chamadas "
-"(ele trata os sons como ruído) e use fones de ouvido. O envio dos sons para "
-"a chamada pode ser desligado a qualquer momento, deixando apenas a sua saída "
-"de áudio."
+"O envio dos sons para a chamada pode ser desligado a qualquer momento, "
+"deixando apenas a sua saída de áudio."
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:35
 msgid "Pads with colors, keys, and a sound playing"
@@ -322,42 +319,10 @@ msgid "Step 1"
 msgstr "Passo 1"
 
 #: src/ui/call-guide-dialog.ui:65
-msgid "Turn off noise suppression"
-msgstr "Desative a supressão de ruído"
-
-#: src/ui/call-guide-dialog.ui:66
-msgid ""
-"Call apps treat sounds as noise and cut them out. Turn off noise suppression "
-"or noise cancellation in the call app."
-msgstr ""
-"Aplicativos de chamada tratam os sons como ruído e os cortam. Desative a "
-"supressão ou o cancelamento de ruído no aplicativo de chamadas."
-
-#: src/ui/call-guide-dialog.ui:72
-msgid "Step 2"
-msgstr "Passo 2"
-
-#: src/ui/call-guide-dialog.ui:84
-msgid "Use headphones"
-msgstr "Use fones de ouvido"
-
-#: src/ui/call-guide-dialog.ui:85
-msgid ""
-"With speakers, your microphone picks the sounds up again and the call hears "
-"them twice."
-msgstr ""
-"Com caixas de som, o seu microfone capta os sons de novo e a chamada os ouve "
-"duas vezes."
-
-#: src/ui/call-guide-dialog.ui:91
-msgid "Step 3"
-msgstr "Passo 3"
-
-#: src/ui/call-guide-dialog.ui:103
 msgid "Choose where the sounds go"
 msgstr "Escolha para onde os sons vão"
 
-#: src/ui/call-guide-dialog.ui:104
+#: src/ui/call-guide-dialog.ui:66
 msgid ""
 "Every app that is using the microphone gets them. To leave the others out, "
 "pick one app in the bottom bar."
@@ -365,11 +330,19 @@ msgstr ""
 "Todo aplicativo que está usando o microfone recebe os sons. Para deixar os "
 "outros de fora, escolha um aplicativo na barra inferior."
 
-#: src/ui/call-guide-dialog.ui:110
-msgid "Step 4"
-msgstr "Passo 4"
+#: src/ui/call-guide-dialog.ui:72
+msgid "Step 2"
+msgstr "Passo 2"
 
-#: src/ui/call-guide-dialog.ui:123
+#: src/ui/call-guide-dialog.ui:85
+msgid ""
+"If the sounds come through choppy, look in the call app for how to turn off "
+"its noise suppression."
+msgstr ""
+"Se os sons chegarem picotados, procure no aplicativo de chamadas como "
+"desativar a supressão de ruído."
+
+#: src/ui/call-guide-dialog.ui:95
 msgid "Got It"
 msgstr "Entendi"
 

@@ -168,7 +168,6 @@ All three pass, and the app that was recording is still fed by its microphone af
 - **The call can clip.** The sound is added to the voice inside the app's recording stream, at the level of the call volume. A loud sound at 100% reached 0 dBFS in a browser with automatic gain on.
 - **Some headsets mute their microphone while they play.** The "AB13X Headset Adapter" (USB `001f:0b21`) delivers exact zeros on its capture, for 1.2 to 1.8 s, while a loud sound plays on its own output, with or without Vinheta (`pw-play` does the same). The sound still reaches the call, since it does not go through the microphone, but the voice is cut meanwhile. Sending the monitor branch to another output avoids it.
 - **`pw-link` by port name failed once** with "No such file or directory" right after the node was created, and worked on retry and by port id. It was not reproduced.
-- **Noise suppression and echo have not been tested on a real call**; see the manual call checklist below.
 - **The server removes the engine's links together with a stream that ends.** When the engine then drops its own proxy for such a link, PipeWire reports "unknown resource" on the core. That error is harmless and must not be treated as a lost connection; only `EPIPE` on the core is. It shows up whenever a sound is stopped while the process keeps running.
 
 ## Running it
@@ -247,24 +246,15 @@ It prints one `PASS` or `FAIL` line per check and exits with status 0 only when 
 
 ## Manual call checklist
 
-Optional, and not done yet: it needs a person on a real call. Its results decide the wording of the call setup guide of the app, which ships with generic advice until then. Use headphones unless a step says otherwise.
+Done on 2026-10-05, on a real call. Repeat it after a change to how the sound reaches the call; it needs a person on a real call. Use headphones unless a step says otherwise.
 
 1. Start the app (`scripts/run-dev.sh`, or the installed package) and add a folder with one audible sound.
 2. In the call app, keep the usual microphone (the default one is fine).
 3. Join a call with someone else, or use the microphone test of the app.
 4. Speak, then click the pad while speaking.
 5. Ask the other side: do they hear the voice and the sound together? On both sides (left and right)?
-6. Repeat step 4 with the noise suppression of the call app turned on, then off. Write down where that setting is, as the app names it.
+6. Repeat step 4 with the noise suppression of the call app turned on, then off.
 7. Repeat step 4 with a long or looping sound and the noise suppression on: is it cut after some seconds?
 8. Repeat step 4 with speakers instead of headphones and ask whether the sound is heard twice (echo).
 
-| Check | Discord | Google Meet |
-| --- | --- | --- |
-| The app is listed in "Send Sounds To" while in the call | | |
-| Voice and sound heard together | | |
-| Voice on both sides | | |
-| Sound survives with noise suppression on | | |
-| Sound survives with noise suppression off | | |
-| Echo with speakers | | |
-| A long sound survives with noise suppression on | | |
-| Where the noise suppression setting is | | |
+Results of 2026-10-05: the call heard the voice and the sound together, the sound survived with the noise suppression of the call app on, and speakers caused no echo. That is why the call setup guide does not ask to use headphones, and only mentions noise suppression as a hint for sounds that come through choppy, without naming where each call app keeps that setting.

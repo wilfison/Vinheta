@@ -9,7 +9,7 @@
   <description>
     <p>Vinheta is a soundboard. Add your folders of sounds, and each one becomes a tab with a pad per sound: click a pad, or press its key, to play it. Pads can have a name, a color, a volume, and a loop, and your favorites are kept in a tab of their own.</p>
     <p>While it runs, Vinheta plays your sounds into the apps that are using your microphone. Join a call as usual, and the other side hears the sounds together with your voice. You hear them on your own headphones, with a separate volume.</p>
-    <p>For a call, turn off the noise suppression of the call app (it treats sounds as noise) and use headphones. Sending sounds to the call can be switched off at any time, leaving only your own output.</p>
+    <p>Sending sounds to the call can be switched off at any time, leaving only your own output.</p>
   </description>
 
   <developer id="io.github.wilfison">

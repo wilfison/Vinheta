@@ -62,8 +62,8 @@
                         <child>
                           <object class="AdwActionRow">
                             <property name="activatable">False</property>
-                            <property name="title" translatable="yes">Turn off noise suppression</property>
-                            <property name="subtitle" translatable="yes">Call apps treat sounds as noise and cut them out. Turn off noise suppression or noise cancellation in the call app.</property>
+                            <property name="title" translatable="yes">Choose where the sounds go</property>
+                            <property name="subtitle" translatable="yes">Every app that is using the microphone gets them. To leave the others out, pick one app in the bottom bar.</property>
                             <child type="prefix">
                               <object class="GtkLabel">
                                 <property name="label">2</property>
@@ -78,44 +78,16 @@
                             </child>
                           </object>
                         </child>
-                        <child>
-                          <object class="AdwActionRow">
-                            <property name="activatable">False</property>
-                            <property name="title" translatable="yes">Use headphones</property>
-                            <property name="subtitle" translatable="yes">With speakers, your microphone picks the sounds up again and the call hears them twice.</property>
-                            <child type="prefix">
-                              <object class="GtkLabel">
-                                <property name="label">3</property>
-                                <property name="valign">center</property>
-                                <accessibility>
-                                  <property name="label" translatable="yes">Step 3</property>
-                                </accessibility>
-                                <style>
-                                  <class name="step-number"/>
-                                </style>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
-                        <child>
-                          <object class="AdwActionRow">
-                            <property name="activatable">False</property>
-                            <property name="title" translatable="yes">Choose where the sounds go</property>
-                            <property name="subtitle" translatable="yes">Every app that is using the microphone gets them. To leave the others out, pick one app in the bottom bar.</property>
-                            <child type="prefix">
-                              <object class="GtkLabel">
-                                <property name="label">4</property>
-                                <property name="valign">center</property>
-                                <accessibility>
-                                  <property name="label" translatable="yes">Step 4</property>
-                                </accessibility>
-                                <style>
-                                  <class name="step-number"/>
-                                </style>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label" translatable="yes">If the sounds come through choppy, look in the call app for how to turn off its noise suppression.</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="dimmed"/>
+                        </style>
                       </object>
                     </child>
                     <child>

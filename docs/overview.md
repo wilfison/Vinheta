@@ -49,9 +49,6 @@ The SVGs in `mockups/` are the visual reference:
 
 ## Open items
 
-- The manual call test ([audio.md](audio.md), "Manual call checklist") was never done: it needs a person on a real call. Until then two things are unknown:
-  - **Noise suppression in call apps.** Discord (Krisp), Meet, and similar apps may cut the sounds out as if they were noise. The call setup guide tells the user to turn noise suppression off, as generic advice; the test may change the guide (the place of that setting in each call app).
-  - **Echo.** If the local monitor leaks into the real microphone, the call hears the sound twice. The call setup guide recommends headphones.
 - Showing the real device behind "System Default" or behind an unavailable choice. The engine does not report the default output, which needs a new engine event.
 - A chosen app that was never seen recording in this run is named by its binary ("chrome (not recording)"), since only the name of the binary is stored.
 - The tabs of a browser are one app: the sounds cannot be sent to one tab only.

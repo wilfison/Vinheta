@@ -24,9 +24,9 @@ sudo apt install ./vinheta_VERSION_amd64.deb
 ## Use it in a call
 
 1. **Join the call as usual.** Keep your own microphone in the call app. Vinheta adds the sounds to what the app records, while both are running.
-2. **Turn off noise suppression.** Call apps treat sounds as noise and cut them out. Turn off noise suppression or noise cancellation in the call app.
-3. **Use headphones.** With speakers, your microphone picks the sounds up again and the call hears them twice.
-4. **Choose where the sounds go.** Every app that is using the microphone gets them. To leave the others out, pick one app in the bottom bar.
+2. **Choose where the sounds go.** Every app that is using the microphone gets them. To leave the others out, pick one app in the bottom bar.
+
+If the sounds come through choppy, look in the call app for how to turn off its noise suppression.
 
 The app shows this guide on its first run, and again from the menu ("Call Setup Guide").
 
