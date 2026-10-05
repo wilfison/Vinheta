@@ -4,15 +4,17 @@ Run `scripts/check.sh` before committing. It prints one `PASS` or `FAIL` line pe
 
 ```sh
 scripts/check.sh           # rustfmt, clippy without warnings, a single glib version, no em dash, one version, complete translations, meson test
-scripts/check.sh --audio   # plus the audio engine harness (fake devices, about 4 minutes)
+scripts/check.sh --audio   # plus the audio engine harness (fake devices, about 4 minutes, skipped when nothing it tests changed)
 scripts/check.sh --app     # plus scripts/verify-app.sh on the installed app
 scripts/check.sh --deb     # plus the package build (in the background, while the other checks run)
 scripts/check.sh --all
+scripts/check.sh --all --force   # runs the audio harness even when nothing it tests changed
 ```
 
 - `scripts/verify-app.sh` checks the installed app end to end on a virtual display: the virtual microphone, playing and stopping through actions and through real clicks, the "Send sounds to call" switch and the call volume measured on a recording, the voice switch, the monitor output (with a fake sink), the pad volume and loop, the trigger modes, a file removed while it plays, the settings of a renamed file, the saved pad settings, a pad key pressed for real, audio coming back after "Try Again", and the cleanup on exit. It uses the real PipeWire and plays a quiet tone on the default output for a few seconds. The levels are measured with the voice off, because a noisy real microphone hides the tone.
 - While working on one behavior, `scripts/verify-app.sh --only REGEX` runs only the sections whose title matches (`--list` prints the titles); the start and the exit of the app are always checked. Every section starts and stops what it needs, so a new section must not depend on the one before it. Run all of it before committing.
-- `scripts/check.sh --all` takes about 6 minutes, most of it the audio harness and then the app check, which cannot run at the same time (both create the `vinheta` node). The package builds alongside them at the lowest priority (`nice -n 19`), so it does not disturb the timed audio checks, and its result is printed last. An agent whose commands time out before that runs it in the background and reads `tmp/check/` or its output when it ends.
+- The audio harness is skipped (`SKIP` instead of `PASS`) when what it tests is the same as at its last pass on this machine: the files of `src/audio/`, the test binary, `Cargo.toml` and `Cargo.lock`, the harness scripts, and the versions of `rustc`, PipeWire, WirePlumber, and GStreamer (`audio_inputs` in `scripts/check.sh`; the fingerprint of the last pass is in `tmp/check/audio-harness.passed`). The engine uses no other module of the crate; if it starts to, add that module to `audio_inputs`.
+- `scripts/check.sh --all` takes about 6 minutes when the audio harness runs and about a minute and a half when it is skipped. The harness and then the app check take most of it, and they cannot run at the same time (both create the `vinheta` node). The package builds alongside them at the lowest priority (`nice -n 19`), so it does not disturb the timed audio checks, and its result is printed last. An agent whose commands time out before that runs it in the background and reads `tmp/check/` or its output when it ends.
 - The code is formatted with `cargo fmt` (default settings); the check fails when it would change something.
 - `scripts/build-deb.sh` builds the package from a copy under `tmp/deb`, so nothing is written to the working tree or to its parent directory.
 - `scripts/version.sh` prints the version when its four places agree (see [packaging.md](packaging.md)), and `scripts/check-translations.sh` fails when a file with strings is missing from `po/POTFILES.in`, when a `gettext` call of a `.rs` file did not reach the template, or when a language of `po/LINGUAS` is incomplete. Both are checks of `scripts/check.sh`.
