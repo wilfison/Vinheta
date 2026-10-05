@@ -38,16 +38,14 @@ The user adds folders, and each folder becomes a tab with one pad per audio file
 
 The SVGs in `mockups/` are the visual reference:
 
-- `main-page.svg`: main window, with tabs per category, a grid of sound pads with a hotkey per item, elapsed/remaining time, and an indicator of how many sounds are playing.
+- `main-page.svg`: main window, with one tab per folder, a grid of sound pads with a key per pad, two pads that play (their times and the border that gets shorter as the sound goes on), and an indicator of how many sounds are playing.
 - `empty-state.svg`: window with no sounds yet, with an "Add Sounds…" call to action (files can also be dropped), a tip to join a call with the usual microphone, and the bottom bar with "Stop all", monitor and call volumes, the selector of the app the sounds are sent to, and the "Send sounds to call" toggle.
 - `preferences.svg`: preferences dialog, covering audio (monitor output, send sounds to call, the app the sounds are sent to), playback (behavior when a pad is triggered, fade out on stop), global shortcuts, and library (copy imported sounds, sounds folder).
 
-The mockups show more than the app has. These parts were dropped:
+`preferences.svg` shows more than the app has. These parts were dropped:
 
-- The "All" tab and the "Add sound" tile.
 - The "Copy Imported Sounds" switch: loose files are always copied into the sounds folder.
-- Durations on idle pads: a duration is only known from a running pipeline, so times are shown only while a pad plays.
-- The "Shortcuts" group of the preferences (global shortcuts).
+- The "Shortcuts" group (global shortcuts).
 
 ## Open items
 

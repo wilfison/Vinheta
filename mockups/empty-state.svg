@@ -73,17 +73,17 @@
     <!-- Local volume -->
     <use xlink:href="#i-phones" href="#i-phones" x="216" y="597"/>
     <text x="242" y="609.500" font-size="13">Headphones</text>
-    <rect x="320" y="603" width="280" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
-    <rect x="320" y="603" width="150" height="4" rx="2" fill="#78aeed"/>
-    <circle cx="470" cy="605" r="9" fill="#fff"/>
+    <rect x="340" y="603" width="260" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
+    <rect x="340" y="603" width="140" height="4" rx="2" fill="#78aeed"/>
+    <circle cx="480" cy="605" r="9" fill="#fff"/>
     <text x="650" y="609.500" text-anchor="end" font-size="12" fill-opacity=".6">54%</text>
 
     <!-- Remote volume -->
     <use xlink:href="#i-mic" href="#i-mic" x="216" y="635"/>
     <text x="242" y="647.500" font-size="13">Call</text>
-    <rect x="320" y="641" width="280" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
-    <rect x="320" y="641" width="238" height="4" rx="2" fill="#78aeed"/>
-    <circle cx="558" cy="643" r="9" fill="#fff"/>
+    <rect x="340" y="641" width="260" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
+    <rect x="340" y="641" width="221" height="4" rx="2" fill="#78aeed"/>
+    <circle cx="561" cy="643" r="9" fill="#fff"/>
     <text x="650" y="647.500" text-anchor="end" font-size="12" fill-opacity=".6">85%</text>
 
     <!-- Selector of the app the sounds are sent to -->

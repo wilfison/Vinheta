@@ -6,6 +6,9 @@
     </filter>
     <clipPath id="win"><rect x="24" y="24" width="952" height="652" rx="14"/></clipPath>
 
+    <!-- The border of a pad that plays: 546 long, clockwise from the middle of the top edge -->
+    <path id="ring" fill="none" stroke-width="3" d="M84 1.5H156A10.5 10.5 0 0 1 166.5 12V108A10.5 10.5 0 0 1 156 118.5H12A10.5 10.5 0 0 1 1.5 108V12A10.5 10.5 0 0 1 12 1.5H84"/>
+
     <g id="i-loop" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 8a5 5 0 0 1 9-3"/><path d="M12.5 1.8v3.5H9"/>
       <path d="M13 8a5 5 0 0 1-9 3"/><path d="M3.5 14.2v-3.5H7"/>
@@ -50,33 +53,31 @@
     <circle cx="950" cy="48" r="12" fill="#fff" fill-opacity=".12"/>
     <path d="M946 44l8 8M954 44l-8 8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
 
-    <!-- Collections -->
-    <rect x="48" y="86" width="70" height="32" rx="16" fill="#fff" fill-opacity=".15"/>
+    <!-- Tabs -->
+    <rect x="48" y="86" width="78" height="32" rx="16" fill="#fff" fill-opacity=".15"/>
     <g font-size="13" font-weight="700" text-anchor="middle">
-      <text x="83" y="107">All</text>
+      <text x="87" y="107">Music</text>
       <g fill-opacity=".6">
-        <text x="163" y="107">Music</text>
-        <text x="247" y="107">Effects</text>
-        <text x="329" y="107">Memes</text>
-        <text x="428" y="107">Favorites</text>
+        <text x="171" y="107">Effects</text>
+        <text x="253" y="107">Memes</text>
+        <text x="352" y="107">Favorites</text>
       </g>
     </g>
-    <use xlink:href="#i-star" href="#i-star" x="376" y="94" fill-opacity=".6" transform="translate(0,0)"/>
+    <use xlink:href="#i-star" href="#i-star" x="300" y="94" fill-opacity=".6"/>
     <circle cx="872" cy="102" r="4" fill="#57e389"/>
     <text x="952" y="106.500" text-anchor="end" font-size="12" fill-opacity=".6">2 playing</text>
 
     <!-- Row 1 -->
     <g transform="translate(48,140)">
-      <rect width="168" height="120" rx="12" fill="#4a2f57" stroke="#dc8add" stroke-width="3"/>
+      <rect width="168" height="120" rx="12" fill="#4a2f57"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">1</text>
       <use xlink:href="#i-star" href="#i-star" x="120" y="11" fill="#f8e45c"/>
       <use xlink:href="#i-loop" href="#i-loop" x="142" y="11"/>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Intro</text>
-      <rect x="12" y="82" width="144" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
-      <rect x="12" y="82" width="36" height="4" rx="2" fill="#dc8add"/>
       <text x="12" y="106" font-size="11" fill-opacity=".85">00:23</text>
       <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".85">-01:12</text>
+      <use xlink:href="#ring" href="#ring" stroke="#dc8add" stroke-dasharray="0 132.2 413.8 600"/>
     </g>
     <g transform="translate(232,140)">
       <rect width="168" height="120" rx="12" fill="#4a2f57"/>
@@ -84,24 +85,18 @@
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">2</text>
       <use xlink:href="#i-loop" href="#i-loop" x="142" y="11"/>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Background Music</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-03:29</text>
     </g>
     <g transform="translate(416,140)">
       <rect width="168" height="120" rx="12" fill="#4a2f57"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">3</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Suspense</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:34</text>
     </g>
     <g transform="translate(600,140)">
       <rect width="168" height="120" rx="12" fill="#4a2f57"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">4</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Outro</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:54</text>
     </g>
     <g transform="translate(784,140)">
       <rect width="168" height="120" rx="12" fill="#2c3e57"/>
@@ -109,8 +104,6 @@
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">5</text>
       <use xlink:href="#i-star" href="#i-star" x="142" y="11" fill="#f8e45c"/>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Channel Jingle</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:07</text>
     </g>
 
     <!-- Row 2 -->
@@ -119,27 +112,22 @@
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">Q</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Drums</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:16</text>
     </g>
     <g transform="translate(232,276)">
-      <rect width="168" height="120" rx="12" fill="#2f4a37" stroke="#57e389" stroke-width="3"/>
+      <rect width="168" height="120" rx="12" fill="#2f4a37"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">W</text>
       <use xlink:href="#i-star" href="#i-star" x="142" y="11" fill="#f8e45c"/>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Applause</text>
-      <rect x="12" y="82" width="144" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
-      <rect x="12" y="82" width="92" height="4" rx="2" fill="#57e389"/>
       <text x="12" y="106" font-size="11" fill-opacity=".85">00:18</text>
       <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".85">-00:10</text>
+      <use xlink:href="#ring" href="#ring" stroke="#57e389" stroke-dasharray="0 351 195 600"/>
     </g>
     <g transform="translate(416,276)">
       <rect width="168" height="120" rx="12" fill="#2f4a37"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">E</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Laughter</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:42</text>
     </g>
     <g transform="translate(600,276)">
       <rect width="168" height="120" rx="12" fill="#2f4a37"/>
@@ -147,16 +135,12 @@
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">R</text>
       <use xlink:href="#i-loop" href="#i-loop" x="142" y="11"/>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Crickets</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:08</text>
     </g>
     <g transform="translate(784,276)">
       <rect width="168" height="120" rx="12" fill="#572e31"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">T</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Air Horn</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:03</text>
     </g>
 
     <!-- Row 3 -->
@@ -165,37 +149,24 @@
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">A</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Drum Roll</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:05</text>
     </g>
     <g transform="translate(232,412)">
       <rect width="168" height="120" rx="12" fill="#572e31"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">S</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Sad Trombone</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:04</text>
     </g>
     <g transform="translate(416,412)">
       <rect width="168" height="120" rx="12" fill="#2c3e57"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">D</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Bell</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:02</text>
     </g>
     <g transform="translate(600,412)">
       <rect width="168" height="120" rx="12" fill="#2c3e57"/>
       <rect x="10" y="10" width="20" height="18" rx="5" fill="#fff" fill-opacity=".14"/>
       <text x="20" y="23" text-anchor="middle" font-size="11" font-weight="700" fill-opacity=".8">F</text>
       <text x="84" y="64" text-anchor="middle" font-size="15" font-weight="700">Ta-da!</text>
-      <text x="12" y="106" font-size="11" fill-opacity=".6">00:00</text>
-      <text x="156" y="106" text-anchor="end" font-size="11" fill-opacity=".6">-00:02</text>
-    </g>
-    <g transform="translate(784,412)">
-      <rect x="1" y="1" width="166" height="118" rx="12" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="2" stroke-dasharray="6 5"/>
-      <use xlink:href="#i-plus" href="#i-plus" x="76" y="38" opacity=".6"/>
-      <text x="84" y="80" text-anchor="middle" font-size="13" fill-opacity=".6">Add sound</text>
     </g>
 
     <!-- Bottom bar -->
@@ -209,17 +180,17 @@
     <!-- Local volume -->
     <use xlink:href="#i-phones" href="#i-phones" x="216" y="597"/>
     <text x="242" y="609.500" font-size="13">Headphones</text>
-    <rect x="320" y="603" width="280" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
-    <rect x="320" y="603" width="150" height="4" rx="2" fill="#78aeed"/>
-    <circle cx="470" cy="605" r="9" fill="#fff"/>
+    <rect x="340" y="603" width="260" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
+    <rect x="340" y="603" width="140" height="4" rx="2" fill="#78aeed"/>
+    <circle cx="480" cy="605" r="9" fill="#fff"/>
     <text x="650" y="609.500" text-anchor="end" font-size="12" fill-opacity=".6">54%</text>
 
     <!-- Remote volume -->
     <use xlink:href="#i-mic" href="#i-mic" x="216" y="635"/>
     <text x="242" y="647.500" font-size="13">Call</text>
-    <rect x="320" y="641" width="280" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
-    <rect x="320" y="641" width="238" height="4" rx="2" fill="#78aeed"/>
-    <circle cx="558" cy="643" r="9" fill="#fff"/>
+    <rect x="340" y="641" width="260" height="4" rx="2" fill="#fff" fill-opacity=".18"/>
+    <rect x="340" y="641" width="221" height="4" rx="2" fill="#78aeed"/>
+    <circle cx="561" cy="643" r="9" fill="#fff"/>
     <text x="650" y="647.500" text-anchor="end" font-size="12" fill-opacity=".6">85%</text>
 
     <!-- Selector of the app the sounds are sent to -->
