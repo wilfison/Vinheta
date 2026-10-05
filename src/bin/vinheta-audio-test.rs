@@ -30,18 +30,17 @@ use std::time::Duration;
 use gst::glib;
 use vinheta::audio::{self, AudioEngine, Config, Event, PlayOptions, PlaybackId};
 
-const USAGE: &str = "usage: vinheta-audio-test [--help] [--version] [--once] [--mic NODE_NAME] \
+const USAGE: &str = "usage: vinheta-audio-test [--help] [--version] [--once] [--target APP] \
 [--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] [--no-call] \
 [--stop-after SECONDS] [--stop-all-after SECONDS] [--mute-call-after SECONDS] \
 [--unmute-call-after SECONDS] [--call-volume-after SECONDS GAIN] \
-[--monitor-volume-after SECONDS GAIN] [--no-voice] [--voice-off-after SECONDS] \
-[--voice-on-after SECONDS] [--mic-after SECONDS NODE_NAME] \
+[--monitor-volume-after SECONDS GAIN] [--target-after SECONDS APP] \
 [--monitor-after SECONDS NODE_NAME] [--replay-after SECONDS] [--volume GAIN] \
 [--playback-volume-after SECONDS GAIN] [--loop] [--loop-off-after SECONDS] \
 [--restart-after SECONDS] [--position-after SECONDS] [--fade-out SECONDS] \
 [--start-after SECONDS] [--restart-engine-after SECONDS] [FILE...]
 
-Without FILE, only the virtual microphone and the microphone link are created.
+Without FILE, the engine only starts and prints the lists.
 With FILEs, they are played together once, and again each time Enter is pressed.
 --once plays the FILEs a single time and exits when they end.
 --no-call starts with the call branch muted.
@@ -49,11 +48,12 @@ The --*-after options act that many seconds after the first playback starts:
 --stop-after stops the first FILE, --stop-all-after stops every FILE, and
 --mute-call-after and --unmute-call-after turn the call branch off and on,
 --call-volume-after and --monitor-volume-after set the gain of a branch (0 to 1),
---voice-off-after and --voice-on-after remove and restore the microphone link,
---mic-after and --monitor-after switch the microphone and the monitor output
-(the name \"default\" follows the system default), and --replay-after plays
-the FILEs again.
---no-voice starts without the microphone link.
+--target-after sends the sounds to another app (\"all\" is every app that is
+recording a microphone), --monitor-after switches the monitor output (the name
+\"default\" follows the system default), and --replay-after plays the FILEs
+again.
+--target is the app the sounds are sent to from the start, as the \"target:\"
+lines name it.
 --volume is the gain of every FILE (0 to 1) and --playback-volume-after changes
 the gain of the first FILE. --loop makes every FILE loop, --loop-off-after ends
 the loop of the first FILE, and --restart-after starts it again from the
@@ -64,9 +64,11 @@ first FILE (\"unknown\" for a missing duration, \"position none\" when it is ove
 --restart-engine-after drops the engine that many seconds after the playback
 starts, starts a new one, and plays the FILEs again; it does so twice, and
 prints \"threads N\" (the threads of the process) after each drop.
-The device lists are printed after the start and whenever they change.
+The outputs (\"devices changed\", then \"output:\" lines) and the recording apps
+(\"targets changed\", then \"target:\" lines) are printed after the start and
+whenever they change.
 An error is printed as \"error: KIND: TEXT\", KIND being a stable name
-(unreachable, connection-lost, node-exists, ...).";
+(unreachable, connection-lost, ...).";
 
 #[derive(Default)]
 struct Args {
@@ -80,9 +82,7 @@ struct Args {
     unmute_call_after: Option<Duration>,
     call_volume_after: Option<(Duration, f64)>,
     monitor_volume_after: Option<(Duration, f64)>,
-    voice_off_after: Option<Duration>,
-    voice_on_after: Option<Duration>,
-    mic_after: Option<(Duration, Option<String>)>,
+    target_after: Option<(Duration, Option<String>)>,
     monitor_after: Option<(Duration, Option<String>)>,
     replay_after: Option<Duration>,
     options: PlayOptions,
@@ -109,10 +109,11 @@ fn parse_args() -> Result<Args, String> {
                 .map_err(|_| format!("bad number of seconds: {text}"))
         };
         let device = |name: String| (name != "default").then_some(name);
+        let app = |name: String| (name != "all").then_some(name);
         match arg.as_str() {
             "--version" => parsed.version = true,
             "--once" => parsed.once = true,
-            "--mic" => parsed.config.mic = Some(value()?),
+            "--target" => parsed.config.target = app(value()?),
             "--monitor" => parsed.config.monitor = Some(value()?),
             "--call-volume" => parsed.config.call_volume = volume(value()?)?,
             "--monitor-volume" => parsed.config.monitor_volume = volume(value()?)?,
@@ -127,10 +128,9 @@ fn parse_args() -> Result<Args, String> {
             "--monitor-volume-after" => {
                 parsed.monitor_volume_after = seconds(value()?)?.zip(Some(volume(value()?)?));
             }
-            "--no-voice" => parsed.config.include_voice = false,
-            "--voice-off-after" => parsed.voice_off_after = seconds(value()?)?,
-            "--voice-on-after" => parsed.voice_on_after = seconds(value()?)?,
-            "--mic-after" => parsed.mic_after = seconds(value()?)?.zip(Some(device(value()?))),
+            "--target-after" => {
+                parsed.target_after = seconds(value()?)?.zip(Some(app(value()?)));
+            }
             "--monitor-after" => {
                 parsed.monitor_after = seconds(value()?)?.zip(Some(device(value()?)));
             }
@@ -257,18 +257,10 @@ impl Tester {
                 println!("monitor volume set to {gain}");
             });
         }
-        self.schedule(self.args.voice_off_after, |tester| {
-            tester.engine(|engine| engine.set_include_voice(false));
-            println!("voice turned off");
-        });
-        self.schedule(self.args.voice_on_after, |tester| {
-            tester.engine(|engine| engine.set_include_voice(true));
-            println!("voice turned on");
-        });
-        if let Some((delay, name)) = self.args.mic_after.clone() {
+        if let Some((delay, app)) = self.args.target_after.clone() {
             self.schedule(Some(delay), move |tester| {
-                println!("microphone set to {name:?}");
-                tester.engine(|engine| engine.set_microphone(name));
+                println!("target set to {app:?}");
+                tester.engine(|engine| engine.set_target(app));
             });
         }
         if let Some((delay, name)) = self.args.monitor_after.clone() {
@@ -351,8 +343,8 @@ impl Tester {
         glib::spawn_future_local(async move {
             while let Ok(event) = events.recv().await {
                 match event {
-                    Event::NodeCreated(id) => {
-                        println!("virtual microphone created, node id {id}");
+                    Event::Ready => {
+                        println!("engine ready");
                         if tester.restarts.get() > 0 {
                             println!("playing the files again");
                             tester.play_all();
@@ -367,29 +359,16 @@ impl Tester {
                             None => tester.start(),
                         }
                     }
-                    Event::MicLinked {
-                        name,
-                        fallback: false,
-                    } => {
-                        println!("microphone linked: {name}");
-                    }
-                    Event::MicLinked {
-                        name,
-                        fallback: true,
-                    } => {
-                        println!("microphone linked as a fallback: {name}");
-                    }
-                    Event::MicUnlinked => println!("microphone unlinked"),
-                    Event::DevicesChanged {
-                        microphones,
-                        outputs,
-                    } => {
+                    Event::DevicesChanged { outputs } => {
                         println!("devices changed");
-                        for device in microphones {
-                            println!("microphone: {} ({})", device.name, device.description);
-                        }
                         for device in outputs {
                             println!("output: {} ({})", device.name, device.description);
+                        }
+                    }
+                    Event::TargetsChanged(targets) => {
+                        println!("targets changed");
+                        for target in targets {
+                            println!("target: {} ({})", target.name, target.description);
                         }
                     }
                     Event::PlaybackFinished { id, path } => {

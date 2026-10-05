@@ -9,7 +9,7 @@
 		<key name="send-sounds-to-call" type="b">
 			<default>true</default>
 			<summary>Send sounds to call</summary>
-			<description>Whether sounds are played into the virtual microphone in addition to the local output.</description>
+			<description>Whether sounds are played into the apps that are recording a microphone in addition to the local output.</description>
 		</key>
 		<key name="monitor-volume" type="d">
 			<range min="0.0" max="1.0"/>
@@ -21,22 +21,17 @@
 			<range min="0.0" max="1.0"/>
 			<default>1.0</default>
 			<summary>Call volume</summary>
-			<description>Position of the slider that sets how loud sounds are in the virtual microphone, from 0 to 1.</description>
+			<description>Position of the slider that sets how loud sounds are in the call, from 0 to 1.</description>
 		</key>
-		<key name="microphone" type="s">
+		<key name="call-target" type="s">
 			<default>''</default>
-			<summary>Microphone</summary>
-			<description>PipeWire node name of the microphone mixed into the virtual one. Empty follows the system default.</description>
+			<summary>App the sounds are sent to</summary>
+			<description>Name of the binary of the app that gets the sounds, among the ones that are recording a microphone. Empty is all of them.</description>
 		</key>
 		<key name="monitor-output" type="s">
 			<default>''</default>
 			<summary>Monitor output</summary>
 			<description>PipeWire node name of the output where sounds are heard. Empty follows the system default.</description>
-		</key>
-		<key name="include-my-voice" type="b">
-			<default>true</default>
-			<summary>Include my voice</summary>
-			<description>Whether the microphone is passed through the virtual microphone.</description>
 		</key>
 		<key name="trigger-mode" type="s">
 			<choices>

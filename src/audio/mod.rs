@@ -18,8 +18,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-//! Audio engine: the "Vinheta" virtual microphone, the microphone link, and
-//! playback to the call and to the local monitor.
+//! Audio engine: playback to the local monitor and into the apps that are
+//! recording a microphone (the call).
 //!
 //! PipeWire runs on its own thread; the caller only sends commands and reads
 //! [`Event`]s from the receiver returned by [`AudioEngine::start`].
@@ -40,16 +40,15 @@ use self::player::Player;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Node name of the microphone. `None` follows the system default source.
-    pub mic: Option<String>,
+    /// The app the sounds are sent to, as named by [`Event::TargetsChanged`].
+    /// `None` is every app that is recording a microphone.
+    pub target: Option<String>,
     /// Node name of the monitor sink. `None` uses the system default sink.
     pub monitor: Option<String>,
     pub call_volume: f64,
     pub monitor_volume: f64,
     /// When false, the call branch of every sound is muted.
     pub send_to_call: bool,
-    /// When false, the microphone is not linked to the virtual microphone.
-    pub include_voice: bool,
     /// How long a stopped playback takes to fade out. Zero stops at once.
     pub fade_out: Duration,
 }
@@ -57,12 +56,11 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            mic: None,
+            target: None,
             monitor: None,
             call_volume: 1.0,
             monitor_volume: 1.0,
             send_to_call: true,
-            include_voice: true,
             fade_out: Duration::ZERO,
         }
     }
@@ -97,8 +95,9 @@ pub struct Position {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PlaybackId(u64);
 
-/// A microphone or an output. `name` is the PipeWire node name, which is what
-/// [`AudioEngine::set_microphone`] and [`AudioEngine::set_monitor`] take.
+/// An output or an app that is recording. `name` is what
+/// [`AudioEngine::set_monitor`] and [`AudioEngine::set_target`] take: the
+/// PipeWire node name of an output, the name of the binary of an app.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Device {
     pub name: String,
@@ -107,22 +106,15 @@ pub struct Device {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    /// The virtual microphone exists; the value is its PipeWire node id.
-    NodeCreated(u32),
-    /// `fallback` is set when the linked microphone is not the one asked
-    /// for: the chosen one does not exist, or the default source is the
-    /// virtual microphone itself.
-    MicLinked {
-        name: String,
-        fallback: bool,
-    },
-    /// The voice was turned off, so no microphone is linked.
-    MicUnlinked,
-    /// Sent once after the start and whenever either list changes.
+    /// The engine can play.
+    Ready,
+    /// Sent once after the start and whenever the list changes.
     DevicesChanged {
-        microphones: Vec<Device>,
         outputs: Vec<Device>,
     },
+    /// The apps that are recording a microphone. Sent once after the start
+    /// and whenever the list changes.
+    TargetsChanged(Vec<Device>),
     PlaybackFinished {
         id: PlaybackId,
         path: PathBuf,
@@ -139,9 +131,6 @@ pub enum Error {
     ConnectionLost(String),
     PipeWire(String),
     GStreamer(String),
-    NodeExists,
-    MicNotFound(String),
-    NoMicrophone,
     FileNotFound(PathBuf),
     Playback {
         id: PlaybackId,
@@ -159,9 +148,6 @@ impl fmt::Display for Error {
             }
             Self::PipeWire(message) => write!(f, "PipeWire error: {message}"),
             Self::GStreamer(message) => write!(f, "GStreamer error: {message}"),
-            Self::NodeExists => write!(f, "a node named \"{}\" already exists", graph::NODE_NAME),
-            Self::MicNotFound(name) => write!(f, "microphone \"{name}\" not found"),
-            Self::NoMicrophone => write!(f, "no microphone available to link"),
             Self::FileNotFound(path) => write!(f, "file not found: {}", path.display()),
             Self::Playback { path, message, .. } => {
                 write!(f, "could not play {}: {message}", path.display())
@@ -178,9 +164,6 @@ impl Error {
             Self::ConnectionLost(_) => "connection-lost",
             Self::PipeWire(_) => "pipewire",
             Self::GStreamer(_) => "gstreamer",
-            Self::NodeExists => "node-exists",
-            Self::MicNotFound(_) => "mic-not-found",
-            Self::NoMicrophone => "no-microphone",
             Self::FileNotFound(_) => "file-not-found",
             Self::Playback { .. } => "playback",
         }
@@ -196,15 +179,14 @@ pub struct AudioEngine {
 }
 
 impl AudioEngine {
-    /// Creates the virtual microphone and returns once it has been requested,
-    /// or fails if PipeWire is unreachable or the node already exists.
+    /// Connects to PipeWire and returns once the engine is set up there, or
+    /// fails if PipeWire is unreachable.
     pub fn start(config: Config) -> Result<(Self, async_channel::Receiver<Event>), Error> {
         let (events, receiver) = async_channel::unbounded();
         let player = Player::new(&config, events.clone())?;
 
         let options = graph::Options {
-            mic: config.mic,
-            include_voice: config.include_voice,
+            target: config.target,
         };
         let (commands, command_receiver) = pw::channel::channel();
         let (started, started_receiver) = mpsc::channel();
@@ -286,15 +268,11 @@ impl AudioEngine {
         self.player.set_monitor_volume(gain);
     }
 
-    /// Links another microphone, by node name. `None` follows the system
-    /// default source, which is also used while the chosen one does not exist.
-    pub fn set_microphone(&self, name: Option<String>) {
-        let _ = self.commands.send(Command::SetMic(name));
-    }
-
-    /// Removes or restores the link from the microphone to the virtual one.
-    pub fn set_include_voice(&self, enabled: bool) {
-        let _ = self.commands.send(Command::SetIncludeVoice(enabled));
+    /// Sends the sounds to one app only, current playbacks included. `None`
+    /// is every app that is recording a microphone. While the chosen app is
+    /// not recording, the sounds reach no app.
+    pub fn set_target(&self, app: Option<String>) {
+        let _ = self.commands.send(Command::SetTarget(app));
     }
 
     /// Moves the monitor branch of current and future playbacks to another

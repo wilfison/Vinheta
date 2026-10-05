@@ -12,7 +12,7 @@ Shortcuts only work while the window has the focus.
 
 ## Accelerators
 
-- "Stop All", "Send Sounds to Call", and "Include My Voice": Ctrl+Shift+S, Ctrl+Shift+L, Ctrl+Shift+M. The last two flip stateful actions made from the settings keys.
+- "Stop All" and "Send Sounds to Call": Ctrl+Shift+S and Ctrl+Shift+L. The second one flips a stateful action made from the settings key.
 - Ctrl+F opens the search, `Ctrl+,` the preferences, and Ctrl+Shift+Page Up and Page Down move the tab being shown.
 - `shortcuts-dialog.ui` is loaded automatically by libadwaita from the `resource-base-path`, which provides the `app.shortcuts` action; that is why it does not appear in `setup_gactions()`.
 

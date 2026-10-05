@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Verifies the audio engine without the real microphone or headphones: a fake
-# microphone (440 Hz) and a temporary sink stand in for them, and the sound is
-# a 1000 Hz tone. See docs/audio.md.
+# Verifies the audio engine without the real microphone, headphones, or call
+# apps: a fake microphone (440 Hz), a temporary sink, and recorders posing as
+# call apps stand in for them, and the sound is a 1000 Hz tone. See
+# docs/audio.md.
 set -uo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -36,6 +37,11 @@ mic=vinheta-test-mic
 monitor=vinheta-test-monitor
 mic2=vinheta-test-mic2
 monitor2=vinheta-test-monitor2
+# The fake call apps, as the engine names them. Every playback is sent to
+# the first one only: with every app as the target, the tones would reach
+# the real apps that are recording.
+app=vinheta-test-call
+other_app=vinheta-test-other
 present=-40
 absent=-60
 failures=0
@@ -122,8 +128,23 @@ record() {
     wait_for "recorder $1" port_exists "$1:input_FR"
 }
 
+# call_app APP FILE [MIC]: a recorder that WirePlumber links to the fake
+# microphone, as it does with a call app.
+call_app() {
+    pw-record --format s16 --rate 48000 --channels 2 --target "${3:-$mic}" \
+        -P "{ state.restore-props=false node.name=$1 application.name=\"Vinheta test app $1\" application.process.binary=$1 }" "$2" &
+    pids+=($!)
+    wait_for "the app $1" fed "$1"
+}
+
+# Whether a microphone feeds the recorder, and whether a sound does.
+fed() { pw-link -l | grep -A1 "^$1:input_" | grep -q '|<-'; }
+call_linked() { pw-link -l | grep -A4 "^$1:input_" | grep -q '|<- vinheta-call-'; }
+
+ready() { grep -q '^engine ready' "$1"; }
+
 leftovers() {
-    node_exists vinheta || pw-link -l | grep -Eq '(^| )vinheta:'
+    pw-dump | grep -Eq '"node.name": "vinheta-(drain|call|monitor)-'
 }
 
 gone_within_2s() {
@@ -154,25 +175,30 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 # Plays the files (the sound by default) through the subject and records the
-# call, the monitor, and a probe whose left channel is the call branch and right
-# channel the monitor branch. With run_for set, the subject is not expected to
-# exit: after that many seconds its state is noted and it is interrupted.
+# call (what the fake call app records), the monitor, and a probe whose left
+# channel is the call branch as the drain node gets it and right channel the
+# monitor branch. With run_for set, the subject is not expected to exit:
+# after that many seconds its state is noted and it is interrupted.
+# call_mic is the microphone of the call app, no_call_app leaves the app out,
+# and with_other_app adds a second one.
 files=()
 run_for=
 record_monitor2=
+call_mic=
+no_call_app=
+with_other_app=
 playback() {
     local label=$1 recorders subject_pid
     shift
     [ ${#files[@]} -eq 0 ] && files=("$sound")
     subject_started=$(date +%s.%N)
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" "$@" "${files[@]}" </dev/null >"$work/$label.log" 2>&1 &
+    "${subject[@]}" --target "$app" --monitor "$monitor" "$@" "${files[@]}" </dev/null >"$work/$label.log" 2>&1 &
     subject_pid=$!
-    wait_for "the vinheta node" port_exists vinheta:capture_FR || return 1
+    wait_for "the engine" ready "$work/$label.log" || return 1
 
     recorders=${#pids[@]}
-    record vinheta-test-rec-call "$work/$label-call.wav"
-    pw-link vinheta:capture_FL vinheta-test-rec-call:input_FL
-    pw-link vinheta:capture_FR vinheta-test-rec-call:input_FR
+    [ -z "$no_call_app" ] && call_app "$app" "$work/$label-call.wav" "${call_mic:-$mic}"
+    [ -n "$with_other_app" ] && call_app "$other_app" "$work/$label-other.wav"
     record vinheta-test-rec-monitor "$work/$label-monitor.wav"
     pw-link "$monitor:monitor_FL" vinheta-test-rec-monitor:input_FL
     pw-link "$monitor:monitor_FR" vinheta-test-rec-monitor:input_FR
@@ -182,13 +208,13 @@ playback() {
         pw-link "$monitor2:monitor_FR" vinheta-test-rec-monitor2:input_FR
     fi
     record vinheta-test-rec-probe "$work/$label-probe.wav"
-    pw-link vinheta:capture_FL vinheta-test-rec-probe:input_FL
+    pw-link "vinheta-drain-$subject_pid:monitor_MONO" vinheta-test-rec-probe:input_FL
     pw-link "$monitor:monitor_FL" vinheta-test-rec-probe:input_FR
 
     if [ -n "$run_for" ]; then
         sleep "$run_for"
         subject_alive=no
-        kill -0 "$subject_pid" 2>/dev/null && node_exists vinheta && subject_alive=ok
+        kill -0 "$subject_pid" 2>/dev/null && node_exists "vinheta-drain-$subject_pid" && subject_alive=ok
         kill -INT "$subject_pid" 2>/dev/null
     fi
     wait "$subject_pid"
@@ -197,6 +223,9 @@ playback() {
     files=()
     run_for=
     record_monitor2=
+    call_mic=
+    no_call_app=
+    with_other_app=
     sleep 0.3
     kill -INT "${pids[@]:$recorders}" 2>/dev/null
     wait "${pids[@]:$recorders}" 2>/dev/null
@@ -245,15 +274,15 @@ between() {
     python3 -c 'import sys; v, low, high = map(float, sys.argv[1:]); sys.exit(0 if low <= v <= high else 1)' "$@" && echo ok
 }
 
-# The links of the first port of the engine's monitor stream, and of one
-# input of the virtual microphone.
+# The links of the first port of the engine's monitor stream.
 monitor_links() { pw-link -l | grep -A2 '^vinheta-monitor-[0-9-]*:output_FL'; }
-voice_links() { pw-link -l | grep -A4 "^vinheta:input_$1" | grep '|<-' | grep -v 'vinheta-call-'; }
 
-# device_blocks LOG: the "devices changed" blocks of a log, one per line.
-device_blocks() {
-    awk '/^devices changed$/ { if (block) print block; block = "#"; next }
-         /^(microphone|output): / { if (block) block = block " " $0; next }
+# list_blocks LOG [KIND]: the "devices changed" blocks of a log (or the
+# "targets changed" ones, with the kind "target"), one per line.
+list_blocks() {
+    awk -v kind="${2:-output}" -v title="${2:-device}s changed" '
+         $0 == title { if (block) print block; block = "#"; next }
+         index($0, kind ": ") == 1 { if (block) block = block " " $0; next }
          END { if (block) print block }' "$1"
 }
 
@@ -281,6 +310,10 @@ ffmpeg -v error -y -f lavfi -i "sine=frequency=1000:duration=4" \
 
 nodes+=("$(create_node "$mic" "Vinheta test microphone" Audio/Source/Virtual MONO)")
 nodes+=("$(create_node "$monitor" "Vinheta test monitor" Audio/Sink "FL FR")")
+# A second microphone, silent and stereo, and a second sink.
+mic2_id=$(create_node "$mic2" "Vinheta test microphone 2" Audio/Source/Virtual "FL FR")
+monitor2_id=$(create_node "$monitor2" "Vinheta test monitor 2" Audio/Sink "FL FR")
+nodes+=("$mic2_id" "$monitor2_id")
 # A live GStreamer source feeding an unmanaged pipewiresink stalls the whole
 # graph (docs/audio.md, known issues), so the fake voice is a file.
 ffmpeg -v error -y -f lavfi -i "sine=frequency=440:duration=600" \
@@ -431,15 +464,16 @@ if section "playback volume and branch volume"; then
     check "monitor keeps the playback gain ($value dB)" "$(between "$value" -2 2)"
 fi
 
-# One second of tone with no silence around it. The voice is off in the
-# loop checks, so that silence on the call recording means a gap.
+# One second of tone with no silence around it. The call app records the
+# silent microphone in the loop checks, so that silence on the call
+# recording means a gap.
 loop="$work/sound-loop.wav"
 ffmpeg -v error -y -f lavfi -i "sine=frequency=1000:duration=1" \
     -af "volume=-12dB,pan=stereo|c0=c0|c1=c0" -ar 48000 "$loop" || exit 1
 
 if section "loop"; then
-    files=("$loop") run_for=7
-    playback loop --no-voice --start-after 1 --loop --stop-after 3.5
+    files=("$loop") run_for=7 call_mic=$mic2
+    playback loop --start-after 1 --loop --stop-after 3.5
     for branch in call monitor; do
         file="$work/loop-$branch.wav"
         expect "$branch in the third pass" "$file" 1000 present "$(window "$file" 2)" 1
@@ -451,8 +485,8 @@ if section "loop"; then
 fi
 
 if section "loop off"; then
-    files=("$loop")
-    playback loop-off --no-voice --start-after 1 --once --loop --loop-off-after 1.5
+    files=("$loop") call_mic=$mic2
+    playback loop-off --start-after 1 --once --loop --loop-off-after 1.5
     check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
     check "subject exited within 4 s of the start of the sound ($subject_seconds s with the 1 s wait)" \
         "$(between "$subject_seconds" 0 5)"
@@ -497,10 +531,10 @@ if section "fade out"; then
 fi
 
 if section "fade and exit"; then
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" --fade-out 2 --stop-all-after 4 "$long" \
+    "${subject[@]}" --target "$app" --monitor "$monitor" --fade-out 2 --stop-all-after 4 "$long" \
         </dev/null >"$work/fade-exit.log" 2>&1 &
     subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 4.5; then
+    if wait_for "the engine" ready "$work/fade-exit.log" && sleep 4.5; then
         check "the sound is still fading" "$(streams | grep -q . && echo ok)"
         kill -INT "$subject_pid"
         check "nothing left after an exit during a fade" "$(gone_within_2s && [ -z "$(streams)" ] && echo ok)"
@@ -511,69 +545,129 @@ if section "fade and exit"; then
 fi
 
 if section "device list"; then
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" </dev/null >"$work/devices.log" 2>&1 &
+    "${subject[@]}" --target "$app" --monitor "$monitor" </dev/null >"$work/devices.log" 2>&1 &
     subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR; then
+    if wait_for "the engine" ready "$work/devices.log"; then
         sleep 0.5
         extra=$(create_node vinheta-test-extra "Vinheta test extra" Audio/Sink "FL FR")
         sleep 2
-        with_extra=$(device_blocks "$work/devices.log" | tail -n 1)
+        with_extra=$(list_blocks "$work/devices.log" | tail -n 1)
         pw-cli destroy "$extra" >/dev/null
         sleep 2
     fi
     kill -INT "$subject_pid" 2>/dev/null
     wait "$subject_pid" 2>/dev/null
-    first=$(device_blocks "$work/devices.log" | head -n 1)
-    last=$(device_blocks "$work/devices.log" | tail -n 1)
-    check "the fake microphone is listed with its description" \
-        "$([[ $first == *"microphone: $mic (Vinheta test microphone)"* ]] && echo ok)"
+    first=$(list_blocks "$work/devices.log" | head -n 1)
+    last=$(list_blocks "$work/devices.log" | tail -n 1)
     check "the fake sink is listed with its description" \
         "$([[ $first == *"output: $monitor (Vinheta test monitor)"* ]] && echo ok)"
-    check "the virtual microphone is never listed" \
-        "$(grep -q '^microphone: vinheta (' "$work/devices.log" || echo ok)"
+    check "the drain node is never listed" \
+        "$(grep -q '^output: vinheta-drain-' "$work/devices.log" || echo ok)"
     check "a sink plugged in shows up within 2 s" \
         "$([[ $with_extra == *"output: vinheta-test-extra (Vinheta test extra)"* ]] && echo ok)"
     check "a removed sink leaves the list" "$([[ $last != *vinheta-test-extra* ]] && echo ok)"
 fi
 
-if section "voice off and on"; then
-    files=("$long")
-    playback voice --once --voice-off-after 4 --voice-on-after 6.5
-    call="$work/voice-call.wav"
-    expect "call before the voice is off" "$call" 440 present "$(window "$call")" 1.5
-    expect "call while the voice is off" "$call" 440 absent "$(after "$call" 4 0.5)" 1.5
-    expect "call while the voice is off" "$call" 1000 present "$(after "$call" 4 0.5)" 1.5
-    expect "call after the voice is back" "$call" 440 present "$(after "$call" 6.5 0.5)" 1.5
+if section "no app is recording"; then
+    no_call_app=1
+    playback no-app "${once[@]}"
+    check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
+    expect "monitor" "$work/no-app-monitor.wav" 1000 present "$(window "$work/no-app-monitor.wav")"
 fi
 
-if section "voice off from the start"; then
-    playback no-voice --once --no-voice
-    start=$(window "$work/no-voice-call.wav")
-    expect "call" "$work/no-voice-call.wav" 440 absent "$start"
-    expect "call" "$work/no-voice-call.wav" 1000 present "$start"
+if section "the chosen app is not recording"; then
+    playback absent-app "${once[@]}" --target vinheta-test-nobody
+    check "subject exited with status 0" "$([ "$subject_status" -eq 0 ] && echo ok)"
+    start=$(window "$work/absent-app-monitor.wav")
+    expect "another app" "$work/absent-app-call.wav" 1000 absent "$start"
+    expect "another app" "$work/absent-app-call.wav" 440 present "$start"
+    expect "monitor" "$work/absent-app-monitor.wav" 1000 present "$start"
 fi
 
-# A second fake microphone, with another tone, and a second fake sink.
-mic2_id=$(create_node "$mic2" "Vinheta test microphone 2" Audio/Source/Virtual MONO)
-monitor2_id=$(create_node "$monitor2" "Vinheta test monitor 2" Audio/Sink "FL FR")
-nodes+=("$mic2_id" "$monitor2_id")
-ffmpeg -v error -y -f lavfi -i "sine=frequency=880:duration=600" \
-    -af "volume=-12dB" -ac 1 -ar 48000 "$work/voice2.wav" || exit 1
-pw-play -P node.autoconnect=false -P state.restore-props=false \
-    -P node.name=vinheta-test-tone2 "$work/voice2.wav" &
-pids+=($!)
-wait_for "the second fake microphone tone" port_exists vinheta-test-tone2:output_MONO || exit 1
-pw-link vinheta-test-tone2:output_MONO "$mic2:input_MONO"
+if section "target switch"; then
+    files=("$long") with_other_app=1
+    playback target-switch --once --target-after 4 "$other_app"
+    first="$work/target-switch-call.wav"
+    second="$work/target-switch-other.wav"
+    expect "first app before the switch" "$first" 1000 present "$(window "$first")" 1.5
+    expect "first app 200 ms after the switch" "$first" 1000 absent "$(after "$first" 4 0.2)" 0.5
+    expect "first app after the switch" "$first" 440 present "$(after "$first" 4)" 1.5
+    # The tone reaches the second app when the target changes, 2.5 s after
+    # it started.
+    expect "second app before the switch" "$second" 1000 absent "$(window "$second" -2)" 1.5
+    expect "second app after the switch" "$second" 1000 present "$(window "$second" 0.2)" 1.5
+fi
 
-if section "microphone switch"; then
+# The app starts recording 4 s into the playback, in the middle of the tone.
+if section "an app that starts recording while a sound plays"; then
+    late="$work/late-app-call.wav"
+    (
+        sleep 4
+        timeout -s INT 5 pw-record --format s16 --rate 48000 --channels 2 --target "$mic" \
+            -P "{ state.restore-props=false node.name=$app application.process.binary=$app }" "$late"
+    ) &
+    watcher=$!
+    files=("$long") no_call_app=1
+    playback late-app "${once[@]}"
+    wait "$watcher"
+    value=$(analyze onset "$late" 0 1000)
+    check "the sound reaches the app within 500 ms ($value ms)" "$(between "$value" 0 500 2>/dev/null)"
+    expect "the app that came late" "$late" 1000 present 1 1.5
+fi
+
+# The second microphone is stereo, so the ports of the app are replaced
+# and the links of the engine with them. It is silent, so the voice going
+# away shows that the app moved.
+if section "an app moved to another microphone"; then
+    (
+        sleep 4.5
+        pw-metadata "$(node_id "$app")" target.object "$mic2" >/dev/null
+    ) &
+    watcher=$!
     files=("$long")
-    playback mic-switch --once --mic-after 4 "$mic2"
-    call="$work/mic-switch-call.wav"
-    expect "call before the switch" "$call" 440 present "$(window "$call")" 1.5
-    expect "call before the switch" "$call" 880 absent "$(window "$call")" 1.5
-    expect "call after the switch" "$call" 440 absent "$(after "$call" 4)" 1.5
-    expect "call after the switch" "$call" 880 present "$(after "$call" 4)" 1.5
-    expect "call after the switch" "$call" 1000 present "$(after "$call" 4)" 1.5
+    playback app-moved "${once[@]}"
+    wait "$watcher"
+    call="$work/app-moved-call.wav"
+    expect "call before the move" "$call" 440 present "$(window "$call")" 1.5
+    expect "call after the move" "$call" 440 absent "$(after "$call" 4.5 1)" 1.5
+    expect "call after the move" "$call" 1000 present "$(after "$call" 4.5 1)" 1.5
+    value=$(analyze gaps "$call" 0 "$(window "$call")" "$(after "$call" 4.5 2)")
+    check "the sound is back within 200 ms (longest silence: $value ms)" "$(between "$value" 0 200)"
+fi
+
+# With every app as the target the sounds would reach the real apps that
+# are recording, so this one plays with the call volume at 0 and looks at
+# the links instead.
+if section "every recording app"; then
+    extras=${#pids[@]}
+    pw-record --target "$mic" \
+        -P "{ state.restore-props=false stream.monitor=true node.name=vinheta-test-meter application.process.binary=vinheta-test-meter }" /dev/null &
+    pids+=($!)
+    record vinheta-test-desktop /dev/null
+    pw-link "$monitor:monitor_FL" vinheta-test-desktop:input_FL
+    pw-link "$monitor:monitor_FR" vinheta-test-desktop:input_FR
+    (
+        sleep 3.5
+        for name in "$app" "$other_app" vinheta-test-meter vinheta-test-desktop; do
+            call_linked "$name" && echo "$name"
+        done >"$work/all-apps-linked.txt"
+    ) &
+    watcher=$!
+    files=("$long") with_other_app=1 run_for=5
+    playback all-apps --target all --call-volume 0
+    wait "$watcher"
+    kill -INT "${pids[@]:$extras}" 2>/dev/null
+    wait "${pids[@]:$extras}" 2>/dev/null
+    pids=("${pids[@]:0:$extras}")
+    linked() { grep -qx "$1" "$work/all-apps-linked.txt"; }
+    check "the sound is linked to both apps" "$(linked "$app" && linked "$other_app" && echo ok)"
+    check "the sound is not linked to a level meter" "$(linked vinheta-test-meter || echo ok)"
+    check "the sound is not linked to a recorder of an output" "$(linked vinheta-test-desktop || echo ok)"
+    targets=$(list_blocks "$work/all-apps.log" target | grep -F "$other_app" | tail -n 1)
+    check "both apps are listed with their names" \
+        "$([[ $targets == *"target: $app (Vinheta test app $app)"*"target: $other_app (Vinheta test app $other_app)"* ]] && echo ok)"
+    check "the meter and the recorder of an output are never listed" \
+        "$(grep -Eq '^target: vinheta-test-(meter|desktop) ' "$work/all-apps.log" || echo ok)"
 fi
 
 if section "monitor switch"; then
@@ -632,50 +726,21 @@ if section "output removed while playing"; then
     expect "call after the removal" "$call" 1000 present "$(window "$call" 4.5)" 1.5
 fi
 
-# The fallback of a removed microphone is the real default source, so
-# this one plays nothing and records nothing.
-if section "microphone removed and back"; then
-    "${subject[@]}" --mic "$mic2" --monitor "$monitor" </dev/null >"$work/mic-removed.log" 2>&1 &
-    subject_pid=$!
-    if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 1.5; then
-        check "the chosen microphone is linked" "$(voice_links FL | grep -q "$mic2:" && echo ok)"
-        pw-cli destroy "$mic2_id" >/dev/null
-        sleep 2
-        check "the missing microphone is reported" \
-            "$(grep -q "microphone \"$mic2\" not found" "$work/mic-removed.log" && echo ok)"
-        check "another microphone is linked as a fallback" \
-            "$(grep -q '^microphone linked as a fallback: ' "$work/mic-removed.log" && echo ok)"
-        check "the fallback feeds both inputs" \
-            "$(voice_links FL | grep -q . && voice_links FR | grep -q . && echo ok)"
-        mic2_id=$(create_node "$mic2" "Vinheta test microphone 2" Audio/Source/Virtual MONO)
-        nodes+=("$mic2_id")
-        sleep 2
-        check "the chosen microphone is linked again" \
-            "$(tail -n 3 "$work/mic-removed.log" | grep -q "^microphone linked: $mic2" && voice_links FL | grep -q "$mic2:" && echo ok)"
-    else
-        check "subject started for the microphone removal" fail
-    fi
-    kill -INT "$subject_pid" 2>/dev/null
-    wait "$subject_pid" 2>/dev/null
-fi
-
-# The recorders cannot be attached by playback(): the node they record from is
-# destroyed with each engine. They are attached to the node of the last one.
+# The recorders are started for the last engine only, so the recordings
+# hold its playback alone.
 if section "a second engine in the same process"; then
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" --once --restart-engine-after 1 "$sound" \
+    "${subject[@]}" --target "$app" --monitor "$monitor" --once --restart-engine-after 1 "$sound" \
         </dev/null >"$work/second-engine.log" 2>&1 &
     subject_pid=$!
-    started_twice() { [ "$(grep -c '^engine started again' "$work/second-engine.log")" -eq 2 ]; }
-    if wait_for "the third engine" started_twice && wait_for "the vinheta node" port_exists vinheta:capture_FR; then
+    ready_thrice() { [ "$(grep -c '^engine ready' "$work/second-engine.log")" -eq 3 ]; }
+    if wait_for "the third engine" ready_thrice; then
         recorders=${#pids[@]}
-        record vinheta-test-rec-call "$work/second-engine-call.wav"
-        pw-link vinheta:capture_FL vinheta-test-rec-call:input_FL
-        pw-link vinheta:capture_FR vinheta-test-rec-call:input_FR
+        call_app "$app" "$work/second-engine-call.wav"
         record vinheta-test-rec-monitor "$work/second-engine-monitor.wav"
         pw-link "$monitor:monitor_FL" vinheta-test-rec-monitor:input_FL
         pw-link "$monitor:monitor_FR" vinheta-test-rec-monitor:input_FR
-        count=$(pw-dump | grep -c '"node.name": "vinheta"')
-        check "the node exists once after the restarts ($count found)" "$([ "$count" -eq 1 ] && echo ok)"
+        count=$(pw-dump | grep -c '"node.name": "vinheta-drain-')
+        check "the drain node exists once after the restarts ($count found)" "$([ "$count" -eq 1 ] && echo ok)"
         wait "$subject_pid"
         check "subject exited with status 0" "$([ $? -eq 0 ] && echo ok)"
         sleep 0.3
@@ -700,20 +765,6 @@ if section "a second engine in the same process"; then
     fi
 fi
 
-if section "the node name is taken"; then
-    taken=$(create_node vinheta "Vinheta test other" Audio/Sink "FL FR")
-    nodes+=("$taken")
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" --once "$sound" </dev/null >"$work/taken.log" 2>&1
-    check "the start fails while the name is taken" "$([ $? -ne 0 ] && echo ok)"
-    check "the kind of the error is node-exists" "$(grep -q '^error: node-exists: ' "$work/taken.log" && echo ok)"
-    pw-cli destroy "$taken" >/dev/null
-    node_gone() { ! node_exists vinheta; }
-    wait_for "the other node to go" node_gone
-    "${subject[@]}" --mic "$mic" --monitor "$monitor" --once "$sound" </dev/null >"$work/taken-after.log" 2>&1
-    check "the start succeeds once the name is free" "$([ $? -eq 0 ] && echo ok)"
-    check "nothing left after the exit" "$(gone_within_2s && echo ok)"
-fi
-
 # A private PipeWire instance: no session manager and no devices, and killing
 # it harms nothing. Nothing is played here: the monitor branch never links.
 if section "a lost connection is reported"; then
@@ -729,8 +780,7 @@ if section "a lost connection is reported"; then
     if wait_for "the private instance" socket_ready; then
         PIPEWIRE_REMOTE=$private "${subject[@]}" </dev/null >"$work/lost.log" 2>&1 &
         subject_pid=$!
-        node_created() { grep -q '^virtual microphone created' "$work/lost.log"; }
-        if wait_for "the node on the private instance" node_created; then
+        if wait_for "the engine on the private instance" ready "$work/lost.log"; then
             kill "$private_pid"
             reported=
             for _ in $(seq 20); do
@@ -755,17 +805,21 @@ fi
 
 for signal in INT KILL; do
     if section "cleanup after SIG$signal"; then
-        "${subject[@]}" --mic "$mic" --monitor "$monitor" "$sound" </dev/null >"$work/sig$signal.log" 2>&1 &
+        "${subject[@]}" --target "$app" --monitor "$monitor" "$sound" </dev/null >"$work/sig$signal.log" 2>&1 &
         subject_pid=$!
-        if wait_for "the vinheta node" port_exists vinheta:capture_FR && sleep 2.5; then
-            check "microphone linked before SIG$signal" \
-                "$(pw-link -l | grep -A2 "^$mic:capture_MONO" | grep -q 'vinheta:input_FL' && echo ok)"
+        recorders=${#pids[@]}
+        if wait_for "the engine" ready "$work/sig$signal.log" && call_app "$app" /dev/null && sleep 2.5; then
+            check "the sound is linked to the app before SIG$signal" "$(call_linked "$app" && echo ok)"
             kill "-$signal" "$subject_pid"
             check "nothing left after SIG$signal" "$(gone_within_2s && echo ok)"
+            check "the app is still fed by its microphone" "$(fed "$app" && ! call_linked "$app" && echo ok)"
         else
             check "subject started for SIG$signal" fail
         fi
         wait "$subject_pid" 2>/dev/null
+        kill -INT "${pids[@]:$recorders}" 2>/dev/null
+        wait "${pids[@]:$recorders}" 2>/dev/null
+        pids=("${pids[@]:0:$recorders}")
     fi
 done
 

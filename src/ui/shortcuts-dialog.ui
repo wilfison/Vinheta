@@ -16,12 +16,6 @@
             <property name="action-name">app.send-sounds-to-call</property>
           </object>
         </child>
-        <child>
-          <object class="AdwShortcutsItem">
-            <property name="title" translatable="yes" context="shortcut window">Include My Voice</property>
-            <property name="action-name">app.include-my-voice</property>
-          </object>
-        </child>
       </object>
     </child>
     <child>

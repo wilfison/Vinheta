@@ -35,6 +35,6 @@ Description: soundboard that plays sounds into your calls
  Vinheta is a soundboard for the GNOME desktop. Each folder added by the
  user becomes a tab with a pad per sound, played with a click or a key.
  .
- Sounds are played on the audio output and are also sent to a virtual
- microphone named "Vinheta", together with the voice of the user, so that
+ Sounds are played on the audio output and are also sent to the apps that
+ are using the microphone, together with the voice of the user, so that
  other people hear them in calls.

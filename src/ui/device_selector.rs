@@ -18,8 +18,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-//! Keeps a `GtkDropDown` or an `AdwComboRow` in sync with a device list of
-//! the application and with the settings key that stores the chosen device.
+//! Keeps a `GtkDropDown` or an `AdwComboRow` in sync with a list of the
+//! application (the outputs, or the apps that are recording) and with the
+//! settings key that stores the chosen entry.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -35,15 +36,16 @@ use crate::APP_ID;
 pub fn bind(selector: &impl IsA<gtk::Widget>, app: &VinhetaApplication, kind: DeviceKind) {
     let selector = selector.upcast_ref::<gtk::Widget>();
     let settings = gio::Settings::new(APP_ID);
-    // The node name of each entry, in the order shown.
+    // The name of each entry, in the order shown.
     let names: Rc<RefCell<Vec<String>>> = Rc::default();
+    // What is shown, to leave an open list alone when nothing changed.
+    let shown: Rc<RefCell<(Vec<String>, usize)>> = Rc::default();
     // Set while the list is rebuilt, which moves the selection by itself.
     let refreshing = Rc::new(Cell::new(false));
 
     let refresh = {
         let names = names.clone();
         let refreshing = refreshing.clone();
-        let settings = settings.clone();
         let selector = selector.downgrade();
         let app = app.downgrade();
         move || {
@@ -53,24 +55,35 @@ pub fn bind(selector: &impl IsA<gtk::Widget>, app: &VinhetaApplication, kind: De
             let (entries, selected) = app.device_entries(kind);
             let labels: Vec<String> = entries
                 .iter()
-                .map(|entry| match (entry.name.is_empty(), entry.available) {
-                    (true, _) => gettext("System Default"),
-                    (false, true) => entry.description.clone(),
-                    // Translators: {} is the name of an audio device that is not connected.
-                    (false, false) => gettext("{} (unavailable)").replace("{}", &entry.description),
-                })
+                .map(
+                    |entry| match (kind, entry.name.is_empty(), entry.available) {
+                        (DeviceKind::Output, true, _) => gettext("System Default"),
+                        // Translators: the sounds are sent to every app that is using the microphone.
+                        (DeviceKind::CallApp, true, _) => gettext("All Apps"),
+                        (_, false, true) => entry.description.clone(),
+                        (DeviceKind::Output, false, false) => {
+                            // Translators: {} is the name of an audio device that is not connected.
+                            gettext("{} (unavailable)").replace("{}", &entry.description)
+                        }
+                        (DeviceKind::CallApp, false, false) => {
+                            // Translators: {} is the name of an app that is not using the microphone.
+                            gettext("{} (not recording)").replace("{}", &entry.description)
+                        }
+                    },
+                )
                 .collect();
-            let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+            selector.set_sensitive(app.audio_available());
+            names.replace(entries.into_iter().map(|entry| entry.name).collect());
+            if *shown.borrow() == (labels.clone(), selected) {
+                return;
+            }
 
             refreshing.set(true);
-            names.replace(entries.into_iter().map(|entry| entry.name).collect());
-            selector.set_property("model", gtk::StringList::new(&labels));
+            let model: Vec<&str> = labels.iter().map(String::as_str).collect();
+            selector.set_property("model", gtk::StringList::new(&model));
             selector.set_property("selected", selected as u32);
             refreshing.set(false);
-
-            // The microphone has no effect while the voice is off.
-            let used = kind != DeviceKind::Microphone || settings.boolean("include-my-voice");
-            selector.set_sensitive(app.audio_available() && used);
+            shown.replace((labels, selected));
         }
     };
     refresh();
@@ -98,7 +111,7 @@ pub fn bind(selector: &impl IsA<gtk::Widget>, app: &VinhetaApplication, kind: De
         move |_, key| {
             // Not at once: the key may be changing from inside the activation
             // of an entry, and the list must outlive it.
-            if key == kind.key() || key == "include-my-voice" {
+            if key == kind.key() {
                 glib::idle_add_local_once(refresh.clone());
             }
         }

@@ -7,7 +7,7 @@ set -uo pipefail
 usage() {
     cat >&2 <<'USAGE'
 usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [--pads FILE]
-                     [--fake-mic 'NODE DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
+                     [--fake-app 'NAME DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
                      [STEP]... [--no-audio] [--private-pipewire] [--first-run]
                      [--lang LOCALE] [--light] [--debug] [--sheet]
        screenshot.sh --clean
@@ -19,9 +19,15 @@ Writes tmp/screenshots/NAME.png from the app installed in build/install.
 --pads FILE    uses FILE as the pad settings (pads.json) the app starts with:
                {"version": 1, "pads": {"/abs/sound.wav": {"name": "Intro",
                "color": "purple", "volume": 0.8, "loop": true}}}
---fake-mic 'NODE DESCRIPTION', --fake-sink 'NODE DESCRIPTION'
-               creates a fake device before the app starts, for a known entry
-               in the device lists (use the node name prefix vinheta-shot-)
+--fake-sink 'NODE DESCRIPTION'
+               creates a fake output before the app starts, for a known entry
+               in the output list (use the node name prefix vinheta-shot-)
+--fake-app 'NAME DESCRIPTION'
+               starts a fake call app before the app starts, for a known
+               entry in the list of apps the sounds are sent to: a recorder
+               of a silent fake microphone (use the prefix vinheta-shot- too;
+               NAME is what the call-target key stores). It needs the session
+               manager, so it does not show with --private-pipewire
 --no-audio     makes PipeWire unreachable, to capture the audio failure state
 --private-pipewire  starts a PipeWire instance of its own (no session manager,
                no devices) and points the app, and every fake device, at it.
@@ -44,9 +50,10 @@ Steps run in the given order once the window is up, before the capture:
 --key KEYS     presses keys, in xdotool syntax (Return, ctrl+q, Tab)
 --size W,H     resizes the window
 --wait SECONDS waits
---plug-mic 'NODE DESCRIPTION', --plug-sink 'NODE DESCRIPTION'
-               creates a fake device while the app runs
---unplug NODE  destroys a fake device
+--plug-app 'NAME DESCRIPTION', --plug-sink 'NODE DESCRIPTION'
+               starts a fake call app or creates a fake output while the app
+               runs
+--unplug NODE  destroys a fake output, or stops a fake call app
 --stop-pipewire, --start-pipewire  kills and starts the instance of
                --private-pipewire while the app runs
 --capture NAME writes tmp/screenshots/NAME.png at this point of the sequence
@@ -63,7 +70,7 @@ Steps run in the given order once the window is up, before the capture:
 
 Warnings and criticals logged by the app are printed at the end.
 
-Fake devices are destroyed when the script ends, whatever happens.
+Fake outputs and call apps are removed when the script ends, whatever happens.
 USAGE
     exit 2
 }
@@ -93,13 +100,13 @@ while [ $# -gt 0 ]; do
         --folder) [ $# -ge 2 ] || usage; folders+=("$(realpath "$2")"); shift ;;
         --setting) [ $# -ge 2 ] || usage; settings+=("$2"); shift ;;
         --pads) [ $# -ge 2 ] || usage; pads=$(realpath "$2"); shift ;;
-        --fake-mic | --fake-sink)
+        --fake-app | --fake-sink)
             [ $# -ge 2 ] || usage
             fakes+=("${1#--fake-} $2")
             fake_names+=("${2%% *}")
             shift
             ;;
-        --action | --click | --right-click | --key | --size | --wait | --exec | --expect-setting | --expect-playing | --plug-mic | --plug-sink | --unplug | --capture | --crop)
+        --action | --click | --right-click | --key | --size | --wait | --exec | --expect-setting | --expect-playing | --plug-app | --plug-sink | --unplug | --capture | --crop)
             [ $# -ge 2 ] || usage
             steps+=("${1#--} $2")
             case $1 in
@@ -172,14 +179,25 @@ stop_pipewire() {
         "$private_socket-manager" "$private_socket-manager.lock"
 }
 
-# fake_device KIND NODE DESCRIPTION
+# fake_device KIND NAME DESCRIPTION. An app is a recorder of a silent fake
+# microphone, which is created with the first one.
+app_mic=vinheta-shot-app-mic
+app_pids="$config/app.pids"
+fake_names+=("$app_mic")
 fake_device() {
-    local class=Audio/Sink positions="FL FR"
-    [ "$1" = mic ] && class=Audio/Source/Virtual positions=MONO
-    create_node "$2" "$3" "$class" "$positions" >/dev/null
+    if [ "$1" = sink ]; then
+        create_node "$2" "$3" Audio/Sink "FL FR" >/dev/null
+        return
+    fi
+    node_exists "$app_mic" ||
+        create_node "$app_mic" "Vinheta screenshot microphone" Audio/Source/Virtual MONO >/dev/null || return 1
+    pw-record --target "$app_mic" \
+        -P "{ state.restore-props=false node.name=$2 application.name=\"$3\" application.process.binary=$2 }" \
+        /dev/null >/dev/null 2>&1 &
+    echo $! >>"$app_pids"
 }
 
-# How many sounds play: each has one stream into the virtual microphone.
+# How many sounds play: each has one call stream.
 playing_count() { pw-dump | grep -c '"node.name": "vinheta-call-'; }
 
 # expect WHAT VALUE COMMAND...: the command prints VALUE within 2 seconds.
@@ -203,6 +221,7 @@ unplug() {
 
 remove_fakes() {
     local node
+    [ ! -f "$app_pids" ] || xargs -r kill <"$app_pids" 2>/dev/null
     for node in "${fake_names[@]}"; do unplug "$node"; done
     [ -z "$private" ] || stop_pipewire
 }
@@ -254,7 +273,7 @@ session() {
             exec) bash -c "$value" ;;
             expect-setting) expect "setting ${value%% *}" "${value#* }" gsettings get "$app_id" "${value%% *}" ;;
             expect-playing) expect "sounds playing" "$value" playing_count ;;
-            plug-mic) fake_device mic "${value%% *}" "${value#* }" ;;
+            plug-app) fake_device app "${value%% *}" "${value#* }" ;;
             plug-sink) fake_device sink "${value%% *}" "${value#* }" ;;
             unplug) unplug "$value" ;;
             stop-pipewire) stop_pipewire ;;
@@ -276,7 +295,7 @@ session() {
 {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-common.sh'"
-    declare -p directories shots name settings steps first_run private_name private_pid_file private_socket config
+    declare -p directories shots name settings steps first_run private_name private_pid_file private_socket config app_mic app_pids
     declare -f fake_device unplug playing_count expect start_pipewire stop_pipewire session
     echo session
 } >"$config/session.sh"

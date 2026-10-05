@@ -89,9 +89,7 @@ mod imp {
         #[template_child]
         pub call_volume_row: TemplateChild<gtk::Box>,
         #[template_child]
-        pub microphone: TemplateChild<gtk::DropDown>,
-        #[template_child]
-        pub microphone_icon: TemplateChild<gtk::Image>,
+        pub call_app: TemplateChild<gtk::DropDown>,
         #[template_child]
         pub tab_menu: TemplateChild<gio::MenuModel>,
         pub settings: OnceCell<gio::Settings>,
@@ -159,7 +157,7 @@ mod imp {
                 volume.emit_by_name::<()>("value-changed", &[]);
             }
             if let Some(app) = app() {
-                device_selector::bind(&*self.microphone, &app, DeviceKind::Microphone);
+                device_selector::bind(&*self.call_app, &app, DeviceKind::CallApp);
                 // Never disconnected: the window lives as long as the app.
                 app.connect_local(
                     "devices-changed",
@@ -170,12 +168,12 @@ mod imp {
                         #[upgrade_or]
                         None,
                         move |_| {
-                            obj.update_microphone_mark();
+                            obj.update_call_app_mark();
                             None
                         }
                     ),
                 );
-                obj.update_microphone_mark();
+                obj.update_call_app_mark();
             }
             self.banner.connect_button_clicked(glib::clone!(
                 #[weak]
@@ -275,9 +273,6 @@ impl VinhetaWindow {
                 AudioFailure::ConnectionLost => {
                     gettext("Audio stopped: the connection to PipeWire was lost")
                 }
-                AudioFailure::NodeExists => gettext(
-                    "Audio is unavailable: another program already has a “Vinheta” microphone",
-                ),
                 AudioFailure::Other => gettext("Audio is unavailable"),
             });
         }
@@ -318,21 +313,26 @@ impl VinhetaWindow {
         self.imp().toasts.add_toast(toast);
     }
 
-    /// The mark that stays after the toast about a missing microphone.
-    fn update_microphone_mark(&self) {
+    /// Says where the sounds go, and marks a chosen app that is not
+    /// recording: nothing else tells that the call does not hear them.
+    fn update_call_app_mark(&self) {
         let imp = self.imp();
-        let missing = app().is_some_and(|app| app.device_missing(DeviceKind::Microphone));
-        if missing {
-            imp.microphone_icon.add_css_class("warning");
-            let tooltip = gettext("Not connected. Using the system default.");
-            imp.microphone.set_tooltip_text(Some(&tooltip));
-            imp.microphone_icon.set_tooltip_text(Some(&tooltip));
+        let Some(app) = app() else { return };
+        let missing = app.device_missing(DeviceKind::CallApp);
+        let tooltip = if missing {
+            gettext("Not recording. The sounds are not sent to it.")
+        } else if app.audio_available() && !app.call_app_recording() {
+            gettext("No app is using the microphone")
         } else {
-            imp.microphone_icon.remove_css_class("warning");
-            imp.microphone
-                .set_tooltip_text(Some(&gettext("Microphone")));
-            imp.microphone_icon.set_tooltip_text(None);
+            gettext("Send Sounds To")
+        };
+        // The icon is inside the button: the style sheet colors it.
+        if missing {
+            imp.call_app.add_css_class("not-recording");
+        } else {
+            imp.call_app.remove_css_class("not-recording");
         }
+        imp.call_app.set_tooltip_text(Some(&tooltip));
     }
 
     /// The sorted and filtered views do not watch their sounds: the

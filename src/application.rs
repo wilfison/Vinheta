@@ -48,17 +48,18 @@ const POSITION_INTERVAL: Duration = Duration::from_millis(100);
 /// Changes of the pad settings are written at most this often.
 const SAVE_DELAY: Duration = Duration::from_millis(500);
 
-/// The two device selectors: the settings key of each, and its list.
+/// The two selectors: the settings key of each, and its list. `CallApp`
+/// is the app the sounds are sent to, among the ones that are recording.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DeviceKind {
-    Microphone,
+    CallApp,
     Output,
 }
 
 impl DeviceKind {
     pub fn key(self) -> &'static str {
         match self {
-            Self::Microphone => "microphone",
+            Self::CallApp => "call-target",
             Self::Output => "monitor-output",
         }
     }
@@ -70,8 +71,6 @@ pub enum AudioFailure {
     /// PipeWire could not be reached when the engine started.
     Unreachable,
     ConnectionLost,
-    /// Another program has a node with the name of the virtual microphone.
-    NodeExists,
     Other,
 }
 
@@ -80,7 +79,6 @@ impl From<&audio::Error> for AudioFailure {
         match error {
             audio::Error::Unreachable(_) => Self::Unreachable,
             audio::Error::ConnectionLost(_) => Self::ConnectionLost,
-            audio::Error::NodeExists => Self::NodeExists,
             _ => Self::Other,
         }
     }
@@ -105,7 +103,8 @@ fn short_name(name: &str) -> String {
     format!("{}…", cut.trim_end())
 }
 
-/// The engine takes `None` for the system default, the settings store "".
+/// The engine takes `None` for the system default and for every app, the
+/// settings store "".
 fn device_setting(settings: &gio::Settings, key: &str) -> Option<String> {
     Some(settings.string(key).to_string()).filter(|name| !name.is_empty())
 }
@@ -132,10 +131,8 @@ mod imp {
         pub generation: Cell<u32>,
         /// False until the engine in use listed its devices.
         pub devices_known: Cell<bool>,
-        /// Whether the chosen microphone and the chosen output are missing.
-        pub missing: Cell<(bool, bool)>,
-        /// Set once the user was told there is no microphone at all.
-        pub no_microphone: Cell<bool>,
+        /// Whether the chosen output is missing.
+        pub output_missing: Cell<bool>,
         pub notices: RefCell<Vec<Notice>>,
         pub call_guide: glib::WeakRef<CallGuideDialog>,
         /// Set when a damaged pad file could not be set aside: nothing is
@@ -143,10 +140,11 @@ mod imp {
         pub pads_read_only: Cell<bool>,
         pub save_failed: Cell<bool>,
         pub settings: OnceCell<gio::Settings>,
-        pub microphones: RefCell<Vec<Device>>,
+        /// The apps that are recording a microphone.
+        pub call_apps: RefCell<Vec<Device>>,
         pub outputs: RefCell<Vec<Device>>,
-        /// Descriptions of the devices seen in this run, by node name, to
-        /// keep naming a chosen device after it is removed.
+        /// Descriptions of the devices and apps seen in this run, by name,
+        /// to keep naming a chosen one after it is gone.
         pub descriptions: RefCell<HashMap<String, String>>,
         pub preferences: glib::WeakRef<PreferencesDialog>,
         /// What the user set for each pad, stored in `pads_file`.
@@ -177,7 +175,6 @@ mod imp {
             obj.set_accels_for_action("win.move-folder-right", &["<control><shift>Page_Down"]);
             obj.set_accels_for_action("app.stop-all", &["<control><shift>s"]);
             obj.set_accels_for_action("app.send-sounds-to-call", &["<control><shift>l"]);
-            obj.set_accels_for_action("app.include-my-voice", &["<control><shift>m"]);
         }
 
         fn signals() -> &'static [Signal] {
@@ -195,7 +192,7 @@ mod imp {
             self.obj().start_audio();
         }
 
-        // Dropping the engine is what removes the virtual microphone.
+        // Dropping the engine is what removes its node and its links.
         fn shutdown(&self) {
             if let Some(timer) = self.save_timer.take() {
                 timer.remove();
@@ -369,20 +366,19 @@ impl VinhetaApplication {
                         };
                         match key {
                             "send-sounds-to-call" => engine.set_send_to_call(settings.boolean(key)),
-                            "include-my-voice" => engine.set_include_voice(settings.boolean(key)),
                             "call-volume" => {
                                 engine.set_call_volume(audio::slider_gain(settings.double(key)));
                             }
                             "monitor-volume" => {
                                 engine.set_monitor_volume(audio::slider_gain(settings.double(key)));
                             }
-                            "microphone" => engine.set_microphone(device_setting(settings, key)),
+                            "call-target" => engine.set_target(device_setting(settings, key)),
                             "monitor-output" => engine.set_monitor(device_setting(settings, key)),
                             "fade-out-on-stop" => engine.set_fade_out(fade_out(settings)),
                             _ => {}
                         }
                     }
-                    if key == "microphone" || key == "monitor-output" {
+                    if key == "call-target" || key == "monitor-output" {
                         app.update_missing_devices();
                         app.emit_by_name::<()>("devices-changed", &[]);
                     }
@@ -391,7 +387,6 @@ impl VinhetaApplication {
         );
         // Stateful actions that flip a key, for the accelerators.
         self.add_action(&settings.create_action("send-sounds-to-call"));
-        self.add_action(&settings.create_action("include-my-voice"));
         self.imp().settings.set(settings).unwrap();
     }
 
@@ -400,12 +395,11 @@ impl VinhetaApplication {
         let imp = self.imp();
         let settings = self.settings();
         let config = Config {
-            mic: device_setting(settings, "microphone"),
+            target: device_setting(settings, "call-target"),
             monitor: device_setting(settings, "monitor-output"),
             call_volume: audio::slider_gain(settings.double("call-volume")),
             monitor_volume: audio::slider_gain(settings.double("monitor-volume")),
             send_to_call: settings.boolean("send-sounds-to-call"),
-            include_voice: settings.boolean("include-my-voice"),
             fade_out: fade_out(settings),
         };
         let generation = imp.generation.get().wrapping_add(1);
@@ -414,7 +408,6 @@ impl VinhetaApplication {
             Ok((engine, events)) => {
                 imp.engine.replace(Some(engine));
                 imp.audio_error.set(None);
-                imp.no_microphone.set(false);
                 glib::spawn_future_local(glib::clone!(
                     #[weak(rename_to = app)]
                     self,
@@ -465,24 +458,21 @@ impl VinhetaApplication {
                     self.toast_playback_failure(&sound);
                 }
             }
-            Event::DevicesChanged {
-                microphones,
-                outputs,
-            } => self.set_devices(microphones, outputs),
+            Event::DevicesChanged { outputs } => {
+                self.remember(&outputs);
+                self.imp().outputs.replace(outputs);
+                self.imp().devices_known.set(true);
+                self.update_missing_devices();
+                self.emit_by_name::<()>("devices-changed", &[]);
+            }
+            Event::TargetsChanged(apps) => {
+                self.remember(&apps);
+                self.imp().call_apps.replace(apps);
+                self.emit_by_name::<()>("devices-changed", &[]);
+            }
             Event::Error(error @ (audio::Error::PipeWire(_) | audio::Error::ConnectionLost(_))) => {
                 self.set_audio_error(&error)
             }
-            Event::Error(error @ audio::Error::NoMicrophone) => {
-                glib::g_warning!("vinheta", "{error}");
-                let voice = self.settings().boolean("include-my-voice");
-                if voice && !self.imp().no_microphone.replace(true) {
-                    self.notify(
-                        &gettext("No microphone found. Your voice is not sent to the call."),
-                        false,
-                    );
-                }
-            }
-            Event::MicLinked { .. } => self.imp().no_microphone.set(false),
             Event::Error(error) => glib::g_warning!("vinheta", "{error}"),
             event => glib::g_debug!("vinheta", "{event:?}"),
         }
@@ -939,85 +929,75 @@ impl VinhetaApplication {
         imp.audio_error.set(Some(failure));
         imp.engine.take();
         imp.devices_known.set(false);
-        imp.missing.set((false, false));
+        imp.output_missing.set(false);
         if let Some(action) = self.lookup_action("retry-audio") {
             if let Some(action) = action.downcast_ref::<gio::SimpleAction>() {
                 action.set_enabled(true);
             }
         }
         self.forget_playbacks();
-        imp.microphones.take();
+        imp.call_apps.take();
         imp.outputs.take();
         self.emit_by_name::<()>("devices-changed", &[]);
     }
 
-    fn set_devices(&self, microphones: Vec<Device>, outputs: Vec<Device>) {
-        let imp = self.imp();
-        imp.descriptions.borrow_mut().extend(
-            microphones
+    fn remember(&self, devices: &[Device]) {
+        self.imp().descriptions.borrow_mut().extend(
+            devices
                 .iter()
-                .chain(&outputs)
                 .map(|device| (device.name.clone(), device.description.clone())),
         );
-        imp.microphones.replace(microphones);
-        imp.outputs.replace(outputs);
-        imp.devices_known.set(true);
-        self.update_missing_devices();
-        self.emit_by_name::<()>("devices-changed", &[]);
     }
 
-    /// Tells the user when a chosen device goes from present to missing:
-    /// once per change, and nothing when it returns.
+    /// Tells the user when the chosen output goes from present to missing:
+    /// once per change, and nothing when it returns. A chosen app that is
+    /// not recording is the usual state, so nothing is said about it.
     fn update_missing_devices(&self) {
         let imp = self.imp();
         if !imp.devices_known.get() {
             return;
         }
-        let settings = self.settings();
-        let missing = |kind: DeviceKind, devices: &[Device]| {
-            let chosen = settings.string(kind.key());
-            devices::is_missing(devices, &chosen).then(|| {
-                let descriptions = imp.descriptions.borrow();
-                descriptions
-                    .get(chosen.as_str())
-                    .cloned()
-                    .unwrap_or_else(|| chosen.to_string())
-            })
-        };
-        let microphone = missing(DeviceKind::Microphone, &imp.microphones.borrow());
-        let output = missing(DeviceKind::Output, &imp.outputs.borrow());
-        let was = imp
-            .missing
-            .replace((microphone.is_some(), output.is_some()));
-        if let Some(name) = microphone.filter(|_| !was.0) {
-            // Translators: {} is the name of a microphone.
-            let message = gettext("Microphone “{}” is not connected. Using the system default.");
-            self.notify(&message.replace("{}", &short_name(&name)), false);
-        }
-        if let Some(name) = output.filter(|_| !was.1) {
+        let chosen = self.settings().string(DeviceKind::Output.key());
+        let missing = devices::is_missing(&imp.outputs.borrow(), &chosen);
+        if missing && !imp.output_missing.replace(missing) {
+            let descriptions = imp.descriptions.borrow();
+            let name = descriptions
+                .get(chosen.as_str())
+                .map_or(&*chosen, String::as_str);
             // Translators: {} is the name of an audio output.
             let message = gettext("Output “{}” is not connected. Using the system default.");
-            self.notify(&message.replace("{}", &short_name(&name)), false);
+            self.notify(&message.replace("{}", &short_name(name)), false);
         }
+        imp.output_missing.set(missing);
     }
 
-    /// Whether the chosen device is not connected. Never while audio is
-    /// unavailable: the banner already says so.
+    /// Whether the chosen output is not connected, or the chosen app is not
+    /// recording. Never while audio is unavailable: the banner already
+    /// says so.
     pub fn device_missing(&self, kind: DeviceKind) -> bool {
-        let missing = self.imp().missing.get();
+        let imp = self.imp();
         self.audio_available()
             && match kind {
-                DeviceKind::Microphone => missing.0,
-                DeviceKind::Output => missing.1,
+                DeviceKind::CallApp => {
+                    let chosen = self.settings().string(kind.key());
+                    devices::is_missing(&imp.call_apps.borrow(), &chosen)
+                }
+                DeviceKind::Output => imp.output_missing.get(),
             }
+    }
+
+    /// Whether some app is recording a microphone, so that the sounds have
+    /// somewhere to go.
+    pub fn call_app_recording(&self) -> bool {
+        !self.imp().call_apps.borrow().is_empty()
     }
 
     pub fn audio_available(&self) -> bool {
         self.imp().engine.borrow().is_some()
     }
 
-    /// The entries of a device selector and the selected position. Without
-    /// audio there is only the system default.
+    /// The entries of a selector and the selected position. Without audio
+    /// there is only the first one: the system default, or every app.
     pub fn device_entries(&self, kind: DeviceKind) -> (Vec<Entry>, usize) {
         let imp = self.imp();
         if !self.audio_available() {
@@ -1025,7 +1005,7 @@ impl VinhetaApplication {
         }
         let chosen = self.settings().string(kind.key());
         let devices = match kind {
-            DeviceKind::Microphone => imp.microphones.borrow(),
+            DeviceKind::CallApp => imp.call_apps.borrow(),
             DeviceKind::Output => imp.outputs.borrow(),
         };
         let descriptions = imp.descriptions.borrow();

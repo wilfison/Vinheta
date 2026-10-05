@@ -46,12 +46,12 @@
 
 ## The bottom bar and the device selectors
 
-- `src/ui/device_selector.rs`: not a widget. `bind` keeps a `GtkDropDown` or an `AdwComboRow` in sync with a device list of the application and with the key that stores the chosen device. It is the only place that writes `microphone` and `monitor-output`. A change of the key or a `devices-changed` signal (which the application emits at once when the key changes) rebuilds the list in an idle callback, never at once: the key may be changing from inside the activation of an entry, and replacing the model there frees the list GTK is still using (a crash when choosing a microphone).
-- `src/devices.rs`: the entries of a device selector (system default, devices, a chosen device that is not connected), and whether a chosen device is missing. No GTK types, covered by unit tests.
+- `src/ui/device_selector.rs`: not a widget. `bind` keeps a `GtkDropDown` or an `AdwComboRow` in sync with a list of the application (the outputs, or the apps that are recording a microphone) and with the key that stores the chosen entry. It is the only place that writes `call-target` and `monitor-output`. The model is only replaced when what it shows changed, so an open list survives the apps that come and go. A change of the key or a `devices-changed` signal (which the application emits at once when the key changes) rebuilds the list in an idle callback, never at once: the key may be changing from inside the activation of an entry, and replacing the model there frees the list GTK is still using (a crash when choosing an entry).
+- `src/devices.rs`: the entries of a selector (the first one, which is the system default or every app, the devices or apps, a chosen one that is not there), and whether the chosen one is missing. No GTK types, covered by unit tests.
 - The sliders go from 0% to 100% (no amplification) with a cubic curve from position to gain. The settings store the position.
-- The monitor selector lives only in the preferences; the microphone selector is in the bottom bar and in the preferences.
-- A chosen device that is not connected is shown as "(unavailable)" and replaced by the system default until it returns. For the monitor WirePlumber does that by itself; for the microphone the engine does.
-- The microphone selector never offers the "Vinheta" node. Other virtual sources are offered as microphones.
+- The monitor selector lives only in the preferences; the selector of the app the sounds are sent to ("Send Sounds To") is in the bottom bar and in the preferences. Its first entry is "All Apps". In the bottom bar the icon is part of the button: the `factory` of the drop-down (the chosen entry) has the icon and the label, and its `list-factory` (the open list) the label alone.
+- A chosen output that is not connected is shown as "(unavailable)" and replaced by the system default until it returns, which WirePlumber does by itself. A chosen app that is not recording is shown as "(not recording)" with the icon in the warning color, and nothing replaces it: the sounds reach no app until it records again.
+- The app selector lists an app once, whatever its number of recording streams, and never a level meter or a recorder of an output.
 
 ## Dialogs
 

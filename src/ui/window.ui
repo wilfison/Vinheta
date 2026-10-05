@@ -128,7 +128,7 @@
                                 <property name="spacing">6</property>
                                 <child>
                                   <object class="GtkLabel">
-                                    <property name="label" translatable="yes">Tip: to be heard in a call, choose “Vinheta” as the microphone in your call app</property>
+                                    <property name="label" translatable="yes">Tip: join a call with your usual microphone, and the sounds you play are heard there</property>
                                     <property name="wrap">True</property>
                                     <property name="justify">center</property>
                                     <style>
@@ -285,7 +285,7 @@
                             <property name="width-request">262</property>
                             <child>
                               <object class="AdwLayoutSlot">
-                                <property name="id">microphone</property>
+                                <property name="id">call-app</property>
                               </object>
                             </child>
                             <child>
@@ -329,7 +329,7 @@
                         </child>
                         <child>
                           <object class="AdwLayoutSlot">
-                            <property name="id">microphone</property>
+                            <property name="id">call-app</property>
                           </object>
                         </child>
                       </object>
@@ -442,23 +442,52 @@
                     </child>
                   </object>
                 </child>
-                <child type="microphone">
-                  <object class="GtkBox">
-                    <property name="spacing">8</property>
-                    <child>
-                      <object class="GtkImage" id="microphone_icon">
-                        <property name="icon-name">audio-input-microphone-symbolic</property>
+                <child type="call-app">
+                  <object class="GtkDropDown" id="call_app">
+                    <property name="hexpand">True</property>
+                    <property name="tooltip-text" translatable="yes">Send Sounds To</property>
+                    <!-- The button shows the icon with the chosen entry.
+                         The default factory does not ellipsize, and a long
+                         app name would make the window wider. -->
+                    <property name="factory">
+                      <object class="GtkBuilderListItemFactory">
+                        <property name="bytes"><![CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <template class="GtkListItem">
+    <property name="child">
+      <object class="GtkBox">
+        <property name="spacing">8</property>
+        <child>
+          <object class="GtkImage">
+            <property name="icon-name">audio-speakers-symbolic</property>
+            <style>
+              <class name="call-app-icon"/>
+            </style>
+          </object>
+        </child>
+        <child>
+          <object class="GtkLabel">
+            <property name="xalign">0</property>
+            <property name="ellipsize">end</property>
+            <property name="width-chars">8</property>
+            <binding name="label">
+              <lookup name="string" type="GtkStringObject">
+                <lookup name="item">GtkListItem</lookup>
+              </lookup>
+            </binding>
+          </object>
+        </child>
+      </object>
+    </property>
+  </template>
+</interface>
+]]></property>
                       </object>
-                    </child>
-                    <child>
-                      <object class="GtkDropDown" id="microphone">
-                        <property name="hexpand">True</property>
-                        <property name="tooltip-text" translatable="yes">Microphone</property>
-                        <!-- The default factory does not ellipsize, and a long
-                             device name would make the window wider. -->
-                        <property name="factory">
-                          <object class="GtkBuilderListItemFactory">
-                            <property name="bytes"><![CDATA[
+                    </property>
+                    <property name="list-factory">
+                      <object class="GtkBuilderListItemFactory">
+                        <property name="bytes"><![CDATA[
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <template class="GtkListItem">
@@ -475,42 +504,16 @@
       </object>
     </property>
   </template>
-  <menu id="tab_menu">
-    <section>
-      <item>
-        <attribute name="label" translatable="yes">Re_name Tab…</attribute>
-        <attribute name="action">win.rename-folder</attribute>
-      </item>
-    </section>
-    <section>
-      <item>
-        <attribute name="label" translatable="yes">Move Tab _Left</attribute>
-        <attribute name="action">win.move-folder-left</attribute>
-      </item>
-      <item>
-        <attribute name="label" translatable="yes">Move Tab _Right</attribute>
-        <attribute name="action">win.move-folder-right</attribute>
-      </item>
-    </section>
-    <section>
-      <item>
-        <attribute name="label" translatable="yes">Remo_ve Folder</attribute>
-        <attribute name="action">win.remove-folder</attribute>
-      </item>
-    </section>
-  </menu>
 </interface>
 ]]></property>
-                          </object>
-                        </property>
-                        <accessibility>
-                          <property name="label" translatable="yes">Microphone</property>
-                        </accessibility>
-                        <style>
-                          <class name="microphone"/>
-                        </style>
                       </object>
-                    </child>
+                    </property>
+                    <accessibility>
+                      <property name="label" translatable="yes">Send Sounds To</property>
+                    </accessibility>
+                    <style>
+                      <class name="call-app"/>
+                    </style>
                   </object>
                 </child>
                 <child type="send">

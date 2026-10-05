@@ -4,13 +4,13 @@ A soundboard for GNOME that plays sounds into your calls.
 
 ![Vinheta, a soundboard for GNOME that plays sounds into your calls](data/screenshots/preview.png)
 
-Add your folders of sounds, and each one becomes a tab with a pad per sound. Click a pad, or press its key, to play it. While Vinheta runs it provides a virtual microphone named "Vinheta" that carries your voice together with the sounds, so the other side of a call hears both, and you hear the sounds on your own headphones.
+Add your folders of sounds, and each one becomes a tab with a pad per sound. Click a pad, or press its key, to play it. While Vinheta runs it plays the sounds into the apps that are using your microphone, so the other side of a call hears them together with your voice, and you hear the sounds on your own headphones. There is nothing to choose in the call app: you keep your usual microphone.
 
 - One tab per folder, kept in sync with the folder while the app runs.
 - Pads with a name, a color, a volume, a loop, and a key.
 - Favorites, search, and sorting by name or by most recent file.
 - Separate volumes for your headphones and for the call.
-- "Send sounds to call" and "Include my voice" switches.
+- A "Send sounds to call" switch, and a choice of the app the sounds are sent to.
 - English and Brazilian Portuguese.
 
 ## Install
@@ -23,10 +23,10 @@ sudo apt install ./vinheta_VERSION_amd64.deb
 
 ## Use it in a call
 
-1. **Choose "Vinheta" as the microphone.** In the audio settings of your call app, select "Vinheta" as the microphone (input device). Your voice and your sounds go through it.
+1. **Join the call as usual.** Keep your own microphone in the call app. Vinheta adds the sounds to what the app records, while both are running.
 2. **Turn off noise suppression.** Call apps treat sounds as noise and cut them out. Turn off noise suppression or noise cancellation in the call app.
 3. **Use headphones.** With speakers, your microphone picks the sounds up again and the call hears them twice.
-4. **Keep Vinheta open.** The "Vinheta" microphone exists only while the app is running.
+4. **Choose where the sounds go.** Every app that is using the microphone gets them. To leave the others out, pick one app in the bottom bar.
 
 The app shows this guide on its first run, and again from the menu ("Call Setup Guide").
 

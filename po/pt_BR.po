@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-04 12:44-0300\n"
+"POT-Creation-Date: 2026-10-05 14:15-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -23,7 +23,7 @@ msgid "Vinheta"
 msgstr "Vinheta"
 
 #: data/io.github.wilfison.Vinheta.desktop.in:3
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1097
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1077
 msgid "Play sounds into your calls"
 msgstr "Toque sons nas suas chamadas"
 
@@ -41,15 +41,17 @@ msgstr "Pastas de sons"
 msgid "Absolute paths of the folders shown as tabs, in tab order."
 msgstr "Caminhos absolutos das pastas mostradas como abas, na ordem das abas."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:11 src/ui/window.ui:521
+#: data/io.github.wilfison.Vinheta.gschema.xml:11 src/ui/window.ui:524
 msgid "Send sounds to call"
 msgstr "Sons na chamada"
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:12
 msgid ""
-"Whether sounds are played into the virtual microphone in addition to the "
-"local output."
-msgstr "Se os sons são tocados no microfone virtual, além da saída local."
+"Whether sounds are played into the apps that are recording a microphone in "
+"addition to the local output."
+msgstr ""
+"Se os sons são tocados nos aplicativos que estão gravando um microfone, além "
+"da saída local."
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:17 src/ui/window.ui:383
 msgid "Headphones volume"
@@ -68,25 +70,21 @@ msgstr "Volume da chamada"
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:24
 msgid ""
-"Position of the slider that sets how loud sounds are in the virtual "
-"microphone, from 0 to 1."
-msgstr ""
-"Posição do controle que define a altura dos sons no microfone virtual, de 0 "
-"a 1."
+"Position of the slider that sets how loud sounds are in the call, from 0 to "
+"1."
+msgstr "Posição do controle que define a altura dos sons na chamada, de 0 a 1."
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:28
-#: src/ui/preferences-dialog.ui:14 src/ui/window.rs:333 src/ui/window.ui:456
-#: src/ui/window.ui:507
-msgid "Microphone"
-msgstr "Microfone"
+msgid "App the sounds are sent to"
+msgstr "Aplicativo que recebe os sons"
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:29
 msgid ""
-"PipeWire node name of the microphone mixed into the virtual one. Empty "
-"follows the system default."
+"Name of the binary of the app that gets the sounds, among the ones that are "
+"recording a microphone. Empty is all of them."
 msgstr ""
-"Nome do nó do PipeWire do microfone misturado ao virtual. Vazio segue o "
-"padrão do sistema."
+"Nome do binário do aplicativo que recebe os sons, entre os que estão "
+"gravando um microfone. Vazio significa todos."
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:33
 msgid "Monitor output"
@@ -100,19 +98,11 @@ msgstr ""
 "Nome do nó do PipeWire da saída onde os sons são ouvidos. Vazio segue o "
 "padrão do sistema."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:38
-msgid "Include my voice"
-msgstr "Incluir minha voz"
-
-#: data/io.github.wilfison.Vinheta.gschema.xml:39
-msgid "Whether the microphone is passed through the virtual microphone."
-msgstr "Se o microfone passa pelo microfone virtual."
-
-#: data/io.github.wilfison.Vinheta.gschema.xml:48
+#: data/io.github.wilfison.Vinheta.gschema.xml:43
 msgid "When a pad is triggered"
 msgstr "Quando um pad é acionado"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:49
+#: data/io.github.wilfison.Vinheta.gschema.xml:44
 msgid ""
 "What a click on a pad does: \"overlap\" plays sounds together and stops a "
 "pad that is playing, \"restart\" starts a playing pad again, \"stop-others\" "
@@ -122,19 +112,19 @@ msgstr ""
 "que está tocando, “restart” reinicia um pad que está tocando, “stop-others” "
 "para todos os outros sons quando um pad começa."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:53
+#: data/io.github.wilfison.Vinheta.gschema.xml:48
 msgid "Fade out on stop"
 msgstr "Esmaecer ao parar"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:54
+#: data/io.github.wilfison.Vinheta.gschema.xml:49
 msgid "Whether a stopped sound fades out instead of being cut."
 msgstr "Se um som parado diminui aos poucos em vez de ser cortado."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:62
+#: data/io.github.wilfison.Vinheta.gschema.xml:57
 msgid "Sort order"
 msgstr "Ordenação"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:63
+#: data/io.github.wilfison.Vinheta.gschema.xml:58
 msgid ""
 "The order of the pads in every view: \"name\" sorts by the shown name, "
 "\"recent\" puts the most recently modified files first."
@@ -142,11 +132,11 @@ msgstr ""
 "A ordem dos pads em todas as visões: “name” ordena pelo nome mostrado, "
 "“recent” coloca primeiro os arquivos modificados mais recentemente."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:67
+#: data/io.github.wilfison.Vinheta.gschema.xml:62
 msgid "Tab names"
 msgstr "Nomes das abas"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:68
+#: data/io.github.wilfison.Vinheta.gschema.xml:63
 msgid ""
 "The label of a tab, by the absolute path of its folder. A folder without an "
 "entry shows its own name."
@@ -154,11 +144,11 @@ msgstr ""
 "O rótulo de uma aba, pelo caminho absoluto da pasta. Uma pasta sem entrada "
 "mostra o próprio nome."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:72
+#: data/io.github.wilfison.Vinheta.gschema.xml:67
 msgid "Sounds folder"
 msgstr "Pasta de sons"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:73
+#: data/io.github.wilfison.Vinheta.gschema.xml:68
 msgid ""
 "Absolute path of the folder that receives the copies of loose files. Empty "
 "means \"sounds\" inside the data directory of the app."
@@ -166,11 +156,11 @@ msgstr ""
 "Caminho absoluto da pasta que recebe as cópias dos arquivos avulsos. Vazio "
 "significa “sounds” dentro do diretório de dados do aplicativo."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:77
+#: data/io.github.wilfison.Vinheta.gschema.xml:72
 msgid "Audio editor"
 msgstr "Editor de áudio"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:78
+#: data/io.github.wilfison.Vinheta.gschema.xml:73
 msgid ""
 "Name of the desktop file of the app that opens a sound for editing. Empty "
 "means the first audio editor that is installed."
@@ -178,11 +168,11 @@ msgstr ""
 "Nome do arquivo desktop do aplicativo que abre um som para edição. Vazio "
 "significa o primeiro editor de áudio instalado."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:82
+#: data/io.github.wilfison.Vinheta.gschema.xml:77
 msgid "Call setup guide shown"
 msgstr "Guia de configuração de chamada mostrado"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:83
+#: data/io.github.wilfison.Vinheta.gschema.xml:78
 msgid ""
 "Whether the call setup guide was shown on the first run. While false, the "
 "guide opens by itself when the app starts with working audio."
@@ -205,15 +195,15 @@ msgstr ""
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:11
 msgid ""
-"While it runs, Vinheta provides a virtual microphone named “Vinheta” that "
-"carries your voice together with the sounds you play. Choose it as the "
-"microphone in your call app, and the other side hears both. You hear the "
-"sounds on your own headphones, with a separate volume."
+"While it runs, Vinheta plays your sounds into the apps that are using your "
+"microphone. Join a call as usual, and the other side hears the sounds "
+"together with your voice. You hear them on your own headphones, with a "
+"separate volume."
 msgstr ""
-"Enquanto está aberto, o Vinheta oferece um microfone virtual chamado "
-"“Vinheta”, que leva a sua voz junto com os sons que você toca. Escolha-o "
-"como microfone no seu aplicativo de chamadas e o outro lado ouve os dois. "
-"Você ouve os sons nos seus fones, com um volume separado."
+"Enquanto está aberto, o Vinheta toca os seus sons nos aplicativos que estão "
+"usando o seu microfone. Entre em uma chamada como de costume e o outro lado "
+"ouve os sons junto com a sua voz. Você os ouve nos seus fones, com um volume "
+"separado."
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:12
 msgid ""
@@ -248,11 +238,7 @@ msgstr ""
 "tecla, favoritos, pesquisa e um microfone virtual que envia os sons para as "
 "suas chamadas."
 
-#: src/application.rs:480
-msgid "No microphone found. Your voice is not sent to the call."
-msgstr "Nenhum microfone encontrado. Sua voz não é enviada para a chamada."
-
-#: src/application.rs:509
+#: src/application.rs:499
 msgid ""
 "Pad settings could not be read and were reset. The old file was kept as "
 "“pads.json.corrupt”."
@@ -260,47 +246,42 @@ msgstr ""
 "Não foi possível ler as configurações dos pads, e elas foram redefinidas. O "
 "arquivo antigo foi mantido como “pads.json.corrupt”."
 
-#: src/application.rs:514
+#: src/application.rs:504
 msgid "Pad settings could not be read. Changes to pads will not be saved."
 msgstr ""
 "Não foi possível ler as configurações dos pads. As alterações nos pads não "
 "serão salvas."
 
-#: src/application.rs:535
+#: src/application.rs:525
 msgid "Pad settings could not be saved"
 msgstr "Não foi possível salvar as configurações dos pads"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:696
+#: src/application.rs:686
 msgid "Moved “{}” to the trash"
 msgstr "“{}” foi movido para a lixeira"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:700
+#: src/application.rs:690
 msgid "Could not move “{}” to the trash"
 msgstr "Não foi possível mover “{}” para a lixeira"
 
-#: src/application.rs:761
+#: src/application.rs:751
 msgid "Could not open the audio editor"
 msgstr "Não foi possível abrir o editor de áudio"
 
-#. Translators: {} is the name of a microphone.
-#: src/application.rs:994
-msgid "Microphone “{}” is not connected. Using the system default."
-msgstr "O microfone “{}” não está conectado. Usando o padrão do sistema."
-
 #. Translators: {} is the name of an audio output.
-#: src/application.rs:999
+#: src/application.rs:968
 msgid "Output “{}” is not connected. Using the system default."
 msgstr "A saída “{}” não está conectada. Usando o padrão do sistema."
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:1080
+#: src/application.rs:1060
 msgid "Could not play “{}”"
 msgstr "Não foi possível tocar “{}”"
 
 #. Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
-#: src/application.rs:1103
+#: src/application.rs:1083
 msgid "translator-credits"
 msgstr "wilfison"
 
@@ -310,24 +291,23 @@ msgstr "Use o Vinheta em uma chamada"
 
 #: src/ui/call-guide-dialog.ui:32
 msgid ""
-"Vinheta creates a virtual microphone that carries your voice and your "
-"sounds. For the other side of a call to hear them:"
+"Vinheta plays your sounds into the apps that are using your microphone. For "
+"the other side of a call to hear them:"
 msgstr ""
-"O Vinheta cria um microfone virtual que leva a sua voz e os seus sons. Para "
-"que o outro lado da chamada os ouça:"
+"O Vinheta toca os seus sons nos aplicativos que estão usando o seu "
+"microfone. Para que o outro lado da chamada os ouça:"
 
 #: src/ui/call-guide-dialog.ui:46
-msgid "Choose “Vinheta” as the microphone"
-msgstr "Escolha “Vinheta” como microfone"
+msgid "Join the call as usual"
+msgstr "Entre na chamada como de costume"
 
 #: src/ui/call-guide-dialog.ui:47
 msgid ""
-"In the audio settings of your call app, select “Vinheta” as the microphone "
-"(input device). Your voice and your sounds go through it."
+"Keep your own microphone in the call app. Vinheta adds the sounds to what "
+"the app records, while both are running."
 msgstr ""
-"Nas configurações de áudio do seu aplicativo de chamadas, selecione "
-"“Vinheta” como microfone (dispositivo de entrada). Sua voz e seus sons "
-"passam por ele."
+"Mantenha o seu próprio microfone no aplicativo de chamadas. O Vinheta "
+"acrescenta os sons ao que o aplicativo grava, enquanto os dois estão abertos."
 
 #: src/ui/call-guide-dialog.ui:53
 msgid "Step 1"
@@ -366,12 +346,16 @@ msgid "Step 3"
 msgstr "Passo 3"
 
 #: src/ui/call-guide-dialog.ui:103
-msgid "Keep Vinheta open"
-msgstr "Mantenha o Vinheta aberto"
+msgid "Choose where the sounds go"
+msgstr "Escolha para onde os sons vão"
 
 #: src/ui/call-guide-dialog.ui:104
-msgid "The “Vinheta” microphone exists only while the app is running."
-msgstr "O microfone “Vinheta” só existe enquanto o aplicativo está aberto."
+msgid ""
+"Every app that is using the microphone gets them. To leave the others out, "
+"pick one app in the bottom bar."
+msgstr ""
+"Todo aplicativo que está usando o microfone recebe os sons. Para deixar os "
+"outros de fora, escolha um aplicativo na barra inferior."
 
 #: src/ui/call-guide-dialog.ui:110
 msgid "Step 4"
@@ -381,14 +365,24 @@ msgstr "Passo 4"
 msgid "Got It"
 msgstr "Entendi"
 
-#: src/ui/device_selector.rs:57
+#: src/ui/device_selector.rs:60
 msgid "System Default"
 msgstr "Padrão do sistema"
 
+#. Translators: the sounds are sent to every app that is using the microphone.
+#: src/ui/device_selector.rs:62
+msgid "All Apps"
+msgstr "Todos os aplicativos"
+
 #. Translators: {} is the name of an audio device that is not connected.
-#: src/ui/device_selector.rs:60
+#: src/ui/device_selector.rs:66
 msgid "{} (unavailable)"
 msgstr "{} (indisponível)"
+
+#. Translators: {} is the name of an app that is not using the microphone.
+#: src/ui/device_selector.rs:70
+msgid "{} (not recording)"
+msgstr "{} (não está gravando)"
 
 #: src/ui/folder-page.ui:35
 msgid "No Audio Files"
@@ -418,112 +412,113 @@ msgstr "Preferências"
 msgid "Audio"
 msgstr "Áudio"
 
-#: src/ui/preferences-dialog.ui:15
-msgid "Your real microphone, mixed into the virtual one"
-msgstr "Seu microfone real, misturado ao virtual"
-
-#: src/ui/preferences-dialog.ui:20
+#: src/ui/preferences-dialog.ui:14
 msgid "Monitor Output"
 msgstr "Saída de monitoração"
 
-#: src/ui/preferences-dialog.ui:21
+#: src/ui/preferences-dialog.ui:15
 msgid "Where you hear the sounds"
 msgstr "Onde você ouve os sons"
 
-#: src/ui/preferences-dialog.ui:26
+#: src/ui/preferences-dialog.ui:20
 msgid "Send Sounds to Call"
 msgstr "Enviar sons para a chamada"
 
+#: src/ui/preferences-dialog.ui:21
+msgid "Play sounds into the apps that are using the microphone"
+msgstr "Toca os sons nos aplicativos que estão usando o microfone"
+
+#: src/ui/preferences-dialog.ui:26 src/ui/window.rs:327 src/ui/window.ui:448
+#: src/ui/window.ui:512
+msgid "Send Sounds To"
+msgstr "Enviar sons para"
+
 #: src/ui/preferences-dialog.ui:27
-msgid "Play sounds into the “Vinheta” virtual microphone"
-msgstr "Toca os sons no microfone virtual “Vinheta”"
+msgid "An app that is using the microphone, or all of them"
+msgstr "Um aplicativo que está usando o microfone, ou todos eles"
 
-#: src/ui/preferences-dialog.ui:32
-msgid "Include My Voice"
-msgstr "Incluir minha voz"
-
-#: src/ui/preferences-dialog.ui:33
-msgid "Pass your microphone through the virtual microphone"
-msgstr "Passa o seu microfone pelo microfone virtual"
-
-#: src/ui/preferences-dialog.ui:40 src/ui/shortcuts-dialog.ui:6
+#: src/ui/preferences-dialog.ui:34 src/ui/shortcuts-dialog.ui:6
 msgid "Playback"
 msgstr "Reprodução"
 
-#: src/ui/preferences-dialog.ui:43
+#: src/ui/preferences-dialog.ui:37
 msgid "When a Pad Is Triggered"
 msgstr "Quando um pad é acionado"
 
-#: src/ui/preferences-dialog.ui:47
+#: src/ui/preferences-dialog.ui:41
 msgid "Overlap"
 msgstr "Sobrepor"
 
-#: src/ui/preferences-dialog.ui:48
+#: src/ui/preferences-dialog.ui:42
 msgid "Restart"
 msgstr "Reiniciar"
 
-#: src/ui/preferences-dialog.ui:49
+#: src/ui/preferences-dialog.ui:43
 msgid "Stop Others"
 msgstr "Parar os outros"
 
-#: src/ui/preferences-dialog.ui:57
+#: src/ui/preferences-dialog.ui:51
 msgid "Fade Out on Stop"
 msgstr "Esmaecer ao parar"
 
-#: src/ui/preferences-dialog.ui:58
+#: src/ui/preferences-dialog.ui:52
 msgid "Avoids abrupt cuts when stopping a sound"
 msgstr "Evita cortes bruscos ao parar um som"
 
-#: src/ui/preferences-dialog.ui:65
+#: src/ui/preferences-dialog.ui:59
 msgid "Library"
 msgstr "Biblioteca"
 
-#: src/ui/preferences-dialog.ui:68 src/ui/preferences_dialog.rs:307
+#: src/ui/preferences-dialog.ui:62 src/ui/preferences_dialog.rs:309
 msgid "Sounds Folder"
 msgstr "Pasta de sons"
 
-#: src/ui/preferences-dialog.ui:73 src/ui/preferences-dialog.ui:76
+#: src/ui/preferences-dialog.ui:67 src/ui/preferences-dialog.ui:70
 msgid "Open Folder"
 msgstr "Abrir pasta"
 
-#: src/ui/preferences-dialog.ui:86 src/ui/preferences-dialog.ui:89
+#: src/ui/preferences-dialog.ui:80 src/ui/preferences-dialog.ui:83
 msgid "Choose Folder…"
 msgstr "Escolher pasta…"
 
-#: src/ui/preferences-dialog.ui:100
+#: src/ui/preferences-dialog.ui:94
 msgid "Audio Editor"
 msgstr "Editor de áudio"
 
-#: src/ui/preferences_dialog.rs:96
+#: src/ui/preferences_dialog.rs:91
 msgid "Sounds play together; a click on a playing pad stops it"
 msgstr "Os sons tocam juntos; um clique em um pad que está tocando o para"
 
-#: src/ui/preferences_dialog.rs:98
+#: src/ui/preferences_dialog.rs:93
 msgid "A click on a playing pad starts it again"
 msgstr "Um clique em um pad que está tocando o reinicia"
 
-#: src/ui/preferences_dialog.rs:99
+#: src/ui/preferences_dialog.rs:94
 msgid "Starting a pad stops every other sound"
 msgstr "Iniciar um pad para todos os outros sons"
 
-#: src/ui/preferences_dialog.rs:148 src/ui/window.rs:327
+#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:323
+msgid "Not recording. The sounds are not sent to it."
+msgstr "Não está gravando. Os sons não são enviados para ele."
+
+#: src/ui/preferences_dialog.rs:148
 msgid "Not connected. Using the system default."
 msgstr "Não conectado. Usando o padrão do sistema."
 
-#: src/ui/preferences_dialog.rs:217
+#: src/ui/preferences_dialog.rs:219
 msgid "Automatic"
 msgstr "Automático"
 
 #. Translators: {} is the name of an app, as in "Uses Audacity".
-#: src/ui/preferences_dialog.rs:229
+#: src/ui/preferences_dialog.rs:231
 msgid "Uses {}"
 msgstr "Usa {}"
 
-#: src/ui/preferences_dialog.rs:230
+#: src/ui/preferences_dialog.rs:232
 msgid "No audio editor was found"
 msgstr "Nenhum editor de áudio foi encontrado"
 
-#: src/ui/preferences_dialog.rs:300
+#: src/ui/preferences_dialog.rs:302
 msgid "Could not open the folder"
 msgstr "Não foi possível abrir a pasta"
 
@@ -557,41 +552,36 @@ msgctxt "shortcut window"
 msgid "Send Sounds to Call"
 msgstr "Enviar sons para a chamada"
 
-#: src/ui/shortcuts-dialog.ui:21
-msgctxt "shortcut window"
-msgid "Include My Voice"
-msgstr "Incluir minha voz"
-
-#: src/ui/shortcuts-dialog.ui:29
+#: src/ui/shortcuts-dialog.ui:23
 msgid "General"
 msgstr "Geral"
 
-#: src/ui/shortcuts-dialog.ui:32
+#: src/ui/shortcuts-dialog.ui:26
 msgctxt "shortcut window"
 msgid "Show Shortcuts"
 msgstr "Mostrar atalhos"
 
-#: src/ui/shortcuts-dialog.ui:38
+#: src/ui/shortcuts-dialog.ui:32
 msgctxt "shortcut window"
 msgid "Search"
 msgstr "Pesquisar"
 
-#: src/ui/shortcuts-dialog.ui:44
+#: src/ui/shortcuts-dialog.ui:38
 msgctxt "shortcut window"
 msgid "Move Tab Left"
 msgstr "Mover aba para a esquerda"
 
-#: src/ui/shortcuts-dialog.ui:50
+#: src/ui/shortcuts-dialog.ui:44
 msgctxt "shortcut window"
 msgid "Move Tab Right"
 msgstr "Mover aba para a direita"
 
-#: src/ui/shortcuts-dialog.ui:56
+#: src/ui/shortcuts-dialog.ui:50
 msgctxt "shortcut window"
 msgid "Preferences"
 msgstr "Preferências"
 
-#: src/ui/shortcuts-dialog.ui:62
+#: src/ui/shortcuts-dialog.ui:56
 msgctxt "shortcut window"
 msgid "Quit"
 msgstr "Sair"
@@ -665,7 +655,7 @@ msgid "Move to _Trash"
 msgstr "Mover para a _lixeira"
 
 #. Translators: {} is a volume, from 0 to 100.
-#: src/ui/sound_dialog.rs:132 src/ui/window.rs:156
+#: src/ui/sound_dialog.rs:132 src/ui/window.rs:154
 msgid "{}%"
 msgstr "{}%"
 
@@ -756,29 +746,28 @@ msgstr "Tocando, {} de {}"
 msgid "Playing, {}"
 msgstr "Tocando, {}"
 
-#: src/ui/window.rs:273
+#: src/ui/window.rs:271
 msgid "Audio is unavailable: PipeWire is not running"
 msgstr "Áudio indisponível: o PipeWire não está em execução"
 
-#: src/ui/window.rs:276
+#: src/ui/window.rs:274
 msgid "Audio stopped: the connection to PipeWire was lost"
 msgstr "O áudio parou: a conexão com o PipeWire foi perdida"
 
-#: src/ui/window.rs:279
-msgid ""
-"Audio is unavailable: another program already has a “Vinheta” microphone"
-msgstr "Áudio indisponível: outro programa já tem um microfone “Vinheta”"
-
-#: src/ui/window.rs:281
+#: src/ui/window.rs:276
 msgid "Audio is unavailable"
 msgstr "Áudio indisponível"
 
 #. Translators: {} is how many sounds are playing.
-#: src/ui/window.rs:299
+#: src/ui/window.rs:294
 msgid "{} playing"
 msgid_plural "{} playing"
 msgstr[0] "{} tocando"
 msgstr[1] "{} tocando"
+
+#: src/ui/window.rs:325
+msgid "No app is using the microphone"
+msgstr "Nenhum aplicativo está usando o microfone"
 
 #: src/ui/window.rs:760
 msgid "Add Folder"
@@ -887,11 +876,11 @@ msgstr "Adicionar pasta…"
 
 #: src/ui/window.ui:131
 msgid ""
-"Tip: to be heard in a call, choose “Vinheta” as the microphone in your call "
-"app"
+"Tip: join a call with your usual microphone, and the sounds you play are "
+"heard there"
 msgstr ""
-"Dica: para ser ouvido em uma chamada, escolha “Vinheta” como microfone no "
-"seu aplicativo de chamadas"
+"Dica: entre em uma chamada com o seu microfone de sempre, e os sons que você "
+"tocar serão ouvidos nela"
 
 #: src/ui/window.ui:142
 msgid "Call Setup Guide"
@@ -917,54 +906,54 @@ msgstr "Fones"
 msgid "Call"
 msgstr "Chamada"
 
-#: src/ui/window.ui:545
+#: src/ui/window.ui:548
 msgid "Add _Sounds…"
 msgstr "Adicionar _sons…"
 
-#: src/ui/window.ui:549
+#: src/ui/window.ui:552
 msgid "Add _Folder…"
 msgstr "Adicionar _pasta…"
 
-#: src/ui/window.ui:556
+#: src/ui/window.ui:559
 msgid "Sort By"
 msgstr "Ordenar por"
 
-#: src/ui/window.ui:558
+#: src/ui/window.ui:561
 msgid "_Name"
 msgstr "_Nome"
 
-#: src/ui/window.ui:563
+#: src/ui/window.ui:566
 msgid "Recently _Added"
 msgstr "_Adicionados recentemente"
 
-#: src/ui/window.ui:570
+#: src/ui/window.ui:573
 msgid "_Preferences"
 msgstr "_Preferências"
 
-#: src/ui/window.ui:574
+#: src/ui/window.ui:577
 msgid "_Call Setup Guide"
 msgstr "_Guia de configuração de chamada"
 
-#: src/ui/window.ui:578
+#: src/ui/window.ui:581
 msgid "_Keyboard Shortcuts"
 msgstr "A_talhos de teclado"
 
-#: src/ui/window.ui:582
+#: src/ui/window.ui:585
 msgid "_About Vinheta"
 msgstr "_Sobre o Vinheta"
 
-#: src/ui/window.ui:590
+#: src/ui/window.ui:593
 msgid "Re_name Tab…"
 msgstr "_Renomear aba…"
 
-#: src/ui/window.ui:596
+#: src/ui/window.ui:599
 msgid "Move Tab _Left"
 msgstr "Mover aba para a _esquerda"
 
-#: src/ui/window.ui:600
+#: src/ui/window.ui:603
 msgid "Move Tab _Right"
 msgstr "Mover aba para a _direita"
 
-#: src/ui/window.ui:606
+#: src/ui/window.ui:609
 msgid "Remo_ve Folder"
 msgstr "Remo_ver pasta"

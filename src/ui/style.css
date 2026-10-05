@@ -249,8 +249,12 @@ gridview.pads > child > .pad.located {
   min-width: 120px;
 }
 
-.bottom-bar .microphone {
+.bottom-bar .call-app {
   min-width: 220px;
+}
+
+.bottom-bar .call-app.not-recording .call-app-icon {
+  color: var(--warning-color);
 }
 
 .drop-hint {

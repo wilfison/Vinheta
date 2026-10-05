@@ -38,13 +38,11 @@ mod imp {
     #[template(resource = "/io/github/wilfison/Vinheta/preferences-dialog.ui")]
     pub struct PreferencesDialog {
         #[template_child]
-        pub microphone: TemplateChild<adw::ComboRow>,
+        pub call_app: TemplateChild<adw::ComboRow>,
         #[template_child]
         pub monitor_output: TemplateChild<adw::ComboRow>,
         #[template_child]
         pub send_to_call: TemplateChild<adw::SwitchRow>,
-        #[template_child]
-        pub include_voice: TemplateChild<adw::SwitchRow>,
         #[template_child]
         pub trigger_mode: TemplateChild<adw::ComboRow>,
         #[template_child]
@@ -80,9 +78,6 @@ mod imp {
             let settings = gio::Settings::new(APP_ID);
             settings
                 .bind("send-sounds-to-call", &*self.send_to_call, "active")
-                .build();
-            settings
-                .bind("include-my-voice", &*self.include_voice, "active")
                 .build();
             settings
                 .bind("fade-out-on-stop", &*self.fade_out, "active")
@@ -129,13 +124,13 @@ impl PreferencesDialog {
     pub fn new(app: &VinhetaApplication) -> Self {
         let dialog: Self = glib::Object::new();
         let imp = dialog.imp();
-        device_selector::bind(&*imp.microphone, app, DeviceKind::Microphone);
+        device_selector::bind(&*imp.call_app, app, DeviceKind::CallApp);
         device_selector::bind(&*imp.monitor_output, app, DeviceKind::Output);
 
-        // A chosen device that is not connected is told in the subtitle,
-        // which is never ellipsized.
+        // A chosen output that is not connected and a chosen app that is
+        // not recording are told in the subtitle, which is never ellipsized.
         let rows = [
-            (imp.microphone.get(), DeviceKind::Microphone),
+            (imp.call_app.get(), DeviceKind::CallApp),
             (imp.monitor_output.get(), DeviceKind::Output),
         ]
         .map(|(row, kind)| (row.subtitle(), row, kind));
@@ -145,7 +140,14 @@ impl PreferencesDialog {
             move || {
                 for (subtitle, row, kind) in &rows {
                     if app.device_missing(*kind) {
-                        row.set_subtitle(&gettext("Not connected. Using the system default."));
+                        row.set_subtitle(&match kind {
+                            DeviceKind::CallApp => {
+                                gettext("Not recording. The sounds are not sent to it.")
+                            }
+                            DeviceKind::Output => {
+                                gettext("Not connected. Using the system default.")
+                            }
+                        });
                         row.add_css_class("warning");
                     } else {
                         row.set_subtitle(subtitle.as_deref().unwrap_or_default());

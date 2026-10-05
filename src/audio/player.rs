@@ -29,14 +29,16 @@ use std::time::{Duration, Instant};
 use gst::glib;
 use gst::prelude::*;
 
-use super::graph::{CALL_STREAM_PREFIX, MONITOR_STREAM_PREFIX};
+use super::graph::{stream_prefix, CALL_STREAM_PREFIX, MONITOR_STREAM_PREFIX};
 use super::{Config, Error, Event, PlayOptions, PlaybackId, Position};
 
 // One queue per branch so a slow sink cannot stall the other one. The queues
 // are short so the end of a pass is known shortly before it is heard. The
 // gains go after them: a volume before the tee would be heard a queue late.
+// The call branch is mono, so it fits a recording app of any channel layout.
 const PIPELINE: &str = "uridecodebin name=source ! audioconvert ! audioresample ! tee name=tee \
     tee. ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=200000000 \
+        ! audioconvert ! audio/x-raw,channels=1 \
         ! volume name=call-volume ! pipewiresink name=call \
     tee. ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=200000000 \
         ! volume name=monitor-volume ! pipewiresink name=monitor";
@@ -224,15 +226,17 @@ impl Player {
         element("call-volume").set_property("mute", !mix.send_to_call);
         playback.apply_gains(&mix, 1.0);
 
-        // WirePlumber does not route a playback stream to an Audio/Source/Virtual
-        // node, so the call branch stays unconnected and the graph thread links it.
-        let suffix = format!("{}-{}", std::process::id(), id.0);
+        // WirePlumber must not route the call branch to an output: the graph
+        // thread links it to the drain node and to the recording apps.
         let call = element("call");
         call.set_property("client-name", "Vinheta");
         call.set_property(
             "stream-properties",
             gst::Structure::builder("props")
-                .field("node.name", format!("{CALL_STREAM_PREFIX}{suffix}"))
+                .field(
+                    "node.name",
+                    format!("{}{}", stream_prefix(CALL_STREAM_PREFIX), id.0),
+                )
                 .field("node.autoconnect", "false")
                 .field("state.restore-props", "false")
                 .build(),
@@ -243,7 +247,10 @@ impl Player {
         monitor.set_property(
             "stream-properties",
             gst::Structure::builder("props")
-                .field("node.name", format!("{MONITOR_STREAM_PREFIX}{suffix}"))
+                .field(
+                    "node.name",
+                    format!("{}{}", stream_prefix(MONITOR_STREAM_PREFIX), id.0),
+                )
                 .field("state.restore-props", "false")
                 .build(),
         );

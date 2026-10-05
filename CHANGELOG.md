@@ -4,6 +4,18 @@ All notable changes to Vinheta are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The sounds are now played straight into the apps that are using your microphone. Keep your usual microphone in the call app: there is no "Vinheta" microphone to choose anymore, and the call setup guide says so.
+- The bottom bar and the preferences have a "Send Sounds To" selector: every app that is using the microphone (the default), or one of them.
+- The sounds reach the call in mono.
+
+### Removed
+
+- The "Vinheta" virtual microphone, the microphone selector, and the "Include my voice" switch with its Ctrl+Shift+M shortcut. Your voice reaches the call through the call app itself.
+
 ## [1.0.0] - 2026-10-04
 
 The first public release.

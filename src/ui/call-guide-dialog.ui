@@ -29,7 +29,7 @@
                     <property name="margin-end">12</property>
                     <child>
                       <object class="GtkLabel">
-                        <property name="label" translatable="yes">Vinheta creates a virtual microphone that carries your voice and your sounds. For the other side of a call to hear them:</property>
+                        <property name="label" translatable="yes">Vinheta plays your sounds into the apps that are using your microphone. For the other side of a call to hear them:</property>
                         <property name="wrap">True</property>
                         <property name="xalign">0</property>
                       </object>
@@ -43,8 +43,8 @@
                         <child>
                           <object class="AdwActionRow">
                             <property name="activatable">False</property>
-                            <property name="title" translatable="yes">Choose “Vinheta” as the microphone</property>
-                            <property name="subtitle" translatable="yes">In the audio settings of your call app, select “Vinheta” as the microphone (input device). Your voice and your sounds go through it.</property>
+                            <property name="title" translatable="yes">Join the call as usual</property>
+                            <property name="subtitle" translatable="yes">Keep your own microphone in the call app. Vinheta adds the sounds to what the app records, while both are running.</property>
                             <child type="prefix">
                               <object class="GtkLabel">
                                 <property name="label">1</property>
@@ -100,8 +100,8 @@
                         <child>
                           <object class="AdwActionRow">
                             <property name="activatable">False</property>
-                            <property name="title" translatable="yes">Keep Vinheta open</property>
-                            <property name="subtitle" translatable="yes">The “Vinheta” microphone exists only while the app is running.</property>
+                            <property name="title" translatable="yes">Choose where the sounds go</property>
+                            <property name="subtitle" translatable="yes">Every app that is using the microphone gets them. To leave the others out, pick one app in the bottom bar.</property>
                             <child type="prefix">
                               <object class="GtkLabel">
                                 <property name="label">4</property>

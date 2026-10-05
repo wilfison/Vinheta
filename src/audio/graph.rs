@@ -27,7 +27,8 @@ use std::rc::Rc;
 use std::sync::mpsc;
 
 use pipewire as pw;
-use pw::metadata::{Metadata, MetadataListener};
+use pw::metadata::Metadata;
+use pw::node::{NodeChangeMask, NodeListener};
 use pw::proxy::{ProxyListener, ProxyT};
 use pw::registry::GlobalObject;
 use pw::spa::utils::dict::DictRef;
@@ -35,26 +36,33 @@ use pw::types::ObjectType;
 
 use super::{Device, Error, Event};
 
-pub(super) const NODE_NAME: &str = "vinheta";
-/// Playback streams whose node name starts with this are linked to the
-/// virtual microphone as soon as their ports show up.
+/// The private node every call stream is linked to, so that a playback
+/// runs while no app is recording. Its media class keeps it out of every
+/// device list; without one it would be an "Audio/Sink".
+pub(super) const DRAIN_PREFIX: &str = "vinheta-drain-";
+/// Playback streams whose node name starts with this and the id of the
+/// process are linked to the recording apps as soon as their ports show up.
 pub(super) const CALL_STREAM_PREFIX: &str = "vinheta-call-";
 /// Monitor streams are routed by WirePlumber; the name is how the engine
 /// finds the running ones when the monitor output changes.
 pub(super) const MONITOR_STREAM_PREFIX: &str = "vinheta-monitor-";
+
+/// The name of the streams of this process: another engine may be running.
+pub(super) fn stream_prefix(prefix: &str) -> String {
+    format!("{prefix}{}-", std::process::id())
+}
+const RECORDER_CLASS: &str = "Stream/Input/Audio";
 const EPIPE: i32 = 32;
 
 pub(super) enum Command {
-    SetMic(Option<String>),
-    SetIncludeVoice(bool),
+    SetTarget(Option<String>),
     SetMonitor(Option<String>),
     Quit,
 }
 
 /// What the engine needs from `Config` on the PipeWire thread.
 pub(super) struct Options {
-    pub mic: Option<String>,
-    pub include_voice: bool,
+    pub target: Option<String>,
 }
 
 struct Node {
@@ -62,20 +70,40 @@ struct Node {
     media_class: String,
     description: Option<String>,
     nick: Option<String>,
+    /// Known once the server sent the properties of a recording stream:
+    /// the registry does not carry the ones needed here.
+    recorder: Option<Recorder>,
 }
 
-/// The microphones and the outputs among `nodes`, each list sorted by
-/// description. The virtual microphone is never one of them.
-fn device_lists<'a>(nodes: impl IntoIterator<Item = &'a Node>) -> (Vec<Device>, Vec<Device>) {
-    let mut microphones = Vec::new();
+#[derive(Debug, Clone, PartialEq)]
+struct Recorder {
+    /// What identifies the app: the name of its binary when it has one.
+    app: String,
+    description: String,
+    /// A level meter ("Peak detect" of a volume control), not a recording.
+    meter: bool,
+}
+
+impl Recorder {
+    fn new(props: &DictRef) -> Self {
+        let get = |key| props.get(key).filter(|text: &&str| !text.is_empty());
+        let name = get("application.name").or(get("node.name"));
+        let app = get("application.process.binary")
+            .or(name)
+            .unwrap_or_default();
+        Self {
+            app: app.to_owned(),
+            description: name.unwrap_or(app).to_owned(),
+            meter: props.get("stream.monitor") == Some("true"),
+        }
+    }
+}
+
+/// The outputs among `nodes`, sorted by description.
+fn output_list<'a>(nodes: impl IntoIterator<Item = &'a Node>) -> Vec<Device> {
     let mut outputs = Vec::new();
     for node in nodes {
-        let list = match node.media_class.as_str() {
-            "Audio/Source" | "Audio/Source/Virtual" if node.name != NODE_NAME => &mut microphones,
-            "Audio/Sink" => &mut outputs,
-            _ => continue,
-        };
-        if node.name.is_empty() {
+        if node.media_class != "Audio/Sink" || node.name.is_empty() {
             continue;
         }
         let description = [&node.description, &node.nick]
@@ -83,21 +111,84 @@ fn device_lists<'a>(nodes: impl IntoIterator<Item = &'a Node>) -> (Vec<Device>, 
             .flatten()
             .find(|text| !text.is_empty())
             .unwrap_or(&node.name);
-        list.push(Device {
+        outputs.push(Device {
             name: node.name.clone(),
             description: description.clone(),
         });
     }
-    for list in [&mut microphones, &mut outputs] {
-        list.sort_by_cached_key(|device| (device.description.to_lowercase(), device.name.clone()));
+    outputs.sort_by_cached_key(|device| (device.description.to_lowercase(), device.name.clone()));
+    outputs
+}
+
+/// The streams that record a microphone, given the links of the graph as
+/// (output node, input node). A stream fed by the monitor of an output
+/// (a desktop recording) and a level meter are not among them.
+fn recording_streams(
+    nodes: &HashMap<u32, Node>,
+    links: impl IntoIterator<Item = (u32, u32)>,
+) -> HashSet<u32> {
+    let is_microphone = |id: &u32| {
+        nodes.get(id).is_some_and(|node| {
+            matches!(
+                node.media_class.as_str(),
+                "Audio/Source" | "Audio/Source/Virtual"
+            )
+        })
+    };
+    let is_recorder = |id: &u32| {
+        nodes.get(id).is_some_and(|node| {
+            node.media_class == RECORDER_CLASS
+                && node
+                    .recorder
+                    .as_ref()
+                    .is_some_and(|recorder| !recorder.meter)
+        })
+    };
+    links
+        .into_iter()
+        .filter(|(output, input)| is_microphone(output) && is_recorder(input))
+        .map(|(_, input)| input)
+        .collect()
+}
+
+/// One entry per app among the recording `streams`, sorted by description.
+fn target_list<'a>(streams: impl IntoIterator<Item = &'a Node>) -> Vec<Device> {
+    let mut targets: Vec<Device> = Vec::new();
+    for recorder in streams
+        .into_iter()
+        .filter_map(|node| node.recorder.as_ref())
+    {
+        if recorder.app.is_empty() || targets.iter().any(|target| target.name == recorder.app) {
+            continue;
+        }
+        targets.push(Device {
+            name: recorder.app.clone(),
+            description: recorder.description.clone(),
+        });
     }
-    (microphones, outputs)
+    targets.sort_by_cached_key(|target| (target.description.to_lowercase(), target.name.clone()));
+    targets
 }
 
 struct Port {
     node: u32,
     output: bool,
-    channel: String,
+}
+
+/// Port pairs that feed `source` into `target`: every output into every
+/// input, since the call branch is mono.
+fn call_pairs(ports: &HashMap<u32, Port>, source: u32, target: u32) -> Vec<(u32, u32)> {
+    let ports_of = |node: u32, output: bool| {
+        ports
+            .iter()
+            .filter(move |(_, port)| port.node == node && port.output == output)
+            .map(|(id, _)| *id)
+    };
+    let mut pairs = Vec::new();
+    for output in ports_of(source, true) {
+        pairs.extend(ports_of(target, false).map(|input| (output, input)));
+    }
+    pairs
 }
 
 struct Link {
@@ -105,30 +196,41 @@ struct Link {
     _listener: ProxyListener,
 }
 
+/// Keeps the properties of a recording stream coming.
+struct Stream {
+    _proxy: pw::node::Node,
+    _listener: NodeListener,
+}
+
 struct Graph {
     core: pw::core::CoreRc,
     events: async_channel::Sender<Event>,
-    mic_override: Option<String>,
-    /// The chosen microphone that was reported as missing, to report it once.
-    missing_mic: Option<String>,
-    include_voice: bool,
+    call_prefix: String,
+    monitor_prefix: String,
+    /// The app the sounds are sent to. `None` is every recording app.
+    target: Option<String>,
     /// Set once the monitor output is changed while the engine runs. The
     /// inner `None` is the system default.
     monitor: Option<Option<String>>,
-    /// The lists last sent in `Event::DevicesChanged`; `None` until the
-    /// first registry roundtrips are over.
-    devices: Option<(Vec<Device>, Vec<Device>)>,
-    devices_ready: bool,
-    default_source: Option<String>,
+    /// The lists last sent in `Event::DevicesChanged` and
+    /// `Event::TargetsChanged`; `None` until the first registry roundtrips
+    /// are over.
+    outputs: Option<Vec<Device>>,
+    targets: Option<Vec<Device>>,
+    lists_ready: bool,
     nodes: HashMap<u32, Node>,
     ports: HashMap<u32, Port>,
-    /// Global id of the virtual microphone, known once the server binds it.
-    vinheta: Option<u32>,
+    /// Every link of the graph, as (output node, input node).
+    node_links: HashMap<u32, (u32, u32)>,
+    streams: HashMap<u32, Stream>,
+    /// The streams seen recording a microphone. One stays here until it is
+    /// removed, so a stream that WirePlumber links again keeps the sounds.
+    recorders: HashSet<u32>,
+    /// Global id of the drain node, known once the server binds it.
+    drain: Option<u32>,
     /// Links created by the engine, keyed by (output port, input port).
     links: HashMap<(u32, u32), Link>,
-    linked_mic: Option<u32>,
-    mic_error: Option<Error>,
-    metadata: Option<(Metadata, MetadataListener)>,
+    metadata: Option<Metadata>,
 }
 
 impl Graph {
@@ -136,8 +238,13 @@ impl Graph {
         let _ = self.events.try_send(event);
     }
 
-    fn add_global(&mut self, global: &GlobalObject<&DictRef>) {
-        let Some(props) = global.props else { return };
+    /// Returns whether the global is a recording stream, whose properties
+    /// are then to be asked for.
+    fn add_global(&mut self, global: &GlobalObject<&DictRef>) -> bool {
+        let Some(props) = global.props else {
+            return false;
+        };
+        let id = |key| props.get(key).and_then(|id| id.parse().ok());
         match global.type_ {
             ObjectType::Node => {
                 let node = Node {
@@ -145,80 +252,54 @@ impl Graph {
                     media_class: props.get("media.class").unwrap_or_default().to_owned(),
                     description: props.get("node.description").map(str::to_owned),
                     nick: props.get("node.nick").map(str::to_owned),
+                    recorder: None,
                 };
                 // A playback that started just before the output was changed.
-                if node.name.starts_with(MONITOR_STREAM_PREFIX) {
+                if node.name.starts_with(&self.monitor_prefix) {
                     self.target_monitor(global.id);
                 }
+                let records = node.media_class == RECORDER_CLASS;
                 self.nodes.insert(global.id, node);
+                return records;
             }
             ObjectType::Port => {
-                let Some(node) = props.get("node.id").and_then(|id| id.parse().ok()) else {
-                    return;
-                };
-                let port = Port {
-                    node,
-                    output: props.get("port.direction") == Some("out"),
-                    channel: props.get("audio.channel").unwrap_or_default().to_owned(),
-                };
-                self.ports.insert(global.id, port);
+                if let Some(node) = id("node.id") {
+                    let output = props.get("port.direction") == Some("out");
+                    self.ports.insert(global.id, Port { node, output });
+                }
+            }
+            ObjectType::Link => {
+                if let (Some(output), Some(input)) = (id("link.output.node"), id("link.input.node"))
+                {
+                    self.node_links.insert(global.id, (output, input));
+                }
             }
             _ => {}
         }
+        false
     }
 
     fn remove_global(&mut self, id: u32) {
         self.nodes.remove(&id);
         self.ports.remove(&id);
+        self.node_links.remove(&id);
+        self.streams.remove(&id);
     }
 
-    fn node_named(&self, name: &str) -> Option<u32> {
-        self.nodes
-            .iter()
-            .find(|(id, node)| node.name == name && Some(**id) != self.vinheta)
-            .map(|(id, _)| *id)
-    }
-
-    /// The node to link as the microphone, and whether it is a fallback. A
-    /// chosen microphone that does not exist is reported once, and the
-    /// default source is used until it shows up.
-    fn resolve_mic(&mut self) -> Result<(u32, bool), Error> {
-        let chosen = self.mic_override.clone().filter(|name| name != NODE_NAME);
-        if let Some(name) = &chosen {
-            if let Some(id) = self.node_named(name) {
-                self.missing_mic = None;
-                return Ok((id, false));
-            }
-            if self.missing_mic.as_ref() != Some(name) {
-                self.missing_mic = Some(name.clone());
-                self.emit(Event::Error(Error::MicNotFound(name.clone())));
+    fn set_recorder(&mut self, id: u32, recorder: Recorder) {
+        if let Some(node) = self.nodes.get_mut(&id) {
+            if node.recorder.as_ref() != Some(&recorder) {
+                node.recorder = Some(recorder);
+                self.sync();
             }
         }
-        let fallback = self.mic_override.is_some();
-
-        let name = self.default_source.as_ref().ok_or(Error::NoMicrophone)?;
-        if name == NODE_NAME {
-            // The user made the virtual microphone the system default, so the
-            // default cannot be followed. "Audio/Source" excludes virtual sources.
-            return self
-                .nodes
-                .iter()
-                .filter(|(_, node)| node.media_class == "Audio/Source")
-                .map(|(id, _)| (*id, true))
-                .min()
-                .ok_or(Error::NoMicrophone);
-        }
-
-        self.node_named(name)
-            .map(|id| (id, fallback))
-            .ok_or_else(|| Error::MicNotFound(name.clone()))
     }
 
     /// Asks WirePlumber to route a monitor stream to the chosen output. A
     /// removed key would leave the target the stream was created with, so
     /// the system default is asked for with "-1".
     fn target_monitor(&self, stream: u32) {
-        if let (Some((metadata, _)), Some(monitor)) = (&self.metadata, &self.monitor) {
+        if let (Some(metadata), Some(monitor)) = (&self.metadata, &self.monitor) {
             let target = monitor.as_deref().unwrap_or("-1");
             metadata.set_property(stream, "target.object", None, Some(target));
         }
@@ -227,99 +308,61 @@ impl Graph {
     fn set_monitor(&mut self, name: Option<String>) {
         self.monitor = Some(name);
         for (id, node) in &self.nodes {
-            if node.name.starts_with(MONITOR_STREAM_PREFIX) {
+            if node.name.starts_with(&self.monitor_prefix) {
                 self.target_monitor(*id);
             }
         }
     }
 
-    fn set_mic(&mut self, name: Option<String>) {
-        self.mic_override = name;
-        self.missing_mic = None;
+    fn set_target(&mut self, app: Option<String>) {
+        self.target = app;
         self.sync();
     }
 
-    fn set_include_voice(&mut self, enabled: bool) {
-        if self.include_voice == enabled {
+    fn update_lists(&mut self) {
+        let found = recording_streams(&self.nodes, self.node_links.values().copied());
+        self.recorders.extend(found);
+        self.recorders.retain(|id| self.nodes.contains_key(id));
+        if !self.lists_ready {
             return;
         }
-        self.include_voice = enabled;
-        if !enabled {
-            self.voice_off();
-        }
-        self.sync();
-    }
 
-    fn voice_off(&mut self) {
-        self.linked_mic = None;
-        self.mic_error = None;
-        self.missing_mic = None;
-        self.emit(Event::MicUnlinked);
-    }
-
-    fn update_devices(&mut self) {
-        if !self.devices_ready {
-            return;
+        let outputs = output_list(self.nodes.values());
+        if self.outputs.as_ref() != Some(&outputs) {
+            self.outputs = Some(outputs.clone());
+            self.emit(Event::DevicesChanged { outputs });
         }
-        let devices = device_lists(self.nodes.values());
-        if self.devices.as_ref() != Some(&devices) {
-            self.devices = Some(devices.clone());
-            self.emit(Event::DevicesChanged {
-                microphones: devices.0,
-                outputs: devices.1,
-            });
+        let targets = target_list(self.recorders.iter().map(|id| &self.nodes[id]));
+        if self.targets.as_ref() != Some(&targets) {
+            self.targets = Some(targets.clone());
+            self.emit(Event::TargetsChanged(targets));
         }
     }
 
-    /// Port pairs that feed `source` into the virtual microphone. A mono
-    /// source feeds every input, otherwise channels are matched by name.
-    fn pairs(&self, source: u32, vinheta: u32) -> Vec<(u32, u32)> {
-        let ports_of = |node: u32, output: bool| {
-            self.ports
-                .iter()
-                .filter(move |(_, port)| port.node == node && port.output == output)
-        };
-        let outputs: Vec<_> = ports_of(source, true).collect();
-        let mut pairs = Vec::new();
-        for (output_id, output) in &outputs {
-            for (input_id, input) in ports_of(vinheta, false) {
-                if outputs.len() == 1 || output.channel == input.channel {
-                    pairs.push((**output_id, *input_id));
-                }
-            }
-        }
-        pairs
+    /// Whether the sounds are to be sent to this recording stream.
+    fn is_target(&self, stream: u32) -> bool {
+        let app = self.nodes[&stream].recorder.as_ref().map(|r| &r.app);
+        self.target.is_none() || self.target.as_ref() == app
     }
 
     /// Makes the links owned by the engine match the current graph.
     fn sync(&mut self) {
-        self.update_devices();
-        let Some(vinheta) = self.vinheta else { return };
+        self.update_lists();
+        let Some(drain) = self.drain else { return };
 
         let mut wanted = HashSet::new();
         for (id, node) in &self.nodes {
-            if node.name.starts_with(CALL_STREAM_PREFIX) {
-                wanted.extend(self.pairs(*id, vinheta));
+            if !node.name.starts_with(&self.call_prefix) {
+                continue;
             }
-        }
-
-        let mut mic_ready = None;
-        let mic = self.include_voice.then(|| self.resolve_mic());
-        match mic {
-            None => {}
-            Some(Ok((mic, fallback))) => {
-                self.mic_error = None;
-                let pairs = self.pairs(mic, vinheta);
-                if !pairs.is_empty() {
-                    mic_ready = Some((mic, fallback));
-                }
-                wanted.extend(pairs);
+            wanted.extend(call_pairs(&self.ports, *id, drain));
+            for stream in self
+                .recorders
+                .iter()
+                .filter(|stream| self.is_target(**stream))
+            {
+                wanted.extend(call_pairs(&self.ports, *id, *stream));
             }
-            Some(Err(error)) if self.mic_error.as_ref() != Some(&error) => {
-                self.mic_error = Some(error.clone());
-                self.emit(Event::Error(error));
-            }
-            Some(Err(_)) => {}
         }
 
         // Dropping a proxy destroys its link, since links do not linger.
@@ -328,16 +371,6 @@ impl Graph {
             if !self.links.contains_key(&pair) {
                 self.create_link(pair);
             }
-        }
-
-        match mic_ready {
-            Some((mic, fallback)) if self.linked_mic != Some(mic) => {
-                self.linked_mic = Some(mic);
-                let name = self.nodes[&mic].name.clone();
-                self.emit(Event::MicLinked { name, fallback });
-            }
-            Some(_) => {}
-            None => self.linked_mic = None,
         }
     }
 
@@ -371,13 +404,6 @@ impl Graph {
             Err(error) => self.emit(Event::Error(Error::PipeWire(error.to_string()))),
         }
     }
-}
-
-/// Extracts `name` from the `{"name":"..."}` value of a default device key.
-fn default_device_name(value: &str) -> Option<String> {
-    let rest = value.split_once("\"name\"")?.1;
-    let rest = rest.split_once('"')?.1;
-    Some(rest.split_once('"')?.0.to_owned())
 }
 
 /// Runs the loop until the server has answered everything sent so far.
@@ -451,19 +477,20 @@ fn run_loop(
     let graph = Rc::new(RefCell::new(Graph {
         core: core.clone(),
         events: events.clone(),
-        mic_override: options.mic,
-        missing_mic: None,
-        include_voice: options.include_voice,
+        call_prefix: stream_prefix(CALL_STREAM_PREFIX),
+        monitor_prefix: stream_prefix(MONITOR_STREAM_PREFIX),
+        target: options.target,
         monitor: None,
-        devices: None,
-        devices_ready: false,
-        default_source: None,
+        outputs: None,
+        targets: None,
+        lists_ready: false,
         nodes: HashMap::new(),
         ports: HashMap::new(),
-        vinheta: None,
+        node_links: HashMap::new(),
+        streams: HashMap::new(),
+        recorders: HashSet::new(),
+        drain: None,
         links: HashMap::new(),
-        linked_mic: None,
-        mic_error: None,
         metadata: None,
     }));
 
@@ -481,31 +508,39 @@ fn run_loop(
                 let is_default_metadata = global.type_ == ObjectType::Metadata
                     && global.props.and_then(|props| props.get("metadata.name")) == Some("default");
                 if is_default_metadata {
-                    if let Ok(metadata) = registry.bind::<Metadata, _>(global) {
-                        let listener = metadata
+                    graph.borrow_mut().metadata = registry.bind::<Metadata, _>(global).ok();
+                    return;
+                }
+                let records = graph.borrow_mut().add_global(global);
+                if records {
+                    if let Ok(proxy) = registry.bind::<pw::node::Node, _>(global) {
+                        let id = global.id;
+                        let listener = proxy
                             .add_listener_local()
-                            .property({
+                            .info({
                                 let graph = Rc::downgrade(&graph);
-                                move |_, key, _, value| {
-                                    if key == Some("default.audio.source") {
-                                        if let Some(graph) = graph.upgrade() {
-                                            let mut graph = graph.borrow_mut();
-                                            graph.default_source =
-                                                value.and_then(default_device_name);
-                                            graph.sync();
-                                        }
+                                move |info| {
+                                    // An update of anything else comes
+                                    // with no properties at all.
+                                    if !info.change_mask().contains(NodeChangeMask::PROPS) {
+                                        return;
                                     }
-                                    0
+                                    if let (Some(graph), Some(props)) =
+                                        (graph.upgrade(), info.props())
+                                    {
+                                        graph.borrow_mut().set_recorder(id, Recorder::new(props));
+                                    }
                                 }
                             })
                             .register();
-                        graph.borrow_mut().metadata = Some((metadata, listener));
+                        let stream = Stream {
+                            _proxy: proxy,
+                            _listener: listener,
+                        };
+                        graph.borrow_mut().streams.insert(id, stream);
                     }
-                    return;
                 }
-                let mut graph = graph.borrow_mut();
-                graph.add_global(global);
-                graph.sync();
+                graph.borrow_mut().sync();
             }
         })
         .global_remove({
@@ -520,22 +555,14 @@ fn run_loop(
         })
         .register();
 
-    // One roundtrip lists the globals, the second delivers the metadata values.
+    // One roundtrip lists the globals, the second delivers the properties
+    // of the recording streams.
     roundtrip(&main_loop, &core)?;
     roundtrip(&main_loop, &core)?;
     {
         let mut graph = graph.borrow_mut();
-        graph.devices_ready = true;
-        graph.update_devices();
-    }
-
-    if graph
-        .borrow()
-        .nodes
-        .values()
-        .any(|node| node.name == NODE_NAME)
-    {
-        return Err(Error::NodeExists);
+        graph.lists_ready = true;
+        graph.update_lists();
     }
 
     // No object.linger: the node belongs to this connection and dies with it.
@@ -544,10 +571,9 @@ fn run_loop(
             "adapter",
             &pw::properties::properties! {
                 "factory.name" => "support.null-audio-sink",
-                "node.name" => NODE_NAME,
-                "node.description" => "Vinheta",
-                "media.class" => "Audio/Source/Virtual",
-                "audio.position" => "[ FL FR ]",
+                "node.name" => format!("{DRAIN_PREFIX}{}", std::process::id()),
+                "media.class" => "Audio/Sink/Internal",
+                "audio.position" => "[ MONO ]",
             },
         )
         .map_err(pipewire_error)?;
@@ -559,11 +585,8 @@ fn run_loop(
             move |id| {
                 if let Some(graph) = graph.upgrade() {
                     let mut graph = graph.borrow_mut();
-                    graph.vinheta = Some(id);
-                    graph.emit(Event::NodeCreated(id));
-                    if !graph.include_voice {
-                        graph.voice_off();
-                    }
+                    graph.drain = Some(id);
+                    graph.emit(Event::Ready);
                     graph.sync();
                 }
             }
@@ -571,7 +594,7 @@ fn run_loop(
         .error({
             let events = events.clone();
             move |_, _, message| {
-                let error = Error::PipeWire(format!("virtual microphone failed: {message}"));
+                let error = Error::PipeWire(format!("drain node failed: {message}"));
                 let _ = events.try_send(Event::Error(error));
             }
         })
@@ -600,8 +623,7 @@ fn run_loop(
         move |command| {
             let Some(graph) = graph.upgrade() else { return };
             match command {
-                Command::SetMic(name) => graph.borrow_mut().set_mic(name),
-                Command::SetIncludeVoice(enabled) => graph.borrow_mut().set_include_voice(enabled),
+                Command::SetTarget(app) => graph.borrow_mut().set_target(app),
                 Command::SetMonitor(name) => graph.borrow_mut().set_monitor(name),
                 Command::Quit => main_loop.quit(),
             }
