@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-05 14:15-0300\n"
+"POT-Creation-Date: 2026-10-05 14:58-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -229,6 +229,14 @@ msgid "The call setup guide"
 msgstr "O guia de configuração de chamada"
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
+msgid ""
+"The sounds play straight into the apps that use your microphone, with no "
+"virtual microphone to choose, and the app has a new icon."
+msgstr ""
+"Os sons tocam direto nos apps que usam o seu microfone, sem microfone "
+"virtual para escolher, e o app tem um ícone novo."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
 msgid ""
 "The first release: folders as tabs, pads with a name, a color, a volume, a "
 "loop and a key, favorites, search, and a virtual microphone that sends the "

@@ -4,13 +4,14 @@ All notable changes to Vinheta are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-10-05
 
 ### Changed
 
 - The sounds are now played straight into the apps that are using your microphone. Keep your usual microphone in the call app: there is no "Vinheta" microphone to choose anymore, and the call setup guide says so.
 - The bottom bar and the preferences have a "Send Sounds To" selector: every app that is using the microphone (the default), or one of them.
 - The sounds reach the call in mono.
+- A new app icon, with a waveform on the playing pad.
 
 ### Removed
 
@@ -36,4 +37,5 @@ The first public release.
 - A narrow layout: the window works down to 360 pixels of width.
 - A Brazilian Portuguese translation.
 
+[1.1.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.1.0
 [1.0.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.0.0

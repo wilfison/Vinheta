@@ -1,3 +1,10 @@
+vinheta (1.1.0-1) resolute; urgency=medium
+
+  * The sounds play straight into the apps that use your microphone, with
+    no virtual microphone to choose, and the app has a new icon.
+
+ -- wilfison <wilfisonbatista@gmail.com>  Mon, 05 Oct 2026 14:58:27 -0300
+
 vinheta (1.0.0-1) resolute; urgency=medium
 
   * First public release.

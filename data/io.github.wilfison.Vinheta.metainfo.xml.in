@@ -45,6 +45,11 @@
   </screenshots>
 
   <releases>
+    <release version="1.1.0" date="2026-10-05">
+      <description>
+        <p>The sounds play straight into the apps that use your microphone, with no virtual microphone to choose, and the app has a new icon.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-10-04">
       <description>
         <p>The first release: folders as tabs, pads with a name, a color, a volume, a loop and a key, favorites, search, and a virtual microphone that sends the sounds to your calls.</p>
