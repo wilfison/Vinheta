@@ -30,6 +30,7 @@ use gettextrs::gettext;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib};
 use vinheta::audio::{self, AudioEngine, Config, Device, Event, PlayOptions, PlaybackId};
+use vinheta::backgrounds;
 use vinheta::devices::{self, Entry};
 use vinheta::editors;
 use vinheta::library;
@@ -162,6 +163,16 @@ mod imp {
         pub save_timer: RefCell<Option<glib::SourceId>>,
         /// Only exists while a sound plays.
         pub position_timer: RefCell<Option<glib::SourceId>>,
+        /// The backgrounds loaded so far, by file name; `None` for one that
+        /// could not be loaded.
+        pub textures: RefCell<HashMap<String, Option<gdk::Texture>>>,
+        /// How many images are being stored, during which nothing is swept.
+        pub storing: Cell<u32>,
+        /// Set when a background stopped being used, until the next sweep.
+        pub sweep_wanted: Cell<bool>,
+        /// The pad file was read, so its entries are all the backgrounds
+        /// that are used.
+        pub sweep_allowed: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -301,6 +312,17 @@ impl VinhetaApplication {
         let reset_sound_action = sound_action("reset-sound", |app, sound| {
             app.update_sound(sound, PadSettings::default());
         });
+        // The parameter is the path of a sound of the library and the path
+        // of an image, or an empty text for no background.
+        let set_background_action = gio::ActionEntry::builder("set-background")
+            .parameter_type(Some(glib::VariantTy::new("(ss)").unwrap()))
+            .activate(move |app: &Self, _, parameter| {
+                let parameter = parameter.and_then(|parameter| parameter.get::<(String, String)>());
+                if let Some((path, image)) = parameter {
+                    app.set_background(&path, &image);
+                }
+            })
+            .build();
         // The parameter is the path of a sound of the library and its key,
         // or an empty text for no key.
         let set_shortcut_action = gio::ActionEntry::builder("set-shortcut")
@@ -350,6 +372,7 @@ impl VinhetaApplication {
             open_in_editor_action,
             reset_sound_action,
             set_shortcut_action,
+            set_background_action,
             trigger_shortcut_action,
             stop_all_action,
         ]);
@@ -501,6 +524,8 @@ impl VinhetaApplication {
             Ok(mut pads) => {
                 pruned = pads.prune_missing();
                 imp.pads.replace(pads);
+                imp.sweep_allowed.set(true);
+                imp.sweep_wanted.set(true);
             }
             // The file is set aside, so that the next save does not destroy it.
             Err(error) => {
@@ -529,6 +554,7 @@ impl VinhetaApplication {
             glib::g_debug!("vinheta", "removed the settings of {pruned} missing files");
             self.save_pads();
         }
+        self.sweep_backgrounds();
     }
 
     fn save_pads(&self) {
@@ -539,7 +565,11 @@ impl VinhetaApplication {
         if imp.pads_read_only.get() {
             return;
         }
-        if let Err(error) = imp.pads.borrow().save(file) {
+        let saved = imp.pads.borrow().save(file);
+        if saved.is_ok() {
+            self.sweep_backgrounds();
+        }
+        if let Err(error) = saved {
             glib::g_warning!("vinheta", "could not save {}: {error}", file.display());
             // Once per session, not once per attempt.
             if !imp.save_failed.replace(true) {
@@ -620,12 +650,112 @@ impl VinhetaApplication {
             engine.set_playback_volume(id, audio::slider_gain(settings.volume));
             engine.set_playback_loop(id, settings.looping);
         }
+        if old.background.is_some() && old.background != settings.background {
+            imp.sweep_wanted.set(true);
+        }
         sound.set_settings(&settings);
         self.schedule_save();
         // The sorted and filtered views do not watch the sounds themselves.
         if let Some(window) = self.window() {
             window.sound_changed(old.name != settings.name, old.favorite != settings.favorite);
         }
+    }
+
+    /// Where the copies of the background images are.
+    fn backgrounds_dir(&self) -> PathBuf {
+        glib::user_data_dir().join("vinheta").join("backgrounds")
+    }
+
+    /// Stores a reduced copy of the image off the main thread and makes it
+    /// the background of the sound. An empty `image` removes the background.
+    fn set_background(&self, path: &str, image: &str) {
+        let Some(sound) = self.find_sound(path) else {
+            glib::g_debug!("vinheta", "no sound {path} to give a background");
+            return;
+        };
+        if image.is_empty() {
+            let mut settings = sound.settings();
+            settings.background = None;
+            self.update_sound(&sound, settings);
+            return;
+        }
+        let image = PathBuf::from(image);
+        if !backgrounds::is_image(&image) {
+            glib::g_debug!("vinheta", "{} is not an image", image.display());
+            return;
+        }
+        let imp = self.imp();
+        imp.storing.set(imp.storing.get() + 1);
+        let path = path.to_owned();
+        let dir = self.backgrounds_dir();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = app)]
+            self,
+            async move {
+                let source = image.clone();
+                let stored = gio::spawn_blocking(move || backgrounds::store(&source, &dir)).await;
+                let imp = app.imp();
+                imp.storing.set(imp.storing.get() - 1);
+                match stored {
+                    Ok(Ok(name)) => {
+                        // A file that could not be loaded before is there now.
+                        imp.textures.borrow_mut().remove(&name);
+                        if let Some(sound) = app.find_sound(&path) {
+                            let mut settings = sound.settings();
+                            settings.background = Some(name);
+                            app.update_sound(&sound, settings);
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        glib::g_warning!("vinheta", "{}: {error}", image.display());
+                        let name = image.file_name().unwrap_or_default().to_string_lossy();
+                        if let Some(window) = app.window() {
+                            // Translators: {} is the file name of an image.
+                            let message = gettext("Could not use “{}” as a background");
+                            window.toast(&message.replace("{}", &name));
+                        }
+                    }
+                    Err(_) => glib::g_warning!("vinheta", "storing {} failed", image.display()),
+                }
+                app.sweep_backgrounds();
+            }
+        ));
+    }
+
+    /// Removes the copies no pad uses, once it is safe: the pad file was
+    /// read, and no image is being stored.
+    fn sweep_backgrounds(&self) {
+        let imp = self.imp();
+        if !imp.sweep_wanted.get() || !imp.sweep_allowed.get() || imp.pads_read_only.get() {
+            return;
+        }
+        if imp.storing.get() > 0 {
+            return;
+        }
+        imp.sweep_wanted.set(false);
+        let used = imp.pads.borrow().backgrounds();
+        let removed = backgrounds::sweep(&self.backgrounds_dir(), &used);
+        if removed > 0 {
+            glib::g_debug!("vinheta", "removed {removed} unused backgrounds");
+        }
+        imp.textures
+            .borrow_mut()
+            .retain(|name, _| used.contains(name));
+    }
+
+    /// The picture of a background, loaded once for every pad that shows it.
+    pub fn background_texture(&self, name: &str) -> Option<gdk::Texture> {
+        if name.is_empty() {
+            return None;
+        }
+        let mut textures = self.imp().textures.borrow_mut();
+        let texture = textures.entry(name.to_owned()).or_insert_with(|| {
+            let file = self.backgrounds_dir().join(name);
+            gdk::Texture::from_filename(&file)
+                .inspect_err(|error| glib::g_warning!("vinheta", "{}: {error}", file.display()))
+                .ok()
+        });
+        texture.clone()
     }
 
     /// Gives a sound of the library its key, or none for an empty text.
