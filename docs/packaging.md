@@ -16,6 +16,7 @@ Prefer `scripts/build-deb.sh`: run in the working tree, `dpkg-buildpackage` leav
 - The version lives in four places: `meson.build`, `Cargo.toml` (and `Cargo.lock`), `debian/changelog`, and the `release` of the metainfo. `scripts/version.sh` fails when they differ.
 - `lintian` reports two warnings that are accepted: `initial-upload-closes-no-bugs` and `no-manual-page`.
 - `Depends` lists `gstreamer1.0-pipewire`, `gstreamer1.0-plugins-base`, and `gstreamer1.0-plugins-good` by hand: the sink, the decoders, and the converters are plugins, which `${shlibs:Depends}` does not see.
+- `Recommends` lists `heif-gdk-pixbuf` and `webp-pixbuf-loader`, the gdk-pixbuf loaders of HEIC and WebP, so that photos of those formats can be pad backgrounds. Every Ubuntu GNOME desktop already has them (`gnome-control-center` depends on both); the app works without them and refuses those formats.
 
 ## Continuous integration
 

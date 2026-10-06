@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- A pad can have a background image: drop an image on the pad, or choose one in its "Edit Sound" dialog. Vinheta keeps a small copy of it, so the original can be moved or deleted.
 - Audio comes back by itself when PipeWire stops or restarts: the app tries again on its own, at growing intervals, and "Try Again" still tries at once.
 
 ### Changed

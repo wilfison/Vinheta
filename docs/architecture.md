@@ -10,6 +10,7 @@ A map of the source tree. Each area has its own document.
 | `src/ui/` | The widgets, their `.ui` templates, and the CSS | [interface.md](interface.md), [shortcuts.md](shortcuts.md) |
 | `src/library.rs` | Folder scan, diff, pad names, import of loose files | [library.md](library.md) |
 | `src/pads.rs` | Pad settings and their file, keys, trigger rule, search match, sort order | [library.md](library.md) |
+| `src/backgrounds.rs` | Which files are images, the reduced copy of a pad background, the removal of unused copies | [library.md](library.md) |
 | `src/devices.rs` | The entries of a device selector | [interface.md](interface.md) |
 | `src/editors.rs` | Which installed app opens a sound for editing | [application.md](application.md) |
 | `src/audio/` | The audio engine (PipeWire and GStreamer) | [audio.md](audio.md) |
@@ -22,7 +23,7 @@ A map of the source tree. Each area has its own document.
 ## Two crates in one package
 
 - `src/lib.rs`: library target that exposes `audio`, `devices`, `editors`, `library`, and `pads`, so other binaries and the tests can use them. The app modules above stay in `main.rs`.
-- The modules of the library have no GTK types and are covered by unit tests. The tests of a module live in a `tests.rs` file of the directory named after it (`src/pads.rs` and `src/pads/tests.rs`).
+- The modules of the library have no GTK types and are covered by unit tests (`src/backgrounds.rs` uses gdk-pixbuf, which needs no display). The tests of a module live in a `tests.rs` file of the directory named after it (`src/pads.rs` and `src/pads/tests.rs`).
 
 ## Threads
 

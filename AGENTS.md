@@ -16,7 +16,7 @@ Read the document of an area before changing it, and update it in the same chang
 | [docs/architecture.md](docs/architecture.md) | The map of the source tree, the crates, the threads, the app ID |
 | [docs/application.md](docs/application.md) | `src/application.rs`: actions, pad settings, audio failures, notices |
 | [docs/interface.md](docs/interface.md) | `src/ui/`: window, tabs, pads, search, dialogs, device selectors, narrow layout |
-| [docs/library.md](docs/library.md) | `src/library.rs` and `src/pads.rs`: folders, the pad file, imports |
+| [docs/library.md](docs/library.md) | `src/library.rs`, `src/pads.rs`, and `src/backgrounds.rs`: folders, the pad file, imports, pad backgrounds |
 | [docs/shortcuts.md](docs/shortcuts.md) | Pad keys, accelerators, and why there are no global shortcuts |
 | [docs/audio.md](docs/audio.md) | `src/audio/`: the engine, its rules, the harness, the manual call checklist |
 | [docs/development.md](docs/development.md) | Building, running in development, non-obvious points of the build |
@@ -51,7 +51,7 @@ Code:
 - `src/config.rs` is **generated** from `src/config.rs.in`. Edit the `.in`, never the `.rs`. A new build-time constant also needs a `conf.set_quoted(...)` in `src/meson.build`.
 - GObject conventions: each type has a `mod imp` holding the state struct and the subclass `impl`s, plus a public `glib::wrapper!`. UI is declared in XML (`.ui`), not built in code.
 - Sounds are started and stopped only through the `app.*` actions, pad settings change only through `update_sound`, and the settings keys are the single source of truth for the mix: the interface binds widgets to keys and never calls the engine for them.
-- Logic that needs no GTK goes in the library modules (`src/library.rs`, `src/pads.rs`, `src/devices.rs`) with unit tests. Tests must not depend on a session: debhelper runs them while building the package.
+- Logic that needs no GTK goes in the library modules (`src/library.rs`, `src/pads.rs`, `src/devices.rs`, `src/backgrounds.rs`, which may use gdk-pixbuf) with unit tests. Tests must not depend on a session: debhelper runs them while building the package.
 - Audio: never add `object.linger` to the node or the links, never set a gain before the `tee`, never link a stream of another process (the names carry the process id), and read "Rules that are easy to get wrong" of `docs/audio.md` first.
 - A scripted check never plays into the real apps that are recording: it sets `call-target` (or `--target`) to a fake call app, or the call volume to 0. It never touches the user's settings, and one that creates, renames, or deletes files works on a copy of a fixture, never in `tmp/fixtures`. New development scripts are bash and source `scripts/dev-common.sh`.
 

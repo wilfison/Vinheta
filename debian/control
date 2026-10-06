@@ -31,6 +31,9 @@ Depends:
  gstreamer1.0-pipewire,
  gstreamer1.0-plugins-base,
  gstreamer1.0-plugins-good,
+Recommends:
+ heif-gdk-pixbuf,
+ webp-pixbuf-loader,
 Description: soundboard that plays sounds into your calls
  Vinheta is a soundboard for the GNOME desktop. Each folder added by the
  user becomes a tab with a pad per sound, played with a click or a key.

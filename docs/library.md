@@ -1,17 +1,18 @@
-# The library (`src/library.rs`, `src/pads.rs`)
+# The library (`src/library.rs`, `src/pads.rs`, `src/backgrounds.rs`)
 
 ## Model
 
 - The user adds **directories**; each directory becomes a **tab**.
 - Every audio file in the directory is shown as a pad. Nothing is copied: the app reads the files where they are, and follows the directory while it runs.
 - The list of directories (and the tab order) is stored in GSettings, and so are the labels the user gave to tabs.
-- Per-pad metadata (name, color, volume, loop, favorite, shortcut) is stored as JSON in `~/.local/share/vinheta`, keyed by file path. It follows a file renamed inside a library directory or moved between two of them.
+- Per-pad metadata (name, color, volume, loop, favorite, shortcut, background) is stored as JSON in `~/.local/share/vinheta`, keyed by file path. It follows a file renamed inside a library directory or moved between two of them.
 - Loose files (dropped, or picked through "Add Sounds…") are always copied into the **sounds folder** ("Sounds Folder" in the preferences, `~/.local/share/vinheta/sounds` by default), which is itself a library directory and therefore a tab. Only these copies can be moved to the trash from the app.
 
 ## Modules
 
 - `src/library.rs`: which files of a folder are sounds, what changed between two scans (`diff`), the name a pad shows for a file (`humanize`: separators become spaces, first letter uppercase), and the import of loose files (`import`: a copy under a hidden temporary name, never overwriting, with `std::fs::copy` so that the copy has a fresh modification time). No GTK types, covered by unit tests.
 - `src/pads.rs`: the pad settings (`PadSettings`, `PadColor`, `PadStore` with the JSON file), the pad keys (`shortcut_key`, and the rule that a key belongs to one entry, applied by `take_shortcut` and on load), the trigger rule (`TriggerMode`, `trigger`, and `play` for the search), the search match (`matches`), the sort order (`SortOrder`, `compare`), the move of the settings of a folder (`move_folder`), and the time format of a playing pad. No GTK types, covered by unit tests.
+- `src/backgrounds.rs`: the background images of pads. `is_image` (the extension of a format the installed gdk-pixbuf loaders read), `split` (images and other paths of a drop), `store` (the copy the app keeps of an image), and `sweep` (the removal of the copies no entry uses). It uses gdk-pixbuf, which needs no display, so it runs in the tests and off the main thread. Covered by unit tests, among them a committed JPEG with an EXIF orientation (`src/backgrounds/sideways.jpg`).
 
 ## Following a folder
 
@@ -37,6 +38,14 @@
 - When the app starts, the entries of files that are gone from a folder that still exists are removed (`prune_missing`), and the file is saved if any was. The entries of a folder that is missing stay, so a drive that is not mounted or "Locate Folder…" finds them again. A file or folder that cannot be read counts as present.
 - The sounds folder lives in the same data directory by default, so nothing there may collide with `pads.json` and `pads.json.corrupt`.
 - What happens to a file that cannot be parsed or saved is in [application.md](application.md), "Pad settings".
+- `background` is the file name of a copy in the `backgrounds` directory, never a path: a name that is empty, hidden, or holds a `/` is dropped when the file is read.
+
+## Pad backgrounds
+
+- The image of a pad is never used where the user keeps it: `store` writes a copy into `backgrounds/` next to `pads.json`. The copy is at most 512 pixels on its longer side (never enlarged), turned upright from its EXIF orientation, a JPEG at quality 85, or a PNG when the image has an alpha channel. Its name is the start of the SHA-256 of its bytes, so the same image on two pads is one file.
+- The copy is written under a hidden temporary name and renamed, so a crash never leaves half a file under its final name.
+- `sweep` removes the files of `backgrounds/` that no entry names. The application runs it at start and after a background is removed or replaced, but never while an image is being stored (the new copy is not named yet), and never in a session whose pad file could not be read: the images named by `pads.json.corrupt` stay until the next start.
+- A format is an image when a loader of gdk-pixbuf reads it, so it depends on the machine: PNG, JPEG, GIF, BMP, and TIFF always, WebP and HEIC with the loaders the package recommends.
 
 ## Tab names
 
