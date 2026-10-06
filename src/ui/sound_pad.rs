@@ -24,7 +24,7 @@ use std::time::Duration;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::prelude::*;
-use gtk::{gdk, gio, glib};
+use gtk::{gdk, gio, glib, graphene, gsk};
 use vinheta::pads::{self, PadColor, PadSettings};
 
 use crate::application::VinhetaApplication;
@@ -33,6 +33,8 @@ use crate::ui::pad_ring::PadRing;
 
 /// How long the highlight of a located pad stays, the length of its animation.
 const BLINK: Duration = Duration::from_millis(1200);
+/// The corner radius of a card, which clips the background.
+const RADIUS: f32 = 12.0;
 
 mod imp {
     use super::*;
@@ -65,6 +67,8 @@ mod imp {
         pub blink: RefCell<Option<glib::SourceId>>,
         /// The second last told to assistive technology, -1 for none.
         pub described: Cell<i64>,
+        /// The file name of the background shown, and its picture.
+        pub background: RefCell<(String, Option<gdk::Texture>)>,
     }
 
     #[glib::object_subclass]
@@ -126,6 +130,33 @@ mod imp {
     }
 
     impl WidgetImpl for SoundPad {
+        /// The background goes under the children, over the card, and
+        /// covers the pad like `object-fit: cover`.
+        fn snapshot(&self, snapshot: &gtk::Snapshot) {
+            if let Some(texture) = &self.background.borrow().1 {
+                let obj = self.obj();
+                let (width, height) = (obj.width() as f32, obj.height() as f32);
+                let (texture_width, texture_height) =
+                    (texture.width() as f32, texture.height() as f32);
+                let scale = (width / texture_width).max(height / texture_height);
+                let (drawn_width, drawn_height) = (texture_width * scale, texture_height * scale);
+                let bounds = graphene::Rect::new(0.0, 0.0, width, height);
+                snapshot.push_rounded_clip(&gsk::RoundedRect::from_rect(bounds, RADIUS));
+                snapshot.append_scaled_texture(
+                    texture,
+                    gsk::ScalingFilter::Trilinear,
+                    &graphene::Rect::new(
+                        (width - drawn_width) / 2.0,
+                        (height - drawn_height) / 2.0,
+                        drawn_width,
+                        drawn_height,
+                    ),
+                );
+                snapshot.pop();
+            }
+            self.parent_snapshot(snapshot);
+        }
+
         fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
             self.parent_size_allocate(width, height, baseline);
             if let Some(popover) = self.popover.borrow().as_ref() {
@@ -163,6 +194,7 @@ impl SoundPad {
         self.end_blink();
         let Some(sound) = sound else {
             imp.ring.set_position(None);
+            self.show_background("");
             return;
         };
         imp.described.set(i64::MIN);
@@ -240,6 +272,7 @@ impl SoundPad {
                 self.remove_css_class(other.name());
             }
         }
+        self.show_background(&sound.background());
         if sound.playing() {
             self.add_css_class("playing");
         } else {
@@ -262,6 +295,28 @@ impl SoundPad {
             .change_action_state("loop", &sound.looping().to_variant());
         imp.actions
             .change_action_state("favorite", &sound.favorite().to_variant());
+    }
+
+    /// Loads the picture only when the file name changed: pads are recycled
+    /// and `show_sound` runs on every change of the sound.
+    fn show_background(&self, name: &str) {
+        let imp = self.imp();
+        if imp.background.borrow().0 == name {
+            return;
+        }
+        let app = gio::Application::default().and_downcast::<VinhetaApplication>();
+        let texture = app.and_then(|app| app.background_texture(name));
+        self.set_css_class("with-image", texture.is_some());
+        imp.background.replace((name.to_owned(), texture));
+        self.queue_draw();
+    }
+
+    fn set_css_class(&self, class: &str, on: bool) {
+        if on {
+            self.add_css_class(class);
+        } else {
+            self.remove_css_class(class);
+        }
     }
 
     /// The times and the border only exist while the sound plays. Without a

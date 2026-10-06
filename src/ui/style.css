@@ -144,6 +144,56 @@ gridview.pads > child {
   }
 }
 
+/* A pad with a picture: the pad draws it under its content, which gets a
+   scrim so that the text reads on any picture. The palette color moves to
+   an inner outline in the color of the ring, drawn after the picture. */
+.pad.with-image {
+  color: white;
+  outline-offset: -3px;
+}
+
+.pad.with-image .content {
+  border-radius: 12px;
+  background-image: linear-gradient(to top, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.3) 55%, rgb(0 0 0 / 0.45));
+}
+
+.pad.with-image label {
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+}
+
+.pad.with-image.blue { outline: 3px solid var(--blue-4); }
+.pad.with-image.green { outline: 3px solid var(--green-4); }
+.pad.with-image.yellow { outline: 3px solid var(--yellow-4); }
+.pad.with-image.orange { outline: 3px solid var(--orange-4); }
+.pad.with-image.red { outline: 3px solid var(--red-4); }
+.pad.with-image.purple { outline: 3px solid var(--purple-4); }
+.pad.with-image.brown { outline: 3px solid var(--brown-4); }
+
+@media (prefers-color-scheme: dark) {
+  .pad.with-image.blue { outline-color: var(--blue-1); }
+  .pad.with-image.green { outline-color: var(--green-1); }
+  .pad.with-image.yellow { outline-color: var(--yellow-1); }
+  .pad.with-image.orange { outline-color: var(--orange-1); }
+  .pad.with-image.red { outline-color: var(--red-1); }
+  .pad.with-image.purple { outline-color: var(--purple-1); }
+  .pad.with-image.brown { outline-color: var(--brown-1); }
+}
+
+/* While it plays the ring takes the place of the outline, which would
+   hide how much is left. */
+.pad.with-image.playing {
+  outline: none;
+}
+
+/* The picture is drawn by the pad, so the whole pad is dimmed. */
+.no-audio .pad.with-image {
+  opacity: 0.5;
+}
+
+.no-audio .pad.with-image > overlay {
+  opacity: 1;
+}
+
 /* A located pad pulses twice in the text color, which stands out on every
    palette color. More specific than the playing border, so a playing pad
    blinks too. Without animations it is a steady outline. */
