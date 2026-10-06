@@ -34,6 +34,13 @@ done
 [ -f "$fixtures/Broken/Broken.wav" ] || echo "this is not audio" >"$fixtures/Broken/Broken.wav"
 [ -f "$fixtures/corrupt-pads.json" ] || echo '{"version": 1, "pads": {' >"$fixtures/corrupt-pads.json"
 
+# A background as the app stores it, and a photo the app has to reduce.
+image() {
+    [ -f "$2" ] || ffmpeg -loglevel error -f lavfi -i "$1" -frames:v 1 -q:v 2 "$2" || exit 1
+}
+image testsrc2=size=512x384 "$fixtures/background.png"
+image smptehdbars=size=4000x3000 "$fixtures/photo.jpg"
+
 cat >"$fixtures/palette.json" <<JSON
 {"version": 1, "pads": {
   "$fixtures/Palette/A-Blue.wav": {"color": "blue"},
@@ -68,6 +75,13 @@ cat >"$fixtures/shortcuts.json" <<JSON
 }}
 JSON
 
+cat >"$fixtures/background.json" <<JSON
+{"version": 1, "pads": {
+  "$fixtures/Fixture/Applause.wav": {"background": "background.png", "color": "purple"},
+  "$fixtures/Fixture/Air Horn.wav": {"background": "background.png"}
+}}
+JSON
+
 cat <<LIST
 $fixtures/Fixture       Air Horn, Applause, Crickets (20 s, silent)
 $fixtures/Palette       eight pads; --pads $fixtures/palette.json colors seven
@@ -79,4 +93,8 @@ $fixtures/corrupt-pads.json  not valid JSON, for --pads
 $fixtures/dialog.json   Applause with a name, purple, volume 0.54, and loop
 $fixtures/favorites.json  Applause and Bell are favorites, Crickets is named "Zebra"
 $fixtures/shortcuts.json  the keys 1 (Air Horn), Q (Applause), and W (Bell)
+$fixtures/background.png  a 512 by 384 picture, for --background
+$fixtures/photo.jpg     a 4000 by 3000 photo, for app.set-background
+$fixtures/background.json  background.png on Applause (purple) and Air Horn
+                        (no color); needs --background $fixtures/background.png
 LIST

@@ -56,6 +56,10 @@ mod imp {
         /// The key that triggers the pad, or empty.
         #[property(get)]
         pub shortcut: RefCell<String>,
+        /// The file name of the background in the backgrounds directory, or
+        /// empty.
+        #[property(get)]
+        pub background: RefCell<String>,
         /// When the file was last modified, in seconds since the epoch.
         #[property(get, set, construct)]
         modified: Cell<i64>,
@@ -79,6 +83,7 @@ mod imp {
                 looping: Cell::new(false),
                 favorite: Cell::new(false),
                 shortcut: RefCell::default(),
+                background: RefCell::default(),
                 modified: Cell::new(0),
                 elapsed: Cell::new(-1),
                 duration: Cell::new(-1),
@@ -155,6 +160,7 @@ impl Sound {
             looping: imp.looping.get(),
             favorite: imp.favorite.get(),
             shortcut: imp.shortcut.borrow().chars().next(),
+            background: Some(imp.background.borrow().clone()).filter(|name| !name.is_empty()),
         }
     }
 
@@ -180,6 +186,10 @@ impl Sound {
         let shortcut = settings.shortcut.map(String::from).unwrap_or_default();
         if imp.shortcut.replace(shortcut.clone()) != shortcut {
             self.notify_shortcut();
+        }
+        let background = settings.background.clone().unwrap_or_default();
+        if imp.background.replace(background.clone()) != background {
+            self.notify_background();
         }
     }
 

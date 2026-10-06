@@ -19,6 +19,7 @@
  */
 
 pub mod audio;
+pub mod backgrounds;
 pub mod devices;
 pub mod editors;
 pub mod library;

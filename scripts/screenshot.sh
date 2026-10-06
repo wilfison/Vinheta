@@ -7,6 +7,7 @@ set -uo pipefail
 usage() {
     cat >&2 <<'USAGE'
 usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [--pads FILE]
+                     [--background FILE]...
                      [--fake-app 'NAME DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
                      [STEP]... [--no-audio] [--private-pipewire] [--first-run]
                      [--lang LOCALE] [--light] [--debug] [--sheet]
@@ -19,6 +20,9 @@ Writes tmp/screenshots/NAME.png from the app installed in build/install.
 --pads FILE    uses FILE as the pad settings (pads.json) the app starts with:
                {"version": 1, "pads": {"/abs/sound.wav": {"name": "Intro",
                "color": "purple", "volume": 0.8, "loop": true}}}
+--background FILE  copies FILE into the backgrounds directory of the app,
+               keeping its name, so that a pad file can name it
+               ("background": "NAME")
 --fake-sink 'NODE DESCRIPTION'
                creates a fake output before the app starts, for a known entry
                in the output list (use the node name prefix vinheta-shot-)
@@ -90,6 +94,7 @@ captures=()
 scheme=prefer-dark
 no_audio=
 pads=
+backgrounds=()
 debug=
 sheet=
 first_run=
@@ -100,6 +105,7 @@ while [ $# -gt 0 ]; do
         --folder) [ $# -ge 2 ] || usage; folders+=("$(realpath "$2")"); shift ;;
         --setting) [ $# -ge 2 ] || usage; settings+=("$2"); shift ;;
         --pads) [ $# -ge 2 ] || usage; pads=$(realpath "$2"); shift ;;
+        --background) [ $# -ge 2 ] || usage; backgrounds+=("$(realpath "$2")"); shift ;;
         --fake-app | --fake-sink)
             [ $# -ge 2 ] || usage
             fakes+=("${1#--fake-} $2")
@@ -149,6 +155,10 @@ for capture in "${captures[@]}"; do rm -f "$shots/$capture.png"; done
 if [ -n "$pads" ]; then
     mkdir -p "$config/data/vinheta"
     cp "$pads" "$config/data/vinheta/pads.json" || exit 1
+fi
+if [ ${#backgrounds[@]} -gt 0 ]; then
+    mkdir -p "$config/data/vinheta/backgrounds"
+    cp "${backgrounds[@]}" "$config/data/vinheta/backgrounds/" || exit 1
 fi
 
 # The private instance is known by its process id, never by its name: a

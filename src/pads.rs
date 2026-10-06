@@ -22,7 +22,7 @@
 //! rule, and the time format of a playing pad. No GTK types.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
@@ -102,6 +102,10 @@ pub struct PadSettings {
     /// The key that triggers the pad: a lower case letter or a digit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcut: Option<char>,
+    /// The file name of the stored copy of the image, inside the backgrounds
+    /// directory.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
 }
 
 impl Default for PadSettings {
@@ -113,6 +117,7 @@ impl Default for PadSettings {
             looping: false,
             favorite: false,
             shortcut: None,
+            background: None,
         }
     }
 }
@@ -131,6 +136,7 @@ impl PadSettings {
             self.volume.clamp(0.0, 1.0)
         };
         self.shortcut = self.shortcut.and_then(shortcut_key);
+        self.background = self.background.filter(|name| is_file_name(name));
         self
     }
 
@@ -152,9 +158,18 @@ impl PadSettings {
                 .get("shortcut")
                 .and_then(Value::as_str)
                 .and_then(single_char),
+            background: value
+                .get("background")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         }
         .normalized()
     }
+}
+
+/// A name inside a directory, never a path that leaves it.
+fn is_file_name(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('.') && !name.contains('/')
 }
 
 fn single_char(text: &str) -> Option<char> {
@@ -254,6 +269,15 @@ impl PadStore {
 
     pub fn is_empty(&self) -> bool {
         self.pads.is_empty()
+    }
+
+    /// The file names of the backgrounds that some entry uses.
+    pub fn backgrounds(&self) -> BTreeSet<String> {
+        let names = self
+            .pads
+            .values()
+            .filter_map(|settings| settings.background.clone());
+        names.collect()
     }
 
     /// Removes the entries of files that are gone from a folder that is

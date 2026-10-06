@@ -46,6 +46,7 @@ fn every_field_is_read() {
             looping: true,
             favorite: false,
             shortcut: None,
+            background: None,
         }
     );
 }
@@ -251,6 +252,64 @@ fn a_missing_file_is_an_empty_store() {
     assert_eq!(PadStore::load(&file), Ok(PadStore::default()));
 }
 
+fn with_background(name: &str) -> PadSettings {
+    PadSettings {
+        background: Some(name.into()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn the_background_is_read_and_left_out_when_none() {
+    assert_eq!(
+        pad(r#""background": "0123abcd.jpg""#).background.as_deref(),
+        Some("0123abcd.jpg")
+    );
+    assert_eq!(pad(r#""loop": true"#).background, None);
+    assert_eq!(PadSettings::default().background, None);
+    let mut store = PadStore::default();
+    store.set("/a.wav", with_background("0123abcd.jpg"));
+    store.set("/b.wav", keyed('q'));
+    let text = serde_json::to_string(&File {
+        version: VERSION,
+        pads: &store.pads,
+    })
+    .unwrap();
+    assert_eq!(text.matches("\"background\"").count(), 1);
+    assert_eq!(parse(&text), store);
+}
+
+#[test]
+fn a_background_is_a_name_inside_the_directory() {
+    for name in ["", "../pads.json", "/etc/passwd", "a/b.jpg", ".hidden.jpg"] {
+        let json = serde_json::to_string(name).unwrap();
+        let settings = pad(&format!(r#""background": {json}, "loop": true"#));
+        assert_eq!(settings.background, None, "{name}");
+    }
+    assert_eq!(pad(r#""background": 7, "loop": true"#).background, None);
+}
+
+#[test]
+fn rename_and_move_folder_carry_the_background() {
+    let mut store = PadStore::default();
+    store.set("/a/x.wav", with_background("one.jpg"));
+    assert!(store.rename("/a/x.wav", "/a/y.wav"));
+    assert_eq!(store.get("/a/y.wav").background.as_deref(), Some("one.jpg"));
+    assert_eq!(store.move_folder("/a", "/b"), 1);
+    assert_eq!(store.get("/b/y.wav").background.as_deref(), Some("one.jpg"));
+}
+
+#[test]
+fn backgrounds_lists_each_name_once() {
+    let mut store = PadStore::default();
+    store.set("/a.wav", with_background("one.jpg"));
+    store.set("/b.wav", with_background("one.jpg"));
+    store.set("/c.wav", with_background("two.png"));
+    store.set("/d.wav", keyed('q'));
+    let names: Vec<String> = store.backgrounds().into_iter().collect();
+    assert_eq!(names, ["one.jpg", "two.png"]);
+}
+
 #[test]
 fn unknown_fields_are_ignored() {
     let store =
@@ -334,6 +393,7 @@ fn a_saved_store_loads_back() {
             looping: true,
             favorite: true,
             shortcut: Some('q'),
+            background: Some("0123abcd.jpg".into()),
         },
     );
     store.set(
