@@ -24,7 +24,7 @@ use std::path::Path;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 use vinheta::pads::{self, PadColor, PadSettings};
 
 use crate::application::VinhetaApplication;
@@ -42,6 +42,14 @@ mod imp {
         pub name: TemplateChild<adw::EntryRow>,
         #[template_child]
         pub swatches: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub background_frame: TemplateChild<gtk::Overlay>,
+        #[template_child]
+        pub background_picture: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub background_choose: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub background_remove: TemplateChild<gtk::Button>,
         #[template_child]
         pub volume: TemplateChild<gtk::Adjustment>,
         #[template_child]
@@ -138,6 +146,23 @@ mod imp {
                 #[weak]
                 obj,
                 move |looping| obj.change(|settings| settings.looping = looping.is_active())
+            ));
+
+            self.background_choose.connect_clicked(glib::clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    glib::spawn_future_local(glib::clone!(
+                        #[weak]
+                        obj,
+                        async move { obj.choose_background().await }
+                    ));
+                }
+            ));
+            self.background_remove.connect_clicked(glib::clone!(
+                #[weak]
+                obj,
+                move |_| obj.set_background("")
             ));
 
             self.shortcut_set.connect_clicked(glib::clone!(
@@ -322,8 +347,53 @@ impl SoundDialog {
         imp.volume.set_value(settings.volume);
         imp.volume.emit_by_name::<()>("value-changed", &[]);
         imp.looping.set_active(settings.looping);
+        let background = settings.background.as_deref().unwrap_or_default();
+        let texture = imp
+            .app
+            .upgrade()
+            .and_then(|app| app.background_texture(background));
+        imp.background_picture.set_paintable(texture.as_ref());
+        imp.background_frame.set_visible(texture.is_some());
+        imp.background_remove
+            .set_visible(settings.background.is_some());
+        imp.background_choose.set_label(&match settings.background {
+            Some(_) => gettext("Change…"),
+            None => gettext("Choose…"),
+        });
         self.show_shortcut(settings.shortcut);
         imp.filling.set(false);
+    }
+
+    /// The dialog stays open: the row shows the picture once it is stored.
+    async fn choose_background(&self) {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&gettext("Images")));
+        filter.add_pixbuf_formats();
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Choose Image"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+        let root = self.root().and_downcast::<gtk::Window>();
+        let Ok(file) = chooser.open_future(root.as_ref()).await else {
+            return;
+        };
+        if let Some(path) = file.path().as_deref().and_then(|path| path.to_str()) {
+            self.set_background(path);
+        }
+    }
+
+    /// An empty `image` removes the background.
+    fn set_background(&self, image: &str) {
+        let imp = self.imp();
+        let (Some(app), Some(sound)) = (imp.app.upgrade(), self.sound()) else {
+            return;
+        };
+        let parameter = (sound.path(), image.to_owned()).to_variant();
+        app.activate_action("set-background", Some(&parameter));
     }
 
     fn change(&self, change: impl FnOnce(&mut PadSettings)) {

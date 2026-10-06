@@ -37,6 +37,50 @@
                   </object>
                 </child>
                 <child>
+                  <object class="AdwActionRow" id="background_row">
+                    <property name="title" translatable="yes">Background</property>
+                    <child type="prefix">
+                      <!-- The picture is an overlay, so that its size does not
+                           count: only the size of the frame does. -->
+                      <object class="GtkOverlay" id="background_frame">
+                        <property name="width-request">48</property>
+                        <property name="height-request">32</property>
+                        <property name="valign">center</property>
+                        <property name="overflow">hidden</property>
+                        <property name="visible">False</property>
+                        <style>
+                          <class name="background-thumbnail"/>
+                        </style>
+                        <child type="overlay">
+                          <object class="GtkPicture" id="background_picture">
+                            <property name="content-fit">cover</property>
+                            <property name="accessible-role">presentation</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child type="suffix">
+                      <object class="GtkButton" id="background_choose">
+                        <property name="valign">center</property>
+                      </object>
+                    </child>
+                    <child type="suffix">
+                      <object class="GtkButton" id="background_remove">
+                        <property name="icon-name">edit-clear-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Remove Image</property>
+                        <property name="valign">center</property>
+                        <property name="visible">False</property>
+                        <accessibility>
+                          <property name="label" translatable="yes">Remove Image</property>
+                        </accessibility>
+                        <style>
+                          <class name="flat"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
                   <object class="AdwActionRow">
                     <property name="title" translatable="yes">Volume</property>
                     <child type="suffix">

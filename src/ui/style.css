@@ -224,6 +224,11 @@ gridview.pads > child > .pad.located {
   background-color: var(--success-bg-color);
 }
 
+/* The background of a pad in the dialog that edits it. */
+.background-thumbnail {
+  border-radius: 6px;
+}
+
 /* The colors of the dialog that edits a pad. */
 .swatch {
   min-width: 28px;

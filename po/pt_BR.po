@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-05 21:20-0300\n"
+"POT-Creation-Date: 2026-10-05 21:29-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -584,23 +584,31 @@ msgstr "Nome"
 msgid "Color"
 msgstr "Cor"
 
-#: src/ui/sound-dialog.ui:41 src/ui/sound-dialog.ui:56
+#: src/ui/sound-dialog.ui:41
+msgid "Background"
+msgstr "Fundo"
+
+#: src/ui/sound-dialog.ui:70 src/ui/sound-dialog.ui:74
+msgid "Remove Image"
+msgstr "Remover imagem"
+
+#: src/ui/sound-dialog.ui:85 src/ui/sound-dialog.ui:100
 msgid "Volume"
 msgstr "Volume"
 
-#: src/ui/sound-dialog.ui:73
+#: src/ui/sound-dialog.ui:117
 msgid "Loop"
 msgstr "Repetir"
 
-#: src/ui/sound-dialog.ui:74
+#: src/ui/sound-dialog.ui:118
 msgid "Play again and again until stopped"
 msgstr "Toca de novo e de novo até ser parado"
 
-#: src/ui/sound-dialog.ui:79
+#: src/ui/sound-dialog.ui:123
 msgid "Shortcut"
 msgstr "Atalho"
 
-#: src/ui/sound-dialog.ui:93 src/ui/sound-dialog.ui:96
+#: src/ui/sound-dialog.ui:137 src/ui/sound-dialog.ui:140
 msgid "Remove Shortcut"
 msgstr "Remover atalho"
 
@@ -641,94 +649,106 @@ msgid "Move to _Trash"
 msgstr "Mover para a _lixeira"
 
 #. Translators: {} is a volume, from 0 to 100.
-#: src/ui/sound_dialog.rs:132 src/ui/window.rs:154
+#: src/ui/sound_dialog.rs:140 src/ui/window.rs:154
 msgid "{}%"
 msgstr "{}%"
 
-#: src/ui/sound_dialog.rs:182
+#: src/ui/sound_dialog.rs:207
 msgid "No Color"
 msgstr "Sem cor"
 
-#: src/ui/sound_dialog.rs:183
+#: src/ui/sound_dialog.rs:208
 msgid "Blue"
 msgstr "Azul"
 
-#: src/ui/sound_dialog.rs:184
+#: src/ui/sound_dialog.rs:209
 msgid "Green"
 msgstr "Verde"
 
-#: src/ui/sound_dialog.rs:185
+#: src/ui/sound_dialog.rs:210
 msgid "Yellow"
 msgstr "Amarelo"
 
-#: src/ui/sound_dialog.rs:186
+#: src/ui/sound_dialog.rs:211
 msgid "Orange"
 msgstr "Laranja"
 
-#: src/ui/sound_dialog.rs:187
+#: src/ui/sound_dialog.rs:212
 msgid "Red"
 msgstr "Vermelho"
 
-#: src/ui/sound_dialog.rs:188
+#: src/ui/sound_dialog.rs:213
 msgid "Purple"
 msgstr "Roxo"
 
-#: src/ui/sound_dialog.rs:189
+#: src/ui/sound_dialog.rs:214
 msgid "Brown"
 msgstr "Marrom"
 
-#: src/ui/sound_dialog.rs:285
+#: src/ui/sound_dialog.rs:310
 msgid "None"
 msgstr "Nenhum"
 
-#: src/ui/sound_dialog.rs:292
+#: src/ui/sound_dialog.rs:317
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/ui/sound_dialog.rs:293
+#: src/ui/sound_dialog.rs:318 src/ui/sound_dialog.rs:356
 msgid "Change…"
 msgstr "Alterar…"
 
-#: src/ui/sound_dialog.rs:294
+#: src/ui/sound_dialog.rs:319
 msgid "Set…"
 msgstr "Definir…"
 
-#: src/ui/sound_dialog.rs:299
+#: src/ui/sound_dialog.rs:324
 msgid "Press a letter or a digit"
 msgstr "Pressione uma letra ou um dígito"
 
 #. Translators: {} is the name of the pad that had the key before.
-#: src/ui/sound_dialog.rs:301
+#: src/ui/sound_dialog.rs:326
 msgid "Taken from “{}”"
 msgstr "Tirado de “{}”"
 
-#: src/ui/sound_dialog.rs:302
+#: src/ui/sound_dialog.rs:327
 msgid "Plays this pad while the window is focused"
 msgstr "Toca este pad enquanto a janela está em foco"
 
+#: src/ui/sound_dialog.rs:357
+msgid "Choose…"
+msgstr "Escolher…"
+
+#: src/ui/sound_dialog.rs:366
+msgid "Images"
+msgstr "Imagens"
+
+#: src/ui/sound_dialog.rs:371
+msgid "Choose Image"
+msgstr "Escolher imagem"
+
 #. Translators: the first {} is the file name of a sound, the
 #. second {} is the key that plays it, as in "Applause.wav, key Q".
-#: src/ui/sound_pad.rs:227
+#: src/ui/sound_pad.rs:259
 msgid "{}, key {}"
 msgstr "{}, tecla {}"
 
 #. Translators: {} is the key that plays a sound, as in "Key Q".
-#: src/ui/sound_pad.rs:298
+#: src/ui/sound_pad.rs:353
 msgid "Key {}"
 msgstr "Tecla {}"
 
-#: src/ui/sound_pad.rs:308
+#: src/ui/sound_pad.rs:363
 msgid "Playing"
 msgstr "Tocando"
 
 #. Translators: the first {} is the elapsed time of a sound, the
 #. second {} is its duration, as in "Playing, 00:23 of 01:35".
-#: src/ui/sound_pad.rs:312
+#: src/ui/sound_pad.rs:367
 msgid "Playing, {} of {}"
 msgstr "Tocando, {} de {}"
 
 #. Translators: {} is the elapsed time of a sound, as in "Playing, 00:23".
-#: src/ui/sound_pad.rs:317
+#: src/ui/sound_pad.rs:372
 msgid "Playing, {}"
 msgstr "Tocando, {}"
 
