@@ -213,6 +213,12 @@ gridview.pads > child > .pad.located {
   animation: located 1.2s ease-in-out 1;
 }
 
+/* A drag of files over a pad. */
+gridview.pads > child > .pad.drop-target {
+  outline: 2px dashed var(--accent-color);
+  outline-offset: -4px;
+}
+
 .playing-counter {
   padding: 12px 40px 4px 12px;
 }

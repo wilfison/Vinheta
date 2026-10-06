@@ -25,11 +25,13 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib, graphene, gsk};
+use vinheta::backgrounds;
 use vinheta::pads::{self, PadColor, PadSettings};
 
 use crate::application::VinhetaApplication;
 use crate::sound::Sound;
 use crate::ui::pad_ring::PadRing;
+use crate::VinhetaWindow;
 
 /// How long the highlight of a located pad stays, the length of its animation.
 const BLINK: Duration = Duration::from_millis(1200);
@@ -117,6 +119,8 @@ mod imp {
                 }
             ));
             obj.add_controller(long_press);
+
+            obj.setup_drop();
         }
 
         fn dispose(&self) {
@@ -376,6 +380,56 @@ impl SoundPad {
             None => description,
         };
         self.update_property(&[gtk::accessible::Property::Description(&description)]);
+    }
+
+    fn window(&self) -> Option<VinhetaWindow> {
+        self.root().and_upcast::<gtk::Widget>().and_downcast()
+    }
+
+    /// The first image dropped on a pad becomes its background. The pad takes
+    /// every drop, so what is not an image goes where a drop on the window
+    /// goes.
+    fn setup_drop(&self) {
+        let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+        drop.connect_drop(glib::clone!(
+            #[weak(rename_to = pad)]
+            self,
+            #[upgrade_or]
+            false,
+            move |_, value, _, _| {
+                let (Ok(files), Some(sound)) = (value.get::<gdk::FileList>(), pad.sound()) else {
+                    return false;
+                };
+                let paths = files.files().iter().filter_map(gio::File::path).collect();
+                let (images, others) = backgrounds::split(paths);
+                // Only one image can be the background; the others are left
+                // out instead of being refused as sounds.
+                if let Some(image) = images.iter().find_map(|path| path.to_str()) {
+                    let parameter = (sound.path(), image.to_owned()).to_variant();
+                    let _ = pad.activate_action("app.set-background", Some(&parameter));
+                }
+                let others: Vec<&str> = others.iter().filter_map(|path| path.to_str()).collect();
+                if !others.is_empty() {
+                    let _ = pad.activate_action("win.import-files", Some(&others.to_variant()));
+                }
+                if let Some(window) = pad.window() {
+                    window.pad_dropped();
+                }
+                true
+            }
+        ));
+        drop.connect_current_drop_notify(glib::clone!(
+            #[weak(rename_to = pad)]
+            self,
+            move |drop| {
+                let active = drop.current_drop().is_some();
+                pad.set_css_class("drop-target", active);
+                if let Some(window) = pad.window() {
+                    window.pad_drop_changed(active);
+                }
+            }
+        ));
+        self.add_controller(drop);
     }
 
     /// The actions of the context menu. They go through the application and

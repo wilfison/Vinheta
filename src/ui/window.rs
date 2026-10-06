@@ -100,6 +100,10 @@ mod imp {
         /// The stores of the folder pages, in tab order. Flattened, they are
         /// what the favorites and the search results filter.
         pub folders: OnceCell<gio::ListStore>,
+        /// The drop target of the whole window, and whether a drag is over
+        /// a pad, which takes it instead.
+        pub drop_target: OnceCell<gtk::DropTarget>,
+        pub pad_drop: Cell<bool>,
         pub favorites: OnceCell<SoundGrid>,
         pub favorites_filter: OnceCell<gtk::CustomFilter>,
         pub favorites_model: OnceCell<gtk::FilterListModel>,
@@ -499,12 +503,32 @@ impl VinhetaWindow {
         drop.connect_current_drop_notify(glib::clone!(
             #[weak(rename_to = window)]
             self,
-            move |drop| window
-                .imp()
-                .drop_hint
-                .set_visible(drop.current_drop().is_some())
+            move |_| window.show_drop_hint()
         ));
-        self.add_controller(drop);
+        self.add_controller(drop.clone());
+        let _ = self.imp().drop_target.set(drop);
+    }
+
+    fn show_drop_hint(&self) {
+        let imp = self.imp();
+        let target = imp.drop_target.get();
+        let dragging = target.is_some_and(|target| target.current_drop().is_some());
+        imp.drop_hint.set_visible(dragging && !imp.pad_drop.get());
+    }
+
+    /// A drag entered or left a pad, which has a hint of its own.
+    pub fn pad_drop_changed(&self, active: bool) {
+        self.imp().pad_drop.set(active);
+        self.show_drop_hint();
+    }
+
+    /// A pad took the drop. The target of the window, which the drag
+    /// crossed on its way, is never told that the drag ended.
+    pub fn pad_dropped(&self) {
+        if let Some(target) = self.imp().drop_target.get() {
+            target.reject();
+        }
+        self.pad_drop_changed(false);
     }
 
     /// A letter or a digit pressed in the window triggers the pad that has

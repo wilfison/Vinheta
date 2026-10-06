@@ -108,6 +108,52 @@ resize_window() {
     xdotool search --onlyvisible --name '^Vinheta$' | head -n 1 | xargs -I{} xdotool windowsize {} "$1" "$2"
 }
 
+# drop_files X Y FILE...: a real drag and drop of the files from a small
+# window that a helper opens at the top left corner, over the app window, to
+# the point X,Y. The helper offers the files as a GTK file list, as a file
+# manager does.
+drop_files() {
+    local x=$1 y=$2 helper
+    shift 2
+    helper=$(
+        cat <<'PY'
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gdk, Gio, GLib, Gtk
+
+files = [Gio.File.new_for_path(path) for path in sys.argv[1:]]
+
+
+def activate(app):
+    window = Gtk.ApplicationWindow(application=app, title="drag-source")
+    window.set_decorated(False)
+    window.set_default_size(60, 40)
+    source = Gtk.DragSource(actions=Gdk.DragAction.COPY)
+    source.connect("prepare", lambda *_: Gdk.ContentProvider.new_for_value(Gdk.FileList.new_from_list(files)))
+    source.connect("drag-end", lambda *_: GLib.timeout_add(300, app.quit))
+    window.add_controller(source)
+    window.present()
+    GLib.timeout_add_seconds(15, app.quit)
+
+
+app = Gtk.Application(flags=Gio.ApplicationFlags.NON_UNIQUE)
+app.connect("activate", activate)
+app.run([])
+PY
+    )
+    GDK_BACKEND=x11 python3 -c "$helper" "$@" &
+    local pid=$!
+    xdotool search --sync --onlyvisible --name '^drag-source$' >/dev/null || return 1
+    # The motion in steps lets GTK see a drag start, then cross the window.
+    xdotool mousemove 30 20 mousedown 1 sleep 0.3 mousemove 50 40 sleep 0.3 \
+        mousemove $(((x + 30) / 2)) $(((y + 20) / 2)) sleep 0.3 \
+        mousemove "$((x - 4))" "$((y - 4))" sleep 0.3 mousemove "$x" "$y" sleep 0.5 mouseup 1
+    wait "$pid"
+}
+
 # silent_sound FILE [SECONDS]: a sound that can be played without being heard.
 silent_sound() {
     ffmpeg -v error -y -f lavfi -i anullsrc=r=48000:cl=stereo -t "${2:-30}" "$1"

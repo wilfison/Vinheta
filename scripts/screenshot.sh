@@ -51,6 +51,8 @@ Steps run in the given order once the window is up, before the capture:
                                PARAMETER is a GVariant such as "'text'"
 --click X,Y    clicks at that position of the window
 --right-click X,Y  clicks there with the secondary button
+--drop 'X,Y FILE[;FILE]...'  drags the files from a helper window, as a file
+               manager would, and drops them at that position of the window
 --key KEYS     presses keys, in xdotool syntax (Return, ctrl+q, Tab)
 --size W,H     resizes the window
 --wait SECONDS waits
@@ -112,7 +114,7 @@ while [ $# -gt 0 ]; do
             fake_names+=("${2%% *}")
             shift
             ;;
-        --action | --click | --right-click | --key | --size | --wait | --exec | --expect-setting | --expect-playing | --plug-app | --plug-sink | --unplug | --capture | --crop)
+        --action | --click | --right-click | --drop | --key | --size | --wait | --exec | --expect-setting | --expect-playing | --plug-app | --plug-sink | --unplug | --capture | --crop)
             [ $# -ge 2 ] || usage
             steps+=("${1#--} $2")
             case $1 in
@@ -251,7 +253,7 @@ done
 directories=$(gvariant_strv "${folders[@]}")
 
 session() {
-    local step kind value setting crop=
+    local step kind value setting crop= point files
 
     capture() {
         import -window root "$shots/$1.png"
@@ -277,6 +279,11 @@ session() {
                 ;;
             click) click "${value%,*}" "${value#*,}" ;;
             right-click) right_click "${value%,*}" "${value#*,}" ;;
+            drop)
+                point=${value%% *}
+                IFS=';' read -ra files <<<"${value#* }"
+                drop_files "${point%,*}" "${point#*,}" "${files[@]}"
+                ;;
             key) key "$value" ;;
             size) resize_window "${value%,*}" "${value#*,}" ;;
             wait) sleep "$value" ;;
