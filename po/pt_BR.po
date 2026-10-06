@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-05 21:29-0300\n"
+"POT-Creation-Date: 2026-10-06 20:35-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -227,13 +227,21 @@ msgstr "O guia de configuração de chamada"
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
 msgid ""
+"A pad can have a background image, and the audio comes back by itself when "
+"PipeWire restarts."
+msgstr ""
+"Um pad pode ter uma imagem de fundo, e o áudio volta sozinho quando o "
+"PipeWire reinicia."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+msgid ""
 "The sounds play straight into the apps that use your microphone, with no "
 "virtual microphone to choose, and the app has a new icon."
 msgstr ""
 "Os sons tocam direto nos apps que usam o seu microfone, sem microfone "
 "virtual para escolher, e o app tem um ícone novo."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
 msgid ""
 "The first release: folders as tabs, pads with a name, a color, a volume, a "
 "loop and a key, favorites, search, and a virtual microphone that sends the "
@@ -414,7 +422,7 @@ msgstr "Enviar sons para a chamada"
 msgid "Play sounds into the apps that are using the microphone"
 msgstr "Toca os sons nos aplicativos que estão usando o microfone"
 
-#: src/ui/preferences-dialog.ui:26 src/ui/window.rs:327 src/ui/window.ui:448
+#: src/ui/preferences-dialog.ui:26 src/ui/window.rs:331 src/ui/window.ui:448
 #: src/ui/window.ui:512
 msgid "Send Sounds To"
 msgstr "Enviar sons para"
@@ -483,7 +491,7 @@ msgstr "Um clique em um pad que está tocando o reinicia"
 msgid "Starting a pad stops every other sound"
 msgstr "Iniciar um pad para todos os outros sons"
 
-#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:323
+#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:327
 msgid "Not recording. The sounds are not sent to it."
 msgstr "Não está gravando. Os sons não são enviados para ele."
 
@@ -649,7 +657,7 @@ msgid "Move to _Trash"
 msgstr "Mover para a _lixeira"
 
 #. Translators: {} is a volume, from 0 to 100.
-#: src/ui/sound_dialog.rs:140 src/ui/window.rs:154
+#: src/ui/sound_dialog.rs:140 src/ui/window.rs:158
 msgid "{}%"
 msgstr "{}%"
 
@@ -693,7 +701,7 @@ msgstr "Nenhum"
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/ui/sound_dialog.rs:318 src/ui/sound_dialog.rs:356
+#: src/ui/sound_dialog.rs:318 src/ui/sound_dialog.rs:360
 msgid "Change…"
 msgstr "Alterar…"
 
@@ -714,91 +722,91 @@ msgstr "Tirado de “{}”"
 msgid "Plays this pad while the window is focused"
 msgstr "Toca este pad enquanto a janela está em foco"
 
-#: src/ui/sound_dialog.rs:357
+#: src/ui/sound_dialog.rs:361
 msgid "Choose…"
 msgstr "Escolher…"
 
-#: src/ui/sound_dialog.rs:366
+#: src/ui/sound_dialog.rs:370
 msgid "Images"
 msgstr "Imagens"
 
-#: src/ui/sound_dialog.rs:371
+#: src/ui/sound_dialog.rs:375
 msgid "Choose Image"
 msgstr "Escolher imagem"
 
 #. Translators: the first {} is the file name of a sound, the
 #. second {} is the key that plays it, as in "Applause.wav, key Q".
-#: src/ui/sound_pad.rs:259
+#: src/ui/sound_pad.rs:263
 msgid "{}, key {}"
 msgstr "{}, tecla {}"
 
 #. Translators: {} is the key that plays a sound, as in "Key Q".
-#: src/ui/sound_pad.rs:353
+#: src/ui/sound_pad.rs:357
 msgid "Key {}"
 msgstr "Tecla {}"
 
-#: src/ui/sound_pad.rs:363
+#: src/ui/sound_pad.rs:367
 msgid "Playing"
 msgstr "Tocando"
 
 #. Translators: the first {} is the elapsed time of a sound, the
 #. second {} is its duration, as in "Playing, 00:23 of 01:35".
-#: src/ui/sound_pad.rs:367
+#: src/ui/sound_pad.rs:371
 msgid "Playing, {} of {}"
 msgstr "Tocando, {} de {}"
 
 #. Translators: {} is the elapsed time of a sound, as in "Playing, 00:23".
-#: src/ui/sound_pad.rs:372
+#: src/ui/sound_pad.rs:376
 msgid "Playing, {}"
 msgstr "Tocando, {}"
 
-#: src/ui/window.rs:271
+#: src/ui/window.rs:275
 msgid "Audio is unavailable: PipeWire is not running"
 msgstr "Áudio indisponível: o PipeWire não está em execução"
 
-#: src/ui/window.rs:274
+#: src/ui/window.rs:278
 msgid "Audio stopped: the connection to PipeWire was lost"
 msgstr "O áudio parou: a conexão com o PipeWire foi perdida"
 
-#: src/ui/window.rs:276
+#: src/ui/window.rs:280
 msgid "Audio is unavailable"
 msgstr "Áudio indisponível"
 
 #. Translators: {} is how many sounds are playing.
-#: src/ui/window.rs:294
+#: src/ui/window.rs:298
 msgid "{} playing"
 msgid_plural "{} playing"
 msgstr[0] "{} tocando"
 msgstr[1] "{} tocando"
 
-#: src/ui/window.rs:325
+#: src/ui/window.rs:329
 msgid "No app is using the microphone"
 msgstr "Nenhum aplicativo está usando o microfone"
 
-#: src/ui/window.rs:760
+#: src/ui/window.rs:784
 msgid "Add Folder"
 msgstr "Adicionar pasta"
 
-#: src/ui/window.rs:769 src/ui/window.rs:800 src/ui/window.rs:1060
-#: src/ui/window.rs:1081
+#: src/ui/window.rs:793 src/ui/window.rs:824 src/ui/window.rs:1084
+#: src/ui/window.rs:1105
 msgid "This folder cannot be added"
 msgstr "Esta pasta não pode ser adicionada"
 
-#: src/ui/window.rs:775
+#: src/ui/window.rs:799
 msgid "Audio Files"
 msgstr "Arquivos de áudio"
 
-#: src/ui/window.rs:782
+#: src/ui/window.rs:806
 msgid "Add Sounds"
 msgstr "Adicionar sons"
 
-#: src/ui/window.rs:839
+#: src/ui/window.rs:863
 msgid "{} sound added"
 msgid_plural "{} sounds added"
 msgstr[0] "{} som adicionado"
 msgstr[1] "{} sons adicionados"
 
-#: src/ui/window.rs:841
+#: src/ui/window.rs:865
 msgid "{} file skipped"
 msgid_plural "{} files skipped"
 msgstr[0] "{} arquivo ignorado"
@@ -806,36 +814,36 @@ msgstr[1] "{} arquivos ignorados"
 
 #. Translators: the first {} is "2 sounds added", the second is
 #. "1 file skipped".
-#: src/ui/window.rs:849
+#: src/ui/window.rs:873
 msgid "{}, {}"
 msgstr "{}, {}"
 
-#: src/ui/window.rs:858
+#: src/ui/window.rs:882
 msgid "No supported audio files"
 msgstr "Nenhum arquivo de áudio compatível"
 
 #. Translators: {} is the name of a tab.
-#: src/ui/window.rs:1018
+#: src/ui/window.rs:1042
 msgid "Removed “{}”"
 msgstr "“{}” foi removida"
 
-#: src/ui/window.rs:1019
+#: src/ui/window.rs:1043
 msgid "Undo"
 msgstr "Desfazer"
 
-#: src/ui/window.rs:1052
+#: src/ui/window.rs:1076
 msgid "Locate Folder"
 msgstr "Localizar pasta"
 
-#: src/ui/window.rs:1077
+#: src/ui/window.rs:1101
 msgid "This folder is already in the library"
 msgstr "Esta pasta já está na biblioteca"
 
-#: src/ui/window.rs:1162
+#: src/ui/window.rs:1186
 msgid "Favorites"
 msgstr "Favoritos"
 
-#: src/ui/window.rs:1246
+#: src/ui/window.rs:1270
 msgid "Sounds"
 msgstr "Sons"
 

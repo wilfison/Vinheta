@@ -45,6 +45,11 @@
   </screenshots>
 
   <releases>
+    <release version="1.2.0" date="2026-10-06">
+      <description>
+        <p>A pad can have a background image, and the audio comes back by itself when PipeWire restarts.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-10-05">
       <description>
         <p>The sounds play straight into the apps that use your microphone, with no virtual microphone to choose, and the app has a new icon.</p>
