@@ -70,6 +70,7 @@ check() {
 # analyze gaps FILE CHANNEL START END: the longest silence (below -50 dBFS)
 # between two times in seconds, in ms.
 # analyze span FILE CHANNEL: seconds from the first sound to the last one.
+# analyze peak FILE CHANNEL START SECONDS: the largest sample, in dBFS.
 analyze() {
     python3 - "$@" <<'PY'
 import array, math, sys, wave
@@ -104,6 +105,10 @@ elif cmd == "gaps":
         run = 0 if sound else run + 1
         longest = max(longest, run)
     print(longest * 5)
+elif cmd == "peak":
+    start, length = int(float(sys.argv[4]) * rate), int(float(sys.argv[5]) * rate)
+    peak = max((abs(s) for s in samples[start:start + length]), default=0)
+    print(f"{20 * math.log10(max(peak, 1) / 32768):.1f}")
 elif cmd == "span":
     block = rate // 100
     sounds = [i for i, sound in enumerate(loud(0, len(samples), block)) if sound]
@@ -462,6 +467,55 @@ if section "playback volume and branch volume"; then
     file="$work/playback-branch-volume-monitor.wav"
     value=$(drop "$file" 1000 "$(window "$file")" "$(after "$file" 4)")
     check "monitor keeps the playback gain ($value dB)" "$(between "$value" -2 2)"
+fi
+
+# A 0 dBFS tone from 1.5 s to 5.5 s, then -20 dBFS to 8 s. The sine filter
+# of ffmpeg is fixed at -18 dBFS, so the amplitude is explicit.
+loud="$work/sound-loud.wav"
+ffmpeg -v error -y -f lavfi \
+    -i "aevalsrc=if(lt(t\,1.5)\,0\,if(lt(t\,5.5)\,1\,0.1))*sin(2*PI*1000*t):s=48000:d=8" \
+    -af "pan=stereo|c0=c0|c1=c0" -ar 48000 "$loud" || exit 1
+
+if section "call limiter"; then
+    files=("$loud")
+    playback limiter --once
+    call="$work/limiter-call.wav"
+    monitor_file="$work/limiter-monitor.wav"
+    start=$(window "$call")
+    value=$(analyze level "$call" 0 1000 "$start" 2)
+    check "call has the loud tone at -6 dBFS ($value dBFS)" "$(between "$value" -7 -5)"
+    value=$(analyze peak "$call" 0 "$start" 2)
+    check "call peaks below -5 dBFS ($value dBFS)" "$(louder -5 "$value" && echo ok)"
+    for freq in 2000 3000; do
+        value=$(analyze level "$call" 0 "$freq" "$start" 2)
+        check "call has no harmonic at $freq Hz ($value dBFS)" "$(louder -50 "$value" && echo ok)"
+    done
+    value=$(analyze level "$monitor_file" 0 1000 "$(window "$monitor_file")" 2)
+    check "monitor has the tone at full level ($value dBFS)" "$(between "$value" -1 0.5)"
+    value=$(analyze level "$call" 0 1000 "$(after "$call" 5.5)" 1.5)
+    check "call has the quiet tone untouched after the release ($value dBFS)" "$(between "$value" -21 -19)"
+    value=$(drop "$call" 440 "$(window "$call" -0.9)" "$start" 0.7)
+    check "the voice keeps its level ($value dB)" "$(between "$value" -2 2)"
+
+    for run in "limiter-off off" "limiter-start-off on"; do
+        label=${run% *} state=${run#* }
+        options=(--once --limiter-after 4 "$state")
+        [ "$state" = on ] && options+=(--no-limiter)
+        files=("$loud")
+        playback "$label" "${options[@]}"
+        call="$work/$label-call.wav"
+        monitor_file="$work/$label-monitor.wav"
+        value=$(drop "$call" 1000 "$(window "$call")" "$(after "$call" 4 0.2)" 0.5)
+        if [ "$state" = off ]; then
+            check "call rises by 6 dB 200 ms after the limiter is off ($value dB)" "$(between "$value" -7 -5)"
+            value=$(analyze peak "$call" 0 "$(after "$call" 4 0.2)" 0.5)
+            check "call reaches full scale without the limiter ($value dBFS)" "$(louder "$value" -0.5 && echo ok)"
+        else
+            check "call falls by 6 dB 200 ms after the limiter is on ($value dB)" "$(between "$value" 5 7)"
+        fi
+        value=$(drop "$monitor_file" 1000 "$(window "$monitor_file")" "$(after "$monitor_file" 4 0.2)" 0.5)
+        check "monitor keeps its level ($value dB)" "$(between "$value" -1 1)"
+    done
 fi
 
 # One second of tone with no silence around it. The call app records the

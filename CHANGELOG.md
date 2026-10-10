@@ -4,6 +4,12 @@ All notable changes to Vinheta are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Loud sounds no longer clip the call: each sound reaches the call at -6 dBFS at most, with no distortion, while the headphones hear it at its full level. "Limit Call Level" in the preferences turns it off.
+
 ## [1.2.0] - 2026-10-06
 
 ### Added
@@ -48,6 +54,7 @@ The first public release.
 - A narrow layout: the window works down to 360 pixels of width.
 - A Brazilian Portuguese translation.
 
+[Unreleased]: https://github.com/wilfison/Vinheta/compare/v1.2.0...HEAD
 [1.2.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.2.0
 [1.1.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.1.0
 [1.0.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.0.0

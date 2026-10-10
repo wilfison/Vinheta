@@ -7,13 +7,13 @@ The hard part of the app is the audio, not the interface: see [audio.md](audio.m
 ## What the app does
 
 - The window shows one tab per folder, with a grid of pads. A click plays a sound and a second click stops it, through the audio engine (`src/audio/`).
-- A sound plays on the headphones and into the apps that are recording a microphone, so a call hears it with the voice of the user. "Send sounds to call" turns the second part off, and "Send Sounds To" restricts it to one app.
+- A sound plays on the headphones and into the apps that are recording a microphone, so a call hears it with the voice of the user. "Send sounds to call" turns the second part off, and "Send Sounds To" restricts it to one app. A loud sound reaches the call at -6 dBFS at most, so it does not clip there; "Limit Call Level" in the preferences turns that off.
 - A pad has a name, a color, a background image, a volume, a loop option, and a key, edited from its context menu and its dialog and stored in `pads.json`. An image dropped on a pad becomes its background; the app keeps a reduced copy of it. While it plays it shows its times and a border that gets shorter as the sound goes on, and the tab row shows how many sounds are playing.
 - The library follows its folders while the app runs (files added, removed, renamed). Loose files are added with "Add Sounds…" or dropped on the window: they are copied into the sounds folder, which is a tab.
 - Pads can be favorites (a star, and a "Favorites" tab), a search finds sounds in every folder and locates them, the pads are sorted by name or by most recent file, and tabs can be renamed and moved.
 - The bottom bar has "Stop all", the "Headphones" and "Call" volume sliders, the selector of the app the sounds are sent to, and the "Send sounds to call" switch. Below 780 pixels of width it is stacked in rows and the pads get narrower; the window works down to 360 pixels.
 - A pad key (a letter or a digit) triggers its pad from any tab while the window has the focus. "Stop All" and "Send Sounds to Call" have accelerators (Ctrl+Shift+S, L). There are no global shortcuts: see [shortcuts.md](shortcuts.md).
-- The preferences dialog has the "Audio" group (monitor output, send sounds to call, the app the sounds are sent to), the "Playback" group (trigger mode, fade out on stop), and the "Library" group (sounds folder).
+- The preferences dialog has the "Audio" group (monitor output, send sounds to call, the app the sounds are sent to, limit call level), the "Playback" group (trigger mode, fade out on stop), and the "Library" group (sounds folder).
 - The call setup guide opens on the first run and from the primary menu.
 - Failures are told to the user: audio that is unavailable has a banner with the reason and "Try Again" (the app also retries by itself, and the banner goes away when audio is back), a chosen device that is not connected and a pad file that could not be read or saved have a toast, and a missing folder has "Locate Folder…" and "Remove Folder" on its page.
 - The interface is translated to Brazilian Portuguese.
@@ -55,6 +55,7 @@ The SVGs in `mockups/` are the visual reference:
 - The label of an unavailable device is ellipsized in the preferences rows, which can hide the "(unavailable)" part.
 - A PPA or another channel with updates, package signing, and other distributions.
 - More languages.
+- One limiter for every sound together: each playback has its own, so two loud sounds playing at once can still clip the call.
 - Global shortcuts ([shortcuts.md](shortcuts.md) has what was measured).
 - Cropping or moving the background of a pad: the picture is centered and covers the pad.
 - Formats gdk-pixbuf cannot read (with ImageMagick, for example) as pad backgrounds.

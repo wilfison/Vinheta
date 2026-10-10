@@ -6,7 +6,7 @@ Until version 1.0.0 the engine created a virtual microphone named "Vinheta", mix
 
 ## Source layout
 
-- `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `PlayOptions`, `Position`, `Event`, `Error`, `PlaybackId`, `Device`, `slider_gain`); `graph.rs` owns the PipeWire thread (drain node, registry, recording streams, links); `player.rs` builds one GStreamer pipeline per sound. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
+- `src/audio/`: the audio engine. `mod.rs` is the public API (`AudioEngine`, `Config`, `PlayOptions`, `Position`, `Event`, `Error`, `PlaybackId`, `Device`, `slider_gain`); `graph.rs` owns the PipeWire thread (drain node, registry, recording streams, links); `player.rs` builds one GStreamer pipeline per sound; `limiter.rs` is the gain limiter of the call branch, with no GStreamer type. PipeWire objects never leave the engine thread: commands go in through a `pipewire::channel`, events come out through `async-channel`.
 - `src/bin/vinheta-audio-test.rs`: diagnostic binary behind the `audio-test` cargo feature (`cargo run --features audio-test --bin vinheta-audio-test -- --help`). Meson does not build or install it.
 
 ## Rules that are easy to get wrong
@@ -20,6 +20,7 @@ Until version 1.0.0 the engine created a virtual microphone named "Vinheta", mix
 - A playback that was stopped on request never reports an event afterwards; the interface relies on that, and on events carrying the `PlaybackId`.
 - "Send sounds to call" mutes the `call-volume` element of each pipeline. The call stream and its links stay in place. The call volume is the `volume` property of the same element, independent of the mute.
 - The gain of a branch element is a product: branch × playback × fade (`effective_gain`). Never set a gain before the `tee`: it is heard a queue late. A branch volume change keeps each playback's own gain.
+- The call branch of each playback ends with a limiter: a buffer probe on the `capsfilter` named `call-format` scales a buffer whose loudest sample is above -6 dBFS down to that ceiling at once, and lets the gain back up over 200 ms. It sits after the call volume, never before it (the ceiling would follow the slider), and after the `tee`, never before it (the headphones would be limited). It is per playback: two sounds playing together can still add up to 0 dBFS in the app. "Limit Call Level" turns it off for current and future playbacks; while it is off the probe passes buffers untouched.
 - The queues of a pipeline hold 200 ms, so the end of a pass is known about 350 ms before it is heard.
 - Every playback runs in segment mode, looping or not: preroll, a flushing `SEGMENT` seek, then `PLAYING`; on each `SEGMENT_DONE` either a non-flushing seek (loop) or an EOS pushed into the sink pad of the `tee` (the only way it ends). These actions are queued with `call_async` from the bus handler, and skipped once the playback is retired.
 - `restart` is a flushing seek: the `PlaybackId` and the streams stay, and nothing is reported.
@@ -119,9 +120,12 @@ pw-metadata STREAM_ID target.object -- -1       # back to the default sink
 
 ```
 uridecodebin ! audioconvert ! audioresample ! tee name=t
-  t. ! queue ! audioconvert ! audio/x-raw,channels=1 ! volume ! pipewiresink   (call: node.autoconnect=false, linked by the engine)
+  t. ! queue ! audioconvert ! audio/x-raw,channels=1 ! volume
+         ! capsfilter caps=audio/x-raw,format=F32LE ! pipewiresink              (call: node.autoconnect=false, linked by the engine)
   t. ! queue ! volume ! pipewiresink                                            (monitor: default sink, or target-object=<sink>)
 ```
+
+- The `capsfilter` of the call branch (`call-format`) carries the limiter: a buffer probe on its `src` pad runs `Limiter` (`limiter.rs`) on the F32LE samples. The format is F32LE there anyway (`volume` and `pipewiresink` both prefer float); the filter makes it a guarantee.
 
 - Each branch has its own `queue` and `volume`. Setting one volume to 0 silences only that branch.
 - The queues hold 200 ms (`max-size-time`, with the buffer and byte limits off) instead of the default second, and the gain of each `volume` element is a product: branch × playback × fade.
@@ -165,7 +169,8 @@ All three pass, and the app that was recording is still fed by its microphone af
 - **A live GStreamer source stalls the graph.** `audiotestsrc is-live=true ! pipewiresink` with `node.autoconnect=false`, linked by hand into a virtual node, left every node suspended and every later link stuck in the `init` state. File sources (`uridecodebin`, `filesrc`) do not have the problem. The soundboard only plays files, but keep this in mind before feeding a live source into the node.
 - **An unlinked call branch blocks the whole pipeline**, including the monitor branch, because the sink does not consume data until it is linked. The engine links the stream to the drain node as soon as its ports show up in the registry, so in practice the delay is not noticeable.
 - **The sounds reach every app that records a microphone**, a sound recorder included, unless one app is chosen. The tabs of a browser cannot be told apart.
-- **The call can clip.** The sound is added to the voice inside the app's recording stream, at the level of the call volume. A loud sound at 100% reached 0 dBFS in a browser with automatic gain on.
+- **The call can still clip with several sounds at once.** The limiter keeps each sound at -6 dBFS in the call, but each playback has its own, so two loud sounds playing together add up inside the app's recording stream. A shared limiter would need one call node fed by every playback. Before the limiter, a loud sound at 100% reached 0 dBFS in a browser with automatic gain on.
+- **The automatic gain of a call app** may raise the sound after the engine; the engine only bounds its own contribution.
 - **Some headsets mute their microphone while they play.** The "AB13X Headset Adapter" (USB `001f:0b21`) delivers exact zeros on its capture, for 1.2 to 1.8 s, while a loud sound plays on its own output, with or without Vinheta (`pw-play` does the same). The sound still reaches the call, since it does not go through the microphone, but the voice is cut meanwhile. Sending the monitor branch to another output avoids it.
 - **`pw-link` by port name failed once** with "No such file or directory" right after the node was created, and worked on retry and by port id. It was not reproduced.
 - **The server removes the engine's links together with a stream that ends.** When the engine then drops its own proxy for such a link, PipeWire reports "unknown resource" on the core. That error is harmless and must not be treated as a lost connection; only `EPIPE` on the core is. It shows up whenever a sound is stopped while the process keeps running.
@@ -182,6 +187,7 @@ cargo run --features audio-test --bin vinheta-audio-test -- [OPTIONS] [FILE...]
 - With one or more `FILE`s: plays them together once, and again each time Enter is pressed.
 - `--once`: plays the files once and exits when they end.
 - `--no-call`: starts with the call branch muted (the "Send sounds to call" switch turned off).
+- `--no-limiter`: starts with the limiter of the call branch off. `--limiter-after SECONDS on|off`: turns it on or off while the files play, and prints `limiter on` or `limiter off`.
 - `--stop-after SECONDS`: stops the first file that many seconds after the playback starts.
 - `--stop-all-after SECONDS`: stops every file.
 - `--mute-call-after SECONDS`, `--unmute-call-after SECONDS`: turn the call branch off and on while the files play.
@@ -218,6 +224,7 @@ It never uses the real microphone, headphones, or call apps. A fake microphone (
 - with `--no-call` the sound never reaches the call recording,
 - a gain of 0.1 on one branch lowers it by 20 dB within 200 ms and leaves the other branch and the voice alone,
 - a stop without a fade is silent 150 ms later,
+- a 0 dBFS tone reaches the call recording at -6 dBFS (±1 dB) with no harmonic above -50 dBFS, while the monitor recording has it at full level; a -20 dBFS tone right after it passes untouched once the gain has recovered, and the voice keeps its level; the limiter turned off (or on) in the middle of the tone changes the call recording by 6 dB within 200 ms and leaves the monitor alone (the loud file is made with `aevalsrc`: the `sine` filter of `ffmpeg` is fixed at -18 dBFS),
 - a playback gain raised from 0.1 to 1 raises both branches by 20 dB within 200 ms and leaves the voice alone, and a branch volume change keeps the playback gain,
 - a looping 1 second tone is still there in its third pass with no silence longer than 15 ms at the seams (the call app records a silent microphone there, so silence means a gap), and reports no end,
 - a loop turned off in the second pass ends after two passes, with one "finished" line and exit status 0,
@@ -256,5 +263,6 @@ Done on 2026-10-05, on a real call. Repeat it after a change to how the sound re
 6. Repeat step 4 with the noise suppression of the call app turned on, then off.
 7. Repeat step 4 with a long or looping sound and the noise suppression on: is it cut after some seconds?
 8. Repeat step 4 with speakers instead of headphones and ask whether the sound is heard twice (echo).
+9. Play a loud sound at 100% while speaking, and ask whether it is clean and the voice still clear. Then turn "Limit Call Level" off in the preferences and repeat. Note the result here with its date (optional).
 
 Results of 2026-10-05: the call heard the voice and the sound together, the sound survived with the noise suppression of the call app on, and speakers caused no echo. That is why the call setup guide does not ask to use headphones, and only mentions noise suppression as a hint for sounds that come through choppy, without naming where each call app keeps that setting.

@@ -25,6 +25,7 @@
 //! [`Event`]s from the receiver returned by [`AudioEngine::start`].
 
 mod graph;
+mod limiter;
 mod player;
 
 use std::fmt;
@@ -49,6 +50,9 @@ pub struct Config {
     pub monitor_volume: f64,
     /// When false, the call branch of every sound is muted.
     pub send_to_call: bool,
+    /// When true, loud sounds reach the call at -6 dBFS at most. The
+    /// monitor branch is never limited.
+    pub limit_call: bool,
     /// How long a stopped playback takes to fade out. Zero stops at once.
     pub fade_out: Duration,
 }
@@ -61,6 +65,7 @@ impl Default for Config {
             call_volume: 1.0,
             monitor_volume: 1.0,
             send_to_call: true,
+            limit_call: true,
             fade_out: Duration::ZERO,
         }
     }
@@ -254,6 +259,12 @@ impl AudioEngine {
     /// Mutes or unmutes the call branch of current and future playbacks.
     pub fn set_send_to_call(&self, enabled: bool) {
         self.player.set_send_to_call(enabled);
+    }
+
+    /// Turns the limiter of the call branch on or off for current and future
+    /// playbacks. The monitor branch is never limited.
+    pub fn set_limit_call(&self, enabled: bool) {
+        self.player.set_limit_call(enabled);
     }
 
     /// Sets the gain of the call branch (0.0 to 1.0) of current and future

@@ -30,22 +30,32 @@ use gst::glib;
 use gst::prelude::*;
 
 use super::graph::{stream_prefix, CALL_STREAM_PREFIX, MONITOR_STREAM_PREFIX};
+use super::limiter::Limiter;
 use super::{Config, Error, Event, PlayOptions, PlaybackId, Position};
 
 // One queue per branch so a slow sink cannot stall the other one. The queues
 // are short so the end of a pass is known shortly before it is heard. The
 // gains go after them: a volume before the tee would be heard a queue late.
 // The call branch is mono, so it fits a recording app of any channel layout.
+// Its limiter is a probe on `call-format`: after the volume, so the ceiling
+// does not follow the slider, and after the tee, so the monitor is untouched.
 const PIPELINE: &str = "uridecodebin name=source ! audioconvert ! audioresample ! tee name=tee \
     tee. ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=200000000 \
         ! audioconvert ! audio/x-raw,channels=1 \
-        ! volume name=call-volume ! pipewiresink name=call \
+        ! volume name=call-volume \
+        ! capsfilter name=call-format caps=audio/x-raw,format=F32LE \
+        ! pipewiresink name=call \
     tee. ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=200000000 \
         ! volume name=monitor-volume ! pipewiresink name=monitor";
 
 const FADE_STEP: Duration = Duration::from_millis(10);
 // The sinks still hold some audio when the ramp reaches zero.
 const FADE_TAIL: Duration = Duration::from_millis(150);
+
+// -6 dBFS: a loud sound leaves half of the scale to the voice.
+const CALL_CEILING: f32 = 0.5;
+const CALL_RELEASE: Duration = Duration::from_millis(200);
+const DEFAULT_RATE: u32 = 48000;
 
 /// The gain of a branch element: the branch, the playback, and the fade
 /// multiplied, each from 0.0 to 1.0.
@@ -74,6 +84,7 @@ struct Playback {
     pipeline: gst::Pipeline,
     control: Arc<Control>,
     volume: f64,
+    limit_call: Arc<AtomicBool>,
 }
 
 impl Playback {
@@ -150,6 +161,7 @@ struct Mix {
     call_volume: f64,
     monitor_volume: f64,
     send_to_call: bool,
+    limit_call: bool,
     fade_out: Duration,
 }
 
@@ -182,6 +194,7 @@ impl Player {
                 call_volume: config.call_volume.clamp(0.0, 1.0),
                 monitor_volume: config.monitor_volume.clamp(0.0, 1.0),
                 send_to_call: config.send_to_call,
+                limit_call: config.limit_call,
                 fade_out: config.fade_out,
             }),
             fades: Mutex::new(Some(fades)),
@@ -215,14 +228,21 @@ impl Player {
             started: AtomicBool::new(false),
             retired: Mutex::new(false),
         });
+        let mix = self.mix.lock().unwrap();
         let playback = Playback {
             pipeline: pipeline.clone(),
             control: control.clone(),
             volume: options.volume.clamp(0.0, 1.0),
+            limit_call: Arc::new(AtomicBool::new(mix.limit_call)),
         };
 
-        let mix = self.mix.lock().unwrap();
         element("source").set_property("uri", uri.as_str());
+        limit(
+            &element("call-format")
+                .static_pad("src")
+                .expect("a capsfilter has a src pad"),
+            playback.limit_call.clone(),
+        );
         element("call-volume").set_property("mute", !mix.send_to_call);
         playback.apply_gains(&mix, 1.0);
 
@@ -401,6 +421,13 @@ impl Player {
         }
     }
 
+    pub(super) fn set_limit_call(&self, enabled: bool) {
+        self.mix.lock().unwrap().limit_call = enabled;
+        for playback in self.playbacks.lock().unwrap().values() {
+            playback.limit_call.store(enabled, Ordering::Relaxed);
+        }
+    }
+
     pub(super) fn set_call_volume(&self, gain: f64) {
         self.mix.lock().unwrap().call_volume = gain.clamp(0.0, 1.0);
         self.apply_gains();
@@ -464,6 +491,46 @@ impl Player {
     pub(super) fn set_monitor(&self, name: Option<String>) {
         self.mix.lock().unwrap().monitor = name;
     }
+}
+
+/// Runs a [`Limiter`] on the F32LE buffers that leave `pad` while `enabled`
+/// is set. The probe runs on the streaming thread of the branch.
+fn limit(pad: &gst::Pad, enabled: Arc<AtomicBool>) {
+    let limiter: Mutex<Option<Limiter>> = Mutex::new(None);
+    pad.add_probe(gst::PadProbeType::BUFFER, move |pad, info| {
+        let mut limiter = limiter.lock().unwrap();
+        let limiter = limiter.get_or_insert_with(|| {
+            let rate = pad
+                .current_caps()
+                .and_then(|caps| caps.structure(0)?.get::<i32>("rate").ok())
+                .and_then(|rate| u32::try_from(rate).ok())
+                .unwrap_or(DEFAULT_RATE);
+            Limiter::new(CALL_CEILING, CALL_RELEASE, rate)
+        });
+        if !enabled.load(Ordering::Relaxed) {
+            limiter.reset();
+            return gst::PadProbeReturn::Ok;
+        }
+        let Some(buffer) = info.buffer_mut() else {
+            return gst::PadProbeReturn::Ok;
+        };
+        let Ok(mut map) = buffer.make_mut().map_writable() else {
+            return gst::PadProbeReturn::Ok;
+        };
+        let bytes = map.as_mut_slice();
+        if bytes.len() % 4 != 0 {
+            return gst::PadProbeReturn::Ok;
+        }
+        let mut samples: Vec<f32> = bytes
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        limiter.process(&mut samples);
+        for (chunk, sample) in bytes.chunks_exact_mut(4).zip(samples) {
+            chunk.copy_from_slice(&sample.to_le_bytes());
+        }
+        gst::PadProbeReturn::Ok
+    });
 }
 
 fn seek_to_start(pipeline: &gst::Pipeline, flags: gst::SeekFlags) -> Result<(), glib::BoolError> {

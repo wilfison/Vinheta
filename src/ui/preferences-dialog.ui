@@ -27,6 +27,12 @@
                 <property name="subtitle" translatable="yes">An app that is using the microphone, or all of them</property>
               </object>
             </child>
+            <child>
+              <object class="AdwSwitchRow" id="limit_call">
+                <property name="title" translatable="yes">Limit Call Level</property>
+                <property name="subtitle" translatable="yes">Keeps loud sounds from clipping in the call</property>
+              </object>
+            </child>
           </object>
         </child>
         <child>

@@ -13,7 +13,7 @@ A map of the source tree. Each area has its own document.
 | `src/backgrounds.rs` | Which files are images, the reduced copy of a pad background, the removal of unused copies | [library.md](library.md) |
 | `src/devices.rs` | The entries of a device selector | [interface.md](interface.md) |
 | `src/editors.rs` | Which installed app opens a sound for editing | [application.md](application.md) |
-| `src/audio/` | The audio engine (PipeWire and GStreamer) | [audio.md](audio.md) |
+| `src/audio/` | The audio engine (PipeWire and GStreamer); `limiter.rs` is the limiter of the call branch | [audio.md](audio.md) |
 | `src/bin/vinheta-audio-test.rs` | Diagnostic binary of the engine | [audio.md](audio.md) |
 | `data/` | Desktop file, metainfo, GSettings schema, D-Bus service, icons | [packaging.md](packaging.md) |
 | `po/` | Translations | [translations.md](translations.md) |

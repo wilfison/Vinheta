@@ -182,3 +182,10 @@ tone_sound() {
     ffmpeg -v error -y -f lavfi -i "sine=frequency=1000:duration=${2:-30}" \
         -af "volume=-45dB" -ac 2 -ar 48000 "$1"
 }
+
+# loud_sound FILE [SECONDS]: a 1000 Hz tone at 0 dBFS, for the call limiter.
+# Play it only with the monitor volume at 0 and a fake call app as the target.
+loud_sound() {
+    ffmpeg -v error -y -f lavfi -i "aevalsrc=sin(2*PI*1000*t):s=48000:d=${2:-30}" \
+        -af "pan=stereo|c0=c0|c1=c0" "$1"
+}

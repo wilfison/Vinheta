@@ -31,22 +31,25 @@ use gst::glib;
 use vinheta::audio::{self, AudioEngine, Config, Event, PlayOptions, PlaybackId};
 
 const USAGE: &str = "usage: vinheta-audio-test [--help] [--version] [--once] [--target APP] \
-[--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] [--no-call] \
+[--monitor NODE_NAME] [--call-volume N] [--monitor-volume N] [--no-call] [--no-limiter] \
 [--stop-after SECONDS] [--stop-all-after SECONDS] [--mute-call-after SECONDS] \
 [--unmute-call-after SECONDS] [--call-volume-after SECONDS GAIN] \
 [--monitor-volume-after SECONDS GAIN] [--target-after SECONDS APP] \
 [--monitor-after SECONDS NODE_NAME] [--replay-after SECONDS] [--volume GAIN] \
 [--playback-volume-after SECONDS GAIN] [--loop] [--loop-off-after SECONDS] \
 [--restart-after SECONDS] [--position-after SECONDS] [--fade-out SECONDS] \
-[--start-after SECONDS] [--restart-engine-after SECONDS] [FILE...]
+[--start-after SECONDS] [--restart-engine-after SECONDS] [--limiter-after SECONDS on|off] \
+[FILE...]
 
 Without FILE, the engine only starts and prints the lists.
 With FILEs, they are played together once, and again each time Enter is pressed.
 --once plays the FILEs a single time and exits when they end.
 --no-call starts with the call branch muted.
+--no-limiter starts with the limiter of the call branch off.
 The --*-after options act that many seconds after the first playback starts:
 --stop-after stops the first FILE, --stop-all-after stops every FILE, and
 --mute-call-after and --unmute-call-after turn the call branch off and on,
+--limiter-after turns the limiter of the call branch on or off,
 --call-volume-after and --monitor-volume-after set the gain of a branch (0 to 1),
 --target-after sends the sounds to another app (\"all\" is every app that is
 recording a microphone), --monitor-after switches the monitor output (the name
@@ -82,6 +85,7 @@ struct Args {
     unmute_call_after: Option<Duration>,
     call_volume_after: Option<(Duration, f64)>,
     monitor_volume_after: Option<(Duration, f64)>,
+    limiter_after: Option<(Duration, bool)>,
     target_after: Option<(Duration, Option<String>)>,
     monitor_after: Option<(Duration, Option<String>)>,
     replay_after: Option<Duration>,
@@ -118,6 +122,7 @@ fn parse_args() -> Result<Args, String> {
             "--call-volume" => parsed.config.call_volume = volume(value()?)?,
             "--monitor-volume" => parsed.config.monitor_volume = volume(value()?)?,
             "--no-call" => parsed.config.send_to_call = false,
+            "--no-limiter" => parsed.config.limit_call = false,
             "--stop-after" => parsed.stop_after = seconds(value()?)?,
             "--stop-all-after" => parsed.stop_all_after = seconds(value()?)?,
             "--mute-call-after" => parsed.mute_call_after = seconds(value()?)?,
@@ -127,6 +132,15 @@ fn parse_args() -> Result<Args, String> {
             }
             "--monitor-volume-after" => {
                 parsed.monitor_volume_after = seconds(value()?)?.zip(Some(volume(value()?)?));
+            }
+            "--limiter-after" => {
+                let delay = seconds(value()?)?;
+                let enabled = match value()?.as_str() {
+                    "on" => true,
+                    "off" => false,
+                    other => return Err(format!("bad limiter state: {other}")),
+                };
+                parsed.limiter_after = delay.zip(Some(enabled));
             }
             "--target-after" => {
                 parsed.target_after = seconds(value()?)?.zip(Some(app(value()?)));
@@ -255,6 +269,12 @@ impl Tester {
             self.schedule(Some(delay), move |tester| {
                 tester.engine(|engine| engine.set_monitor_volume(gain));
                 println!("monitor volume set to {gain}");
+            });
+        }
+        if let Some((delay, enabled)) = self.args.limiter_after {
+            self.schedule(Some(delay), move |tester| {
+                tester.engine(|engine| engine.set_limit_call(enabled));
+                println!("limiter {}", if enabled { "on" } else { "off" });
             });
         }
         if let Some((delay, app)) = self.args.target_after.clone() {

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 20:35-0300\n"
+"POT-Creation-Date: 2026-10-10 13:14-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -23,7 +23,7 @@ msgid "Vinheta"
 msgstr "Vinheta"
 
 #: data/io.github.wilfison.Vinheta.desktop.in:3
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1261
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1263
 msgid "Play sounds into your calls"
 msgstr "Toque sons nas suas chamadas"
 
@@ -53,32 +53,44 @@ msgstr ""
 "Se os sons são tocados nos aplicativos que estão gravando um microfone, além "
 "da saída local."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:17 src/ui/window.ui:383
+#: data/io.github.wilfison.Vinheta.gschema.xml:16
+msgid "Limit call level"
+msgstr "Limitar o nível na chamada"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:17
+msgid ""
+"Whether loud sounds are kept at -6 dBFS in the call, so that they do not "
+"clip."
+msgstr ""
+"Se os sons altos são mantidos em -6 dBFS na chamada, para que não "
+"distorçam."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:22 src/ui/window.ui:383
 msgid "Headphones volume"
 msgstr "Volume dos fones"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:18
+#: data/io.github.wilfison.Vinheta.gschema.xml:23
 msgid ""
 "Position of the slider that sets how loud sounds are on the local output, "
 "from 0 to 1."
 msgstr ""
 "Posição do controle que define a altura dos sons na saída local, de 0 a 1."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:23 src/ui/window.ui:427
+#: data/io.github.wilfison.Vinheta.gschema.xml:28 src/ui/window.ui:427
 msgid "Call volume"
 msgstr "Volume da chamada"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:24
+#: data/io.github.wilfison.Vinheta.gschema.xml:29
 msgid ""
 "Position of the slider that sets how loud sounds are in the call, from 0 to "
 "1."
 msgstr "Posição do controle que define a altura dos sons na chamada, de 0 a 1."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:28
+#: data/io.github.wilfison.Vinheta.gschema.xml:33
 msgid "App the sounds are sent to"
 msgstr "Aplicativo que recebe os sons"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:29
+#: data/io.github.wilfison.Vinheta.gschema.xml:34
 msgid ""
 "Name of the binary of the app that gets the sounds, among the ones that are "
 "recording a microphone. Empty is all of them."
@@ -86,11 +98,11 @@ msgstr ""
 "Nome do binário do aplicativo que recebe os sons, entre os que estão "
 "gravando um microfone. Vazio significa todos."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:33
+#: data/io.github.wilfison.Vinheta.gschema.xml:38
 msgid "Monitor output"
 msgstr "Saída de monitoração"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:34
+#: data/io.github.wilfison.Vinheta.gschema.xml:39
 msgid ""
 "PipeWire node name of the output where sounds are heard. Empty follows the "
 "system default."
@@ -98,11 +110,11 @@ msgstr ""
 "Nome do nó do PipeWire da saída onde os sons são ouvidos. Vazio segue o "
 "padrão do sistema."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:43
+#: data/io.github.wilfison.Vinheta.gschema.xml:48
 msgid "When a pad is triggered"
 msgstr "Quando um pad é acionado"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:44
+#: data/io.github.wilfison.Vinheta.gschema.xml:49
 msgid ""
 "What a click on a pad does: \"overlap\" plays sounds together and stops a "
 "pad that is playing, \"restart\" starts a playing pad again, \"stop-others\" "
@@ -112,19 +124,19 @@ msgstr ""
 "que está tocando, “restart” reinicia um pad que está tocando, “stop-others” "
 "para todos os outros sons quando um pad começa."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:48
+#: data/io.github.wilfison.Vinheta.gschema.xml:53
 msgid "Fade out on stop"
 msgstr "Esmaecer ao parar"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:49
+#: data/io.github.wilfison.Vinheta.gschema.xml:54
 msgid "Whether a stopped sound fades out instead of being cut."
 msgstr "Se um som parado diminui aos poucos em vez de ser cortado."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:57
+#: data/io.github.wilfison.Vinheta.gschema.xml:62
 msgid "Sort order"
 msgstr "Ordenação"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:58
+#: data/io.github.wilfison.Vinheta.gschema.xml:63
 msgid ""
 "The order of the pads in every view: \"name\" sorts by the shown name, "
 "\"recent\" puts the most recently modified files first."
@@ -132,11 +144,11 @@ msgstr ""
 "A ordem dos pads em todas as visões: “name” ordena pelo nome mostrado, "
 "“recent” coloca primeiro os arquivos modificados mais recentemente."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:62
+#: data/io.github.wilfison.Vinheta.gschema.xml:67
 msgid "Tab names"
 msgstr "Nomes das abas"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:63
+#: data/io.github.wilfison.Vinheta.gschema.xml:68
 msgid ""
 "The label of a tab, by the absolute path of its folder. A folder without an "
 "entry shows its own name."
@@ -144,11 +156,11 @@ msgstr ""
 "O rótulo de uma aba, pelo caminho absoluto da pasta. Uma pasta sem entrada "
 "mostra o próprio nome."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:67
+#: data/io.github.wilfison.Vinheta.gschema.xml:72
 msgid "Sounds folder"
 msgstr "Pasta de sons"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:68
+#: data/io.github.wilfison.Vinheta.gschema.xml:73
 msgid ""
 "Absolute path of the folder that receives the copies of loose files. Empty "
 "means \"sounds\" inside the data directory of the app."
@@ -156,11 +168,11 @@ msgstr ""
 "Caminho absoluto da pasta que recebe as cópias dos arquivos avulsos. Vazio "
 "significa “sounds” dentro do diretório de dados do aplicativo."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:72
+#: data/io.github.wilfison.Vinheta.gschema.xml:77
 msgid "Audio editor"
 msgstr "Editor de áudio"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:73
+#: data/io.github.wilfison.Vinheta.gschema.xml:78
 msgid ""
 "Name of the desktop file of the app that opens a sound for editing. Empty "
 "means the first audio editor that is installed."
@@ -168,11 +180,11 @@ msgstr ""
 "Nome do arquivo desktop do aplicativo que abre um som para edição. Vazio "
 "significa o primeiro editor de áudio instalado."
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:77
+#: data/io.github.wilfison.Vinheta.gschema.xml:82
 msgid "Call setup guide shown"
 msgstr "Guia de configuração de chamada mostrado"
 
-#: data/io.github.wilfison.Vinheta.gschema.xml:78
+#: data/io.github.wilfison.Vinheta.gschema.xml:83
 msgid ""
 "Whether the call setup guide was shown on the first run. While false, the "
 "guide opens by itself when the app starts with working audio."
@@ -251,7 +263,7 @@ msgstr ""
 "tecla, favoritos, pesquisa e um microfone virtual que envia os sons para as "
 "suas chamadas."
 
-#: src/application.rs:541
+#: src/application.rs:543
 msgid ""
 "Pad settings could not be read and were reset. The old file was kept as "
 "“pads.json.corrupt”."
@@ -259,47 +271,47 @@ msgstr ""
 "Não foi possível ler as configurações dos pads, e elas foram redefinidas. O "
 "arquivo antigo foi mantido como “pads.json.corrupt”."
 
-#: src/application.rs:546
+#: src/application.rs:548
 msgid "Pad settings could not be read. Changes to pads will not be saved."
 msgstr ""
 "Não foi possível ler as configurações dos pads. As alterações nos pads não "
 "serão salvas."
 
-#: src/application.rs:576
+#: src/application.rs:578
 msgid "Pad settings could not be saved"
 msgstr "Não foi possível salvar as configurações dos pads"
 
 #. Translators: {} is the file name of an image.
-#: src/application.rs:714
+#: src/application.rs:716
 msgid "Could not use “{}” as a background"
 msgstr "Não foi possível usar “{}” como fundo"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:837
+#: src/application.rs:839
 msgid "Moved “{}” to the trash"
 msgstr "“{}” foi movido para a lixeira"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:841
+#: src/application.rs:843
 msgid "Could not move “{}” to the trash"
 msgstr "Não foi possível mover “{}” para a lixeira"
 
-#: src/application.rs:902
+#: src/application.rs:904
 msgid "Could not open the audio editor"
 msgstr "Não foi possível abrir o editor de áudio"
 
 #. Translators: {} is the name of an audio output.
-#: src/application.rs:1152
+#: src/application.rs:1154
 msgid "Output “{}” is not connected. Using the system default."
 msgstr "A saída “{}” não está conectada. Usando o padrão do sistema."
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:1244
+#: src/application.rs:1246
 msgid "Could not play “{}”"
 msgstr "Não foi possível tocar “{}”"
 
 #. Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
-#: src/application.rs:1267
+#: src/application.rs:1269
 msgid "translator-credits"
 msgstr "wilfison"
 
@@ -431,88 +443,96 @@ msgstr "Enviar sons para"
 msgid "An app that is using the microphone, or all of them"
 msgstr "Um aplicativo que está usando o microfone, ou todos eles"
 
-#: src/ui/preferences-dialog.ui:34 src/ui/shortcuts-dialog.ui:6
+#: src/ui/preferences-dialog.ui:32
+msgid "Limit Call Level"
+msgstr "Limitar o nível na chamada"
+
+#: src/ui/preferences-dialog.ui:33
+msgid "Keeps loud sounds from clipping in the call"
+msgstr "Evita que sons altos distorçam na chamada"
+
+#: src/ui/preferences-dialog.ui:40 src/ui/shortcuts-dialog.ui:6
 msgid "Playback"
 msgstr "Reprodução"
 
-#: src/ui/preferences-dialog.ui:37
+#: src/ui/preferences-dialog.ui:43
 msgid "When a Pad Is Triggered"
 msgstr "Quando um pad é acionado"
 
-#: src/ui/preferences-dialog.ui:41
+#: src/ui/preferences-dialog.ui:47
 msgid "Overlap"
 msgstr "Sobrepor"
 
-#: src/ui/preferences-dialog.ui:42
+#: src/ui/preferences-dialog.ui:48
 msgid "Restart"
 msgstr "Reiniciar"
 
-#: src/ui/preferences-dialog.ui:43
+#: src/ui/preferences-dialog.ui:49
 msgid "Stop Others"
 msgstr "Parar os outros"
 
-#: src/ui/preferences-dialog.ui:51
+#: src/ui/preferences-dialog.ui:57
 msgid "Fade Out on Stop"
 msgstr "Esmaecer ao parar"
 
-#: src/ui/preferences-dialog.ui:52
+#: src/ui/preferences-dialog.ui:58
 msgid "Avoids abrupt cuts when stopping a sound"
 msgstr "Evita cortes bruscos ao parar um som"
 
-#: src/ui/preferences-dialog.ui:59
+#: src/ui/preferences-dialog.ui:65
 msgid "Library"
 msgstr "Biblioteca"
 
-#: src/ui/preferences-dialog.ui:62 src/ui/preferences_dialog.rs:309
+#: src/ui/preferences-dialog.ui:68 src/ui/preferences_dialog.rs:314
 msgid "Sounds Folder"
 msgstr "Pasta de sons"
 
-#: src/ui/preferences-dialog.ui:67 src/ui/preferences-dialog.ui:70
+#: src/ui/preferences-dialog.ui:73 src/ui/preferences-dialog.ui:76
 msgid "Open Folder"
 msgstr "Abrir pasta"
 
-#: src/ui/preferences-dialog.ui:80 src/ui/preferences-dialog.ui:83
+#: src/ui/preferences-dialog.ui:86 src/ui/preferences-dialog.ui:89
 msgid "Choose Folder…"
 msgstr "Escolher pasta…"
 
-#: src/ui/preferences-dialog.ui:94
+#: src/ui/preferences-dialog.ui:100
 msgid "Audio Editor"
 msgstr "Editor de áudio"
 
-#: src/ui/preferences_dialog.rs:91
+#: src/ui/preferences_dialog.rs:96
 msgid "Sounds play together; a click on a playing pad stops it"
 msgstr "Os sons tocam juntos; um clique em um pad que está tocando o para"
 
-#: src/ui/preferences_dialog.rs:93
+#: src/ui/preferences_dialog.rs:98
 msgid "A click on a playing pad starts it again"
 msgstr "Um clique em um pad que está tocando o reinicia"
 
-#: src/ui/preferences_dialog.rs:94
+#: src/ui/preferences_dialog.rs:99
 msgid "Starting a pad stops every other sound"
 msgstr "Iniciar um pad para todos os outros sons"
 
-#: src/ui/preferences_dialog.rs:145 src/ui/window.rs:327
+#: src/ui/preferences_dialog.rs:150 src/ui/window.rs:327
 msgid "Not recording. The sounds are not sent to it."
 msgstr "Não está gravando. Os sons não são enviados para ele."
 
-#: src/ui/preferences_dialog.rs:148
+#: src/ui/preferences_dialog.rs:153
 msgid "Not connected. Using the system default."
 msgstr "Não conectado. Usando o padrão do sistema."
 
-#: src/ui/preferences_dialog.rs:219
+#: src/ui/preferences_dialog.rs:224
 msgid "Automatic"
 msgstr "Automático"
 
 #. Translators: {} is the name of an app, as in "Uses Audacity".
-#: src/ui/preferences_dialog.rs:231
+#: src/ui/preferences_dialog.rs:236
 msgid "Uses {}"
 msgstr "Usa {}"
 
-#: src/ui/preferences_dialog.rs:232
+#: src/ui/preferences_dialog.rs:237
 msgid "No audio editor was found"
 msgstr "Nenhum editor de áudio foi encontrado"
 
-#: src/ui/preferences_dialog.rs:302
+#: src/ui/preferences_dialog.rs:307
 msgid "Could not open the folder"
 msgstr "Não foi possível abrir a pasta"
 

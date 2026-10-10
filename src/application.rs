@@ -400,6 +400,7 @@ impl VinhetaApplication {
                         };
                         match key {
                             "send-sounds-to-call" => engine.set_send_to_call(settings.boolean(key)),
+                            "limit-call-level" => engine.set_limit_call(settings.boolean(key)),
                             "call-volume" => {
                                 engine.set_call_volume(audio::slider_gain(settings.double(key)));
                             }
@@ -434,6 +435,7 @@ impl VinhetaApplication {
             call_volume: audio::slider_gain(settings.double("call-volume")),
             monitor_volume: audio::slider_gain(settings.double("monitor-volume")),
             send_to_call: settings.boolean("send-sounds-to-call"),
+            limit_call: settings.boolean("limit-call-level"),
             fade_out: fade_out(settings),
         };
         let generation = imp.generation.get().wrapping_add(1);

@@ -136,7 +136,7 @@ When writing a "Screenshot check", say how the state is reached. The tools of `s
 Limits the PRD must respect (do not write criteria that depend on them):
 
 - Portal dialogs (the file or folder chooser) do not work on the virtual display. Whatever depends on them is marked for manual testing.
-- The app on the virtual display uses the real PipeWire: it plays on the default output and into the real apps that are recording a microphone, unless `call-target` names a fake call app. Test sounds are silent (`silent_sound`) or the quiet tone of `tone_sound`, both in `scripts/dev-common.sh`.
+- The app on the virtual display uses the real PipeWire: it plays on the default output and into the real apps that are recording a microphone, unless `call-target` names a fake call app. Test sounds are silent (`silent_sound`) or the quiet tone of `tone_sound`, both in `scripts/dev-common.sh`. `loud_sound` (a 0 dBFS tone, for the call limiter) plays only with the monitor volume at 0 and a fake call app as the target.
 - If another Vinheta instance is open, the engine fails with "node already exists". For the same reason, two checks that start the app (screenshots, `verify-app.sh`) cannot run at the same time.
 - The fallback of a removed or missing device is the real default device. A check of that fallback must play nothing audible (monitor volume at 0, or a silent file) and record nothing from the real microphone.
 - A level is measured on what a fake call app records from a silent fake microphone (`call_app` and `call_level` of `scripts/verify-app.sh`), with `call-target` set to that app. Every app as the target would reach the real apps that are recording: check that case on the links, with the call volume at 0.

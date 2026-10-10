@@ -19,7 +19,7 @@
 
 ## The mix
 
-- The settings are the single source of truth for the mix: the application builds the engine `Config` from them and forwards every change of a key to the engine (`call-volume`, `monitor-volume`, `call-target`, `monitor-output`, `send-sounds-to-call`, and `fade-out-on-stop`, which is a fade of 300 ms or none). The interface only binds widgets to keys and never calls the engine for these. The application also keeps the lists reported by the engine (the outputs, and the apps that are recording a microphone: `DeviceKind::Output` and `DeviceKind::CallApp`) and emits its `devices-changed` signal when they, or the audio availability, change. `call-target` stores the name of the binary of the chosen app, empty for all of them.
+- The settings are the single source of truth for the mix: the application builds the engine `Config` from them and forwards every change of a key to the engine (`call-volume`, `monitor-volume`, `call-target`, `monitor-output`, `send-sounds-to-call`, `limit-call-level`, and `fade-out-on-stop`, which is a fade of 300 ms or none). The interface only binds widgets to keys and never calls the engine for these. The application also keeps the lists reported by the engine (the outputs, and the apps that are recording a microphone: `DeviceKind::Output` and `DeviceKind::CallApp`) and emits its `devices-changed` signal when they, or the audio availability, change. `call-target` stores the name of the binary of the chosen app, empty for all of them.
 - While a sound plays, one timer of the application (every 100 ms) asks the engine for the position of each playback and writes it to the `Sound`. It does not exist while nothing plays.
 
 ## The sounds folder

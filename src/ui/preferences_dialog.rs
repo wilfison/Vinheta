@@ -44,6 +44,8 @@ mod imp {
         #[template_child]
         pub send_to_call: TemplateChild<adw::SwitchRow>,
         #[template_child]
+        pub limit_call: TemplateChild<adw::SwitchRow>,
+        #[template_child]
         pub trigger_mode: TemplateChild<adw::ComboRow>,
         #[template_child]
         pub fade_out: TemplateChild<adw::SwitchRow>,
@@ -78,6 +80,9 @@ mod imp {
             let settings = gio::Settings::new(APP_ID);
             settings
                 .bind("send-sounds-to-call", &*self.send_to_call, "active")
+                .build();
+            settings
+                .bind("limit-call-level", &*self.limit_call, "active")
                 .build();
             settings
                 .bind("fade-out-on-stop", &*self.fade_out, "active")

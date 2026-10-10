@@ -46,6 +46,10 @@ quiet="$work/Tones/tone-quiet.wav"
 looped="$work/Tones/tone-loop.wav"
 cp "$tone" "$quiet"
 tone_sound "$looped" 2 || exit 1
+# A 0 dBFS tone for the limiter. Its name sorts after tone.wav, which stays
+# the first pad of the grid.
+loud="$work/Tones/tone-loud.wav"
+loud_sound "$loud" 60 || exit 1
 # One that is deleted while it plays, and one that is renamed.
 gone="$work/Tones/tone-gone.wav"
 kept="$work/Tones/tone-kept.wav"
@@ -184,6 +188,22 @@ session() {
         gsettings set "$app_id" call-volume 1.0
         activate stop-all
         check "call volume 0.5 is 18 dB quieter ($full dBFS at 1.0, $half dBFS at 0.5)" falls_by "$full" "$half" 15 21
+    fi
+
+    # The loud tone must not reach the real output: the monitor volume is 0.
+    if section "call limiter"; then
+        gsettings set "$app_id" monitor-volume 0.0
+        activate toggle-sound "'$loud'"
+        sleep 1
+        on=$(call_level limiter-on)
+        gsettings set "$app_id" limit-call-level false
+        sleep 0.5
+        off=$(call_level limiter-off)
+        gsettings set "$app_id" limit-call-level true
+        activate stop-all
+        gsettings set "$app_id" monitor-volume 1.0
+        check "the limiter keeps a loud sound at -6 dBFS ($on dBFS)" python3 -c 'import sys; sys.exit(0 if -7.5 <= float(sys.argv[1]) <= -4.5 else 1)' "$on"
+        check "without the limiter it is louder ($off dBFS)" at_least "$off" "$on" 5
     fi
 
     # Every app as the target would reach the real ones, so that case is
@@ -403,7 +423,7 @@ session() {
 {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-common.sh'"
-    declare -p work tone quiet looped gone kept moved deleted unmounted pads test_sink test_mic test_app other_app only
+    declare -p work tone quiet looped loud gone kept moved deleted unmounted pads test_sink test_mic test_app other_app only
     declare -f check node_exists call_linked not call_app call_level sent_to at_least \
         monitor_on monitor_linked falls_by call_streams one_call_stream within pad_field \
         loop_saved entry_removed settings_moved missing_pruned section session

@@ -57,7 +57,7 @@
 ## Dialogs
 
 - `src/ui/preferences_dialog.rs` + `src/ui/preferences-dialog.ui`: the `AdwPreferencesDialog`.
-- `Ctrl+,` opens the preferences. The "Sounds Folder" row has two buttons: one opens the folder, one chooses another. The "Audio Editor" row offers "Automatic" (its subtitle names the editor that was found) and every installed app that opens sounds, the editors first; it is the only place that writes `audio-editor`. The list is read when the dialog opens.
+- `Ctrl+,` opens the preferences. "Limit Call Level", the last row of the "Audio" group, binds `limit-call-level`: it keeps loud sounds at -6 dBFS in the call (see [audio.md](audio.md)). The "Sounds Folder" row has two buttons: one opens the folder, one chooses another. The "Audio Editor" row offers "Automatic" (its subtitle names the editor that was found) and every installed app that opens sounds, the editors first; it is the only place that writes `audio-editor`. The list is read when the dialog opens.
 - The call setup guide (`src/ui/call_guide_dialog.rs` + `call-guide-dialog.ui`) opens by itself in `activate` while the `call-guide-shown` key is false and audio works; the key is set when the dialog closes, however it closes.
 - The shortcuts dialog and the pad keys are described in [shortcuts.md](shortcuts.md).
 
