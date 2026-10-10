@@ -188,6 +188,7 @@ trap 'exit 130' INT TERM
 # and with_other_app adds a second one.
 files=()
 run_for=
+subject_limit=60
 record_monitor2=
 call_mic=
 no_call_app=
@@ -221,6 +222,19 @@ playback() {
         subject_alive=no
         kill -0 "$subject_pid" 2>/dev/null && node_exists "vinheta-drain-$subject_pid" && subject_alive=ok
         kill -INT "$subject_pid" 2>/dev/null
+    fi
+    # No playback of the harness lasts a minute. A subject that does is
+    # stuck, as when the PipeWire graph stops scheduling the nodes, and so
+    # would every section after it. A short loop also lets a TERM through.
+    local deadline=$((SECONDS + subject_limit))
+    while kill -0 "$subject_pid" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do
+        sleep 0.2
+    done
+    if kill -0 "$subject_pid" 2>/dev/null; then
+        check "$label: the subject ends within $subject_limit s (a stuck graph? see pw-top)" fail
+        kill -KILL "$subject_pid" 2>/dev/null
+        echo "aborted: the rest of the harness would be stuck too" >&2
+        exit 1
     fi
     wait "$subject_pid"
     subject_status=$?

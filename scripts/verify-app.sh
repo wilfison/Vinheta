@@ -15,6 +15,12 @@ set -uo pipefail
 
 . "$(dirname "$0")/dev-common.sh"
 . "$root/scripts/audio-common.sh"
+# What the session script inherits: every variable and function this script
+# defines or redefines from here on, so a new one cannot be left out of it.
+declare -A inherited
+for name in $(compgen -v); do inherited[v:$name]=$(declare -p "$name" 2>/dev/null); done
+for name in $(compgen -A function); do inherited[f:$name]=$(declare -f "$name"); done
+unset name
 
 # --only REGEX runs the sections whose title matches (the start and the exit
 # of the app are always checked); --list prints the titles.
@@ -156,7 +162,7 @@ session() {
     if section "play and stop through actions"; then
         # The first playback of a run can take longer to link.
         activate toggle-sound "'$tone'"
-        check "a playing sound has a linked call stream" within 3 call_linked
+        check "a playing sound has a linked call stream" within 5 call_linked
         activate stop-all
         sleep 1
         check "stop all removes the call stream" not call_linked
@@ -423,10 +429,13 @@ session() {
 {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-common.sh'"
-    declare -p work tone quiet looped loud gone kept moved deleted unmounted pads test_sink test_mic test_app other_app only
-    declare -f check node_exists call_linked not call_app call_level sent_to at_least \
-        monitor_on monitor_linked falls_by call_streams one_call_stream within pad_field \
-        loop_saved entry_removed settings_moved missing_pruned section session
+    # Only lowercase names: the shell's own variables (BASH_*) stay out.
+    for name in $(compgen -v | grep -E '^[a-z][a-z0-9_]*$' | grep -vx 'inherited\|name'); do
+        [ "${inherited[v:$name]-}" = "$(declare -p "$name")" ] || declare -p "$name"
+    done
+    for name in $(compgen -A function); do
+        [ "${inherited[f:$name]-}" = "$(declare -f "$name")" ] || declare -f "$name"
+    done
     echo session
 } >"$work/session.sh"
 

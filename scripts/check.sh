@@ -16,8 +16,7 @@ schema, Rust tests).
          unless nothing it tests changed since it last passed here
 --app    also installs the app and runs scripts/verify-app.sh (real PipeWire,
          plays a quiet tone)
---deb    also builds the package with scripts/build-deb.sh, in the background
-         while the other checks run
+--deb    also builds the package with scripts/build-deb.sh, last
 --all    all of the above
 --force  runs the audio harness even when nothing it tests changed
 --only   runs only the checks whose label matches REGEX (one step of the CI
@@ -66,36 +65,29 @@ report() {
 }
 
 # run LABEL COMMAND...: the output is kept in tmp/check and shown on failure.
+# The command runs in the background and is waited for, so that a TERM or a
+# Ctrl-C stops it at once instead of waiting for it to end.
+current=
 run() {
-    local label=$1
+    local label=$1 status
     shift
     wanted "$label" || return 0
-    "$@" >"$(log_of "$label")" 2>&1
-    report "$label" $?
+    "$@" >"$(log_of "$label")" 2>&1 &
+    current=$!
+    wait "$current"
+    status=$?
+    current=
+    report "$label" "$status"
 }
 
-# start LABEL COMMAND...: like run, in the background; finish LABEL reports it.
-# A background job ignores Ctrl-C, so it gets a process group to be killed
-# with when the script ends early.
-declare -A started
-start() {
-    local label=$1
-    shift
-    wanted "$label" || return 0
-    setsid "$@" >"$(log_of "$label")" 2>&1 &
-    started[$label]=$!
+# A command started with setsid has a process group of its own, stopped as a
+# whole; the others get the TERM alone.
+stop_current() {
+    [ -n "$current" ] || return 0
+    kill -TERM -- "-$current" 2>/dev/null || kill -TERM "$current" 2>/dev/null
+    wait "$current"
 }
-finish() {
-    [ -n "${started[$1]+set}" ] || return 0
-    wait "${started[$1]}"
-    report "$1" $?
-    unset "started[$1]"
-}
-stop_started() {
-    local pid
-    for pid in "${started[@]}"; do kill -- "-$pid" 2>/dev/null; done
-}
-trap stop_started EXIT
+trap stop_current EXIT
 trap 'exit 130' INT TERM
 
 # What the result of the audio harness depends on: the engine and its test
@@ -138,10 +130,6 @@ untracked_em_dash() {
     [ -z "$found" ] || { echo "$found"; return 1; }
 }
 
-# The package builds from its own copy and plays nothing, so it overlaps the
-# rest. At the lowest priority, so it does not disturb the timed audio checks.
-[ -n "$deb" ] && start "debian package" nice -n 19 scripts/build-deb.sh
-
 run "rustfmt has nothing to change" formatted
 run "clippy without warnings" clippy
 run "a single glib version" one_glib
@@ -155,7 +143,10 @@ if [ -n "$app" ]; then
     run "install into the local prefix" install_app
     run "app end to end" scripts/verify-app.sh
 fi
-[ -n "$deb" ] && finish "debian package"
+# Last, after every check that uses PipeWire: next to the build, the graph
+# stopped scheduling the nodes of the harness and of the app check three
+# times (2026-10-10), even at the lowest priority.
+[ -n "$deb" ] && run "debian package" setsid scripts/build-deb.sh
 
 if [ -n "$only" ] && [ "$matched" -eq 0 ]; then
     echo "no check matches --only $only" >&2
