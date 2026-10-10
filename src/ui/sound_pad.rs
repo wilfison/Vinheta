@@ -26,7 +26,7 @@ use gettextrs::gettext;
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib, graphene, gsk};
 use vinheta::backgrounds;
-use vinheta::pads::{self, PadColor, PadSettings};
+use vinheta::pads::{self, Crop, PadColor, PadSettings};
 
 use crate::application::VinhetaApplication;
 use crate::sound::Sound;
@@ -71,6 +71,8 @@ mod imp {
         pub described: Cell<i64>,
         /// The file name of the background shown, and its picture.
         pub background: RefCell<(String, Option<gdk::Texture>)>,
+        /// The area of the picture shown, `None` for all of it.
+        pub crop: Cell<Option<Crop>>,
     }
 
     #[glib::object_subclass]
@@ -134,26 +136,28 @@ mod imp {
     }
 
     impl WidgetImpl for SoundPad {
-        /// The background goes under the children, over the card, and
-        /// covers the pad like `object-fit: cover`.
+        /// The background goes under the children, over the card, and its
+        /// crop covers the pad like `object-fit: cover`.
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
             if let Some(texture) = &self.background.borrow().1 {
                 let obj = self.obj();
                 let (width, height) = (obj.width() as f32, obj.height() as f32);
-                let (texture_width, texture_height) =
-                    (texture.width() as f32, texture.height() as f32);
-                let scale = (width / texture_width).max(height / texture_height);
-                let (drawn_width, drawn_height) = (texture_width * scale, texture_height * scale);
+                let image = (f64::from(texture.width()), f64::from(texture.height()));
+                let (x, y, drawn_width, drawn_height) = backgrounds::cover(
+                    image,
+                    self.crop.get(),
+                    (f64::from(width), f64::from(height)),
+                );
                 let bounds = graphene::Rect::new(0.0, 0.0, width, height);
                 snapshot.push_rounded_clip(&gsk::RoundedRect::from_rect(bounds, RADIUS));
                 snapshot.append_scaled_texture(
                     texture,
                     gsk::ScalingFilter::Trilinear,
                     &graphene::Rect::new(
-                        (width - drawn_width) / 2.0,
-                        (height - drawn_height) / 2.0,
-                        drawn_width,
-                        drawn_height,
+                        x as f32,
+                        y as f32,
+                        drawn_width as f32,
+                        drawn_height as f32,
                     ),
                 );
                 snapshot.pop();
@@ -198,7 +202,7 @@ impl SoundPad {
         self.end_blink();
         let Some(sound) = sound else {
             imp.ring.set_position(None);
-            self.show_background("");
+            self.show_background("", None);
             return;
         };
         imp.described.set(i64::MIN);
@@ -276,7 +280,7 @@ impl SoundPad {
                 self.remove_css_class(other.name());
             }
         }
-        self.show_background(&sound.background());
+        self.show_background(&sound.background(), sound.crop_area());
         if sound.playing() {
             self.add_css_class("playing");
         } else {
@@ -303,8 +307,11 @@ impl SoundPad {
 
     /// Loads the picture only when the file name changed: pads are recycled
     /// and `show_sound` runs on every change of the sound.
-    fn show_background(&self, name: &str) {
+    fn show_background(&self, name: &str, crop: Option<Crop>) {
         let imp = self.imp();
+        if imp.crop.replace(crop) != crop {
+            self.queue_draw();
+        }
         if imp.background.borrow().0 == name {
             return;
         }
@@ -406,7 +413,7 @@ impl SoundPad {
                 // out instead of being refused as sounds.
                 if let Some(image) = images.iter().find_map(|path| path.to_str()) {
                     let parameter = (sound.path(), image.to_owned()).to_variant();
-                    let _ = pad.activate_action("app.set-background", Some(&parameter));
+                    let _ = pad.activate_action("app.add-background", Some(&parameter));
                 }
                 let others: Vec<&str> = others.iter().filter_map(|path| path.to_str()).collect();
                 if !others.is_empty() {

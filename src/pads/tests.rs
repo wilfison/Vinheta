@@ -47,6 +47,7 @@ fn every_field_is_read() {
             favorite: false,
             shortcut: None,
             background: None,
+            crop: None,
         }
     );
 }
@@ -394,6 +395,12 @@ fn a_saved_store_loads_back() {
             favorite: true,
             shortcut: Some('q'),
             background: Some("0123abcd.jpg".into()),
+            crop: Some(Crop {
+                x: 0.5,
+                y: 0.25,
+                width: 0.5,
+                height: 0.25,
+            }),
         },
     );
     store.set(
@@ -536,4 +543,112 @@ fn times() {
     assert_eq!(format_time(Duration::from_secs(3723)), "1:02:03");
     assert_eq!(format_remaining(Duration::ZERO), "-00:00");
     assert_eq!(format_remaining(Duration::from_secs(72)), "-01:12");
+}
+
+const QUARTER: &str =
+    r#""background": "a.jpg", "crop": {"x": 0.5, "y": 0.5, "width": 0.5, "height": 0.5}"#;
+
+#[test]
+fn the_crop_is_read_and_written() {
+    let settings = pad(QUARTER);
+    assert_eq!(
+        settings.crop,
+        Some(Crop {
+            x: 0.5,
+            y: 0.5,
+            width: 0.5,
+            height: 0.5
+        })
+    );
+    let mut store = PadStore::default();
+    store.set("/a.wav", settings.clone());
+    store.set("/b.wav", with_background("b.jpg"));
+    let text = serde_json::to_string(&File {
+        version: VERSION,
+        pads: &store.pads,
+    })
+    .unwrap();
+    assert_eq!(text.matches("\"crop\"").count(), 1);
+    assert!(text.contains(r#""crop":{"x":0.5,"y":0.5,"width":0.5,"height":0.5}"#));
+    assert_eq!(parse(&text), store);
+    assert_eq!(pad(r#""background": "a.jpg""#).crop, None);
+    assert_eq!(PadSettings::default().crop, None);
+}
+
+#[test]
+fn an_invalid_crop_is_dropped() {
+    for crop in [
+        r#"{"x": 0.8, "y": 0, "width": 0.5, "height": 0.5}"#,
+        r#"{"x": 0, "y": 0.6, "width": 0.5, "height": 0.5}"#,
+        r#"{"x": -0.1, "y": 0, "width": 0.5, "height": 0.5}"#,
+        r#"{"x": 0, "y": -0.1, "width": 0.5, "height": 0.5}"#,
+        r#"{"x": 0, "y": 0, "width": 0, "height": 0.5}"#,
+        r#"{"x": 0, "y": 0, "width": 0.5, "height": -1}"#,
+        r#"{"x": 0, "y": 0, "width": 0.5}"#,
+        r#"{"x": "0", "y": 0, "width": 0.5, "height": 0.5}"#,
+        r#"[0, 0, 0.5, 0.5]"#,
+    ] {
+        let settings = pad(&format!(r#""background": "a.jpg", "crop": {crop}"#));
+        assert_eq!(settings.crop, None, "{crop}");
+        assert_eq!(settings.background.as_deref(), Some("a.jpg"));
+    }
+    let nan = PadSettings {
+        background: Some("a.jpg".into()),
+        crop: Some(Crop {
+            x: f64::NAN,
+            y: 0.0,
+            width: 0.5,
+            height: 0.5,
+        }),
+        ..Default::default()
+    };
+    let mut store = PadStore::default();
+    store.set("/a.wav", nan);
+    assert_eq!(store.get("/a.wav").crop, None);
+    // A rounding error of the app itself is kept.
+    let edge = pad(
+        r#""background": "a.jpg", "crop": {"x": 0.5000001, "y": 0, "width": 0.5, "height": 1}"#,
+    );
+    assert!(edge.crop.is_some());
+}
+
+#[test]
+fn a_crop_without_a_background_is_dropped() {
+    let crop = r#""crop": {"x": 0, "y": 0, "width": 0.5, "height": 0.5}"#;
+    assert_eq!(pad(&format!("{crop}, \"loop\": true")).crop, None);
+    let bad_name = pad(&format!(
+        r#"{crop}, "background": "../x.jpg", "loop": true"#
+    ));
+    assert_eq!(bad_name.crop, None);
+}
+
+#[test]
+fn rename_and_move_folder_carry_the_crop() {
+    let mut store = PadStore::default();
+    store.set("/a/x.wav", pad(QUARTER));
+    assert!(store.rename("/a/x.wav", "/a/y.wav"));
+    assert!(store.get("/a/y.wav").crop.is_some());
+    assert_eq!(store.move_folder("/a", "/b"), 1);
+    assert!(store.get("/b/y.wav").crop.is_some());
+}
+
+#[test]
+fn the_crop_as_text() {
+    let crop = Crop {
+        x: 0.5,
+        y: 0.0,
+        width: 0.33333,
+        height: 1.0,
+    };
+    assert_eq!(crop.to_string(), "0.5 0 0.3333 1");
+    assert_eq!(
+        "0.5 0 0.3333 1".parse::<Crop>(),
+        Ok(Crop {
+            width: 0.3333,
+            ..crop
+        })
+    );
+    for text in ["", "1 2 3", "1 2 3 4 5", "a b c d", "1  2 3 4"] {
+        assert_eq!(text.parse::<Crop>(), Err(()), "{text}");
+    }
 }

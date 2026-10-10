@@ -12,7 +12,7 @@
 
 - `src/library.rs`: which files of a folder are sounds, what changed between two scans (`diff`), the name a pad shows for a file (`humanize`: separators become spaces, first letter uppercase), and the import of loose files (`import`: a copy under a hidden temporary name, never overwriting, with `std::fs::copy` so that the copy has a fresh modification time). No GTK types, covered by unit tests.
 - `src/pads.rs`: the pad settings (`PadSettings`, `PadColor`, `PadStore` with the JSON file), the pad keys (`shortcut_key`, and the rule that a key belongs to one entry, applied by `take_shortcut` and on load), the trigger rule (`TriggerMode`, `trigger`, and `play` for the search), the search match (`matches`), the sort order (`SortOrder`, `compare`), the move of the settings of a folder (`move_folder`), and the time format of a playing pad. No GTK types, covered by unit tests.
-- `src/backgrounds.rs`: the background images of pads. `is_image` (the extension of a format the installed gdk-pixbuf loaders read), `split` (images and other paths of a drop), `store` (the copy the app keeps of an image), and `sweep` (the removal of the copies no entry uses). It uses gdk-pixbuf, which needs no display, so it runs in the tests and off the main thread. Covered by unit tests, among them a committed JPEG with an EXIF orientation (`src/backgrounds/sideways.jpg`).
+- `src/backgrounds.rs`: the background images of pads. `is_image` (the extension of a format the installed gdk-pixbuf loaders read), `split` (images and other paths of a drop), `store` (the copy the app keeps of an image), and `sweep` (the removal of the copies no entry uses), and the geometry of the area a pad shows: `cover` (where the picture goes so that a crop covers a pad), and on `Crop` (defined in `src/pads.rs`) `fit` (the largest centered crop of an aspect), `zoomed`, `zoom`, and `moved`, with `PAD_ASPECT` (3:2, the pad of the wide layout) and a zoom from 1 to 3. It uses gdk-pixbuf, which needs no display, so it runs in the tests and off the main thread. Covered by unit tests, among them a committed JPEG with an EXIF orientation (`src/backgrounds/sideways.jpg`).
 
 ## Following a folder
 
@@ -39,11 +39,13 @@
 - The sounds folder lives in the same data directory by default, so nothing there may collide with `pads.json` and `pads.json.corrupt`.
 - What happens to a file that cannot be parsed or saved is in [application.md](application.md), "Pad settings".
 - `background` is the file name of a copy in the `backgrounds` directory, never a path: a name that is empty, hidden, or holds a `/` is dropped when the file is read.
+- `crop` (`{"x": 0.5, "y": 0.5, "width": 0.5, "height": 0.5}`) is the area of the copy the pad shows, in fractions of its width and height, so it does not depend on the size of the copy. Without it the pad shows the whole picture. A crop that leaves the picture, is empty, or has a member that is not a number is dropped when the file is read, and so is any crop of an entry without a background.
 
 ## Pad backgrounds
 
 - The image of a pad is never used where the user keeps it: `store` writes a copy into `backgrounds/` next to `pads.json`. The copy is at most 512 pixels on its longer side (never enlarged), turned upright from its EXIF orientation, a JPEG at quality 85, or a PNG when the image has an alpha channel. Its name is the start of the SHA-256 of its bytes, so the same image on two pads is one file.
 - The copy is written under a hidden temporary name and renamed, so a crash never leaves half a file under its final name.
+- The copy is never cropped: the crop is a field of the entry, so it can be changed again without the original. A new image resets it; the same image stored again (the same name) keeps it.
 - `sweep` removes the files of `backgrounds/` that no entry names. The application runs it at start and after a background is removed or replaced, but never while an image is being stored (the new copy is not named yet), and never in a session whose pad file could not be read: the images named by `pads.json.corrupt` stay until the next start.
 - A format is an image when a loader of gdk-pixbuf reads it, so it depends on the machine: PNG, JPEG, GIF, BMP, and TIFF always, WebP and HEIC with the loaders the package recommends.
 

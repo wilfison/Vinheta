@@ -106,6 +106,101 @@ pub struct PadSettings {
     /// directory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
+    /// The area of the background the pad shows; none for the whole picture.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crop: Option<Crop>,
+}
+
+/// A rectangle of a picture, in fractions of its width and height, so that
+/// it does not depend on the size of the copy.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Crop {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// What the app writes may be off by a rounding error.
+const CROP_TOLERANCE: f64 = 1e-6;
+
+impl Crop {
+    pub const WHOLE: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+    };
+
+    /// Inside the picture, and not empty.
+    pub fn is_valid(&self) -> bool {
+        let Self {
+            x,
+            y,
+            width,
+            height,
+        } = *self;
+        [x, y, width, height].iter().all(|value| value.is_finite())
+            && x >= -CROP_TOLERANCE
+            && y >= -CROP_TOLERANCE
+            && width > 0.0
+            && height > 0.0
+            && x + width <= 1.0 + CROP_TOLERANCE
+            && y + height <= 1.0 + CROP_TOLERANCE
+    }
+
+    fn from_json(value: &Value) -> Option<Self> {
+        let member = |name: &str| value.get(name).and_then(Value::as_f64);
+        Some(Self {
+            x: member("x")?,
+            y: member("y")?,
+            width: member("width")?,
+            height: member("height")?,
+        })
+    }
+}
+
+/// "x y width height", how the `Sound` object exposes it.
+impl fmt::Display for Crop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let number = |value: f64| {
+            let text = format!("{value:.4}");
+            let text = text.trim_end_matches('0').trim_end_matches('.');
+            if text == "-0" {
+                "0".to_owned()
+            } else {
+                text.to_owned()
+            }
+        };
+        write!(
+            f,
+            "{} {} {} {}",
+            number(self.x),
+            number(self.y),
+            number(self.width),
+            number(self.height)
+        )
+    }
+}
+
+impl std::str::FromStr for Crop {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        let numbers: Vec<f64> = text
+            .split(' ')
+            .map(|part| part.parse::<f64>().map_err(|_| ()))
+            .collect::<Result<_, _>>()?;
+        match numbers[..] {
+            [x, y, width, height] => Ok(Self {
+                x,
+                y,
+                width,
+                height,
+            }),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Default for PadSettings {
@@ -118,6 +213,7 @@ impl Default for PadSettings {
             favorite: false,
             shortcut: None,
             background: None,
+            crop: None,
         }
     }
 }
@@ -137,6 +233,9 @@ impl PadSettings {
         };
         self.shortcut = self.shortcut.and_then(shortcut_key);
         self.background = self.background.filter(|name| is_file_name(name));
+        self.crop = self
+            .crop
+            .filter(|crop| self.background.is_some() && crop.is_valid());
         self
     }
 
@@ -162,6 +261,7 @@ impl PadSettings {
                 .get("background")
                 .and_then(Value::as_str)
                 .map(str::to_owned),
+            crop: value.get("crop").and_then(Crop::from_json),
         }
         .normalized()
     }

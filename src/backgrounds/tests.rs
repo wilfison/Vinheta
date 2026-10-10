@@ -154,3 +154,98 @@ fn sweep_of_a_missing_directory_does_nothing() {
     let scratch = Scratch::new();
     assert_eq!(sweep(&scratch.stored(), &BTreeSet::new()), 0);
 }
+
+fn close(a: f64, b: f64) -> bool {
+    (a - b).abs() < 1e-3
+}
+
+fn close_crop(crop: Crop, expected: (f64, f64, f64, f64)) -> bool {
+    close(crop.x, expected.0)
+        && close(crop.y, expected.1)
+        && close(crop.width, expected.2)
+        && close(crop.height, expected.3)
+}
+
+#[test]
+fn fit_is_the_largest_centered_crop_of_the_aspect() {
+    let wide = Crop::fit((512.0, 384.0), PAD_ASPECT);
+    assert!(close_crop(wide, (0.0, 0.0556, 1.0, 0.8889)), "{wide:?}");
+    let tall = Crop::fit((384.0, 512.0), PAD_ASPECT);
+    assert!(close_crop(tall, (0.0, 0.25, 1.0, 0.5)), "{tall:?}");
+    let square = Crop::fit((300.0, 300.0), 1.0);
+    assert!(close_crop(square, (0.0, 0.0, 1.0, 1.0)), "{square:?}");
+    let panorama = Crop::fit((900.0, 300.0), PAD_ASPECT);
+    assert!(close_crop(panorama, (0.25, 0.0, 0.5, 1.0)), "{panorama:?}");
+}
+
+#[test]
+fn zoomed_keeps_the_center_and_the_limits() {
+    let image = (512.0, 384.0);
+    let fit = Crop::fit(image, PAD_ASPECT);
+    let two = fit.zoomed(image, PAD_ASPECT, 2.0);
+    assert!(close(two.width, fit.width / 2.0) && close(two.height, fit.height / 2.0));
+    assert!(close(two.x + two.width / 2.0, 0.5) && close(two.y + two.height / 2.0, 0.5));
+    let four = fit.zoomed(image, PAD_ASPECT, 4.0);
+    assert!(close(four.width, fit.width / MAX_ZOOM));
+    let below = fit.zoomed(image, PAD_ASPECT, 0.5);
+    assert!(close_crop(below, (fit.x, fit.y, fit.width, fit.height)));
+    // A crop at a corner, zoomed out, is pushed back inside the picture.
+    let corner = Crop {
+        x: 0.75,
+        y: 0.75,
+        width: 0.25,
+        height: 0.25,
+    };
+    let out = corner.zoomed(image, PAD_ASPECT, 1.0);
+    assert!(out.is_valid(), "{out:?}");
+    assert!(close(out.x + out.width, 1.0) && close(out.y + out.height, 1.0));
+}
+
+#[test]
+fn zoom_is_read_back() {
+    let image = (512.0, 384.0);
+    let fit = Crop::fit(image, PAD_ASPECT);
+    assert!(close(fit.zoom(image, PAD_ASPECT), 1.0));
+    assert!(close(
+        fit.zoomed(image, PAD_ASPECT, 2.0).zoom(image, PAD_ASPECT),
+        2.0
+    ));
+}
+
+#[test]
+fn moved_stops_at_the_edges() {
+    let crop = Crop {
+        x: 0.25,
+        y: 0.25,
+        width: 0.5,
+        height: 0.5,
+    };
+    assert!(close_crop(crop.moved(0.1, -0.1), (0.35, 0.15, 0.5, 0.5)));
+    assert!(close_crop(crop.moved(2.0, -2.0), (0.5, 0.0, 0.5, 0.5)));
+}
+
+#[test]
+fn cover_without_a_crop_is_what_the_pad_drew() {
+    let (x, y, width, height) = cover((512.0, 384.0), None, (144.0, 96.0));
+    assert!(close(x, 0.0) && close(y, -6.0) && close(width, 144.0) && close(height, 108.0));
+}
+
+#[test]
+fn cover_fills_the_target_with_the_crop() {
+    let right_half = Crop {
+        x: 0.5,
+        y: 0.0,
+        width: 0.5,
+        height: 1.0,
+    };
+    let (x, _, width, _) = cover((512.0, 384.0), Some(right_half), (144.0, 96.0));
+    assert!(close(x, -144.0) && close(width, 288.0), "{x} {width}");
+
+    let image = (512.0, 384.0);
+    let crop = Crop::fit(image, PAD_ASPECT).zoomed(image, PAD_ASPECT, 2.0);
+    let crop = crop.moved(0.2, 0.1);
+    let (x, y, width, height) = cover(image, Some(crop), (144.0, 96.0));
+    // The crop touches all four sides of the target.
+    assert!(close(x + crop.x * width, 0.0) && close(y + crop.y * height, 0.0));
+    assert!(close(crop.width * width, 144.0) && close(crop.height * height, 96.0));
+}

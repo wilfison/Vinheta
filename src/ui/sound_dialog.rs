@@ -51,6 +51,8 @@ mod imp {
         #[template_child]
         pub background_remove: TemplateChild<gtk::Button>,
         #[template_child]
+        pub background_adjust: TemplateChild<adw::ButtonRow>,
+        #[template_child]
         pub volume: TemplateChild<gtk::Adjustment>,
         #[template_child]
         pub volume_percent: TemplateChild<gtk::Label>,
@@ -162,7 +164,17 @@ mod imp {
             self.background_remove.connect_clicked(glib::clone!(
                 #[weak]
                 obj,
-                move |_| obj.set_background("")
+                move |_| obj.background_action("set-background", "")
+            ));
+            self.background_adjust.connect_activated(glib::clone!(
+                #[weak]
+                obj,
+                move |_| {
+                    if let Some(sound) = obj.sound() {
+                        let path = sound.path().to_variant();
+                        let _ = obj.activate_action("win.adjust-background", Some(&path));
+                    }
+                }
             ));
 
             self.shortcut_set.connect_clicked(glib::clone!(
@@ -356,6 +368,7 @@ impl SoundDialog {
         imp.background_frame.set_visible(texture.is_some());
         imp.background_remove
             .set_visible(settings.background.is_some());
+        imp.background_adjust.set_visible(texture.is_some());
         imp.background_choose.set_label(&match settings.background {
             Some(_) => gettext("Change…"),
             None => gettext("Choose…"),
@@ -382,18 +395,19 @@ impl SoundDialog {
             return;
         };
         if let Some(path) = file.path().as_deref().and_then(|path| path.to_str()) {
-            self.set_background(path);
+            self.background_action("add-background", path);
         }
     }
 
-    /// An empty `image` removes the background.
-    fn set_background(&self, image: &str) {
+    /// Activates an action of the application with the path of the sound and
+    /// an image (empty to remove the background).
+    fn background_action(&self, action: &str, image: &str) {
         let imp = self.imp();
         let (Some(app), Some(sound)) = (imp.app.upgrade(), self.sound()) else {
             return;
         };
         let parameter = (sound.path(), image.to_owned()).to_variant();
-        app.activate_action("set-background", Some(&parameter));
+        app.activate_action(action, Some(&parameter));
     }
 
     fn change(&self, change: impl FnOnce(&mut PadSettings)) {

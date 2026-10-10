@@ -35,7 +35,7 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 ```
 
 - It writes `tmp/screenshots/NAME.png`. Screenshots are temporary: read them, then delete them (`scripts/screenshot.sh --clean`).
-- `scripts/fixtures.sh` creates the folders these checks use in `tmp/fixtures` and prints them: `Fixture` (three silent pads), `Palette` with `palette.json` (one pad per color), `Loop` with `loop.json` (a 3 second pad that loops), `dialog.json` (one pad with every setting), `Many` (60 pads, enough to scroll), `Effects` (three pads, so that a search for "app" has results in two folders), `favorites.json` (two favorites in two folders and a pad named "Zebra"), and `shortcuts.json` (the keys 1 on "Air Horn", Q on "Applause", and W on "Bell" of `Effects`), `Broken` (one file that holds text, so playing it fails), `corrupt-pads.json` (not valid JSON, for `--pads`), `background.png` (a 512 by 384 picture), `photo.jpg` (a 4000 by 3000 photo, for `app.set-background`), and `background.json` (`background.png` on "Applause", which is purple, and on "Air Horn"; it needs `--background`).
+- `scripts/fixtures.sh` creates the folders these checks use in `tmp/fixtures` and prints them: `Fixture` (three silent pads), `Palette` with `palette.json` (one pad per color), `Loop` with `loop.json` (a 3 second pad that loops), `dialog.json` (one pad with every setting), `Many` (60 pads, enough to scroll), `Effects` (three pads, so that a search for "app" has results in two folders), `favorites.json` (two favorites in two folders and a pad named "Zebra"), and `shortcuts.json` (the keys 1 on "Air Horn", Q on "Applause", and W on "Bell" of `Effects`), `Broken` (one file that holds text, so playing it fails), `corrupt-pads.json` (not valid JSON, for `--pads`), `background.png` (a 512 by 384 picture), `photo.jpg` (a 4000 by 3000 photo, for `app.set-background`), `background.json` (`background.png` on "Applause", which is purple, and on "Air Horn"; it needs `--background`), and `crop.json` (the same, with the bottom right quarter of the picture as the crop of "Applause").
 - A check that creates, renames, or deletes files works on a copy of a fixture (for example under `tmp/monitor-test`), never in `tmp/fixtures`.
 - The virtual display has no window manager: the content of the window is 10 pixels narrower than the size given to `--size`. Use `--size 370,700` for the narrow layout at 360 pixels (dialogs need exactly 360).
 - A scripted import lands in `tmp/screenshot-config/data/vinheta/sounds`, and a trashed file in `tmp/screenshot-config/data/Trash`.
@@ -63,7 +63,7 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 - With every app as the target, which is the default, a sound reaches the real apps that are recording. A check that plays something audible sets the target to a fake call app first (`call-target`, or `--target` of the test binary); the case of every app is checked on the links, with the call volume at 0.
 - A level is measured on what a fake call app records from a silent fake microphone, so the real microphone never hides a quiet tone.
 - `loud_sound` of `scripts/dev-common.sh` makes a 0 dBFS tone, for the limiter. It plays only with the monitor volume at 0 and a fake call app as the target.
-- Real clicks on a list entry, drags inside the app, and typing are not simulated reliably. Check the state (the setting, the action) and test the gesture by hand. A click on the switch of an `AdwSwitchRow` is reliable (`--click X,Y` then `--expect-setting`). A drop of files from outside the app is real with `--drop` (`drop_files` of `scripts/dev-common.sh`).
+- Real clicks on a list entry and typing are not simulated reliably. Check the state (the setting, the action) and test the gesture by hand. A click on the switch of an `AdwSwitchRow` is reliable (`--click X,Y` then `--expect-setting`). A mouse drag inside the app is real when it is one `--exec` step with the pointer moved in steps: `xdotool mousemove X Y mousedown 1 sleep 0.2 mousemove X2 Y sleep 0.2 mouseup 1` moved the volume slider of the pad dialog and the picture of "Adjust Background" (2026-10-10); check the result on a value (the pad file), not only on a picture. The wheel is `xdotool click 4` and `click 5`. A drop of files from outside the app is real with `--drop` (`drop_files` of `scripts/dev-common.sh`).
 
 ## Tested by hand only
 
@@ -75,6 +75,7 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 - Switching between two real outputs.
 - In the pad dialog: typing a name, clicking a swatch, and listening for a key with the keyboard only (Tab to the button, Enter, a key, Escape, Backspace).
 - The long press and the Menu key on a pad.
+- A touchpad scroll and a touch drag on the picture of "Adjust Background" (the mouse wheel and a mouse drag are scripted).
 - Picking an entry of the trigger mode row.
 - Typing in the search and pressing Enter, and typing a tab name.
 - A keyboard layout where digits need Shift.

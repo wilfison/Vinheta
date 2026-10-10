@@ -8,7 +8,7 @@ The hard part of the app is the audio, not the interface: see [audio.md](audio.m
 
 - The window shows one tab per folder, with a grid of pads. A click plays a sound and a second click stops it, through the audio engine (`src/audio/`).
 - A sound plays on the headphones and into the apps that are recording a microphone, so a call hears it with the voice of the user. "Send sounds to call" turns the second part off, and "Send Sounds To" restricts it to one app. A loud sound reaches the call at -6 dBFS at most, so it does not clip there; "Limit Call Level" in the preferences turns that off.
-- A pad has a name, a color, a background image, a volume, a loop option, and a key, edited from its context menu and its dialog and stored in `pads.json`. An image dropped on a pad becomes its background; the app keeps a reduced copy of it. While it plays it shows its times and a border that gets shorter as the sound goes on, and the tab row shows how many sounds are playing.
+- A pad has a name, a color, a background image, a volume, a loop option, and a key, edited from its context menu and its dialog and stored in `pads.json`. An image dropped on a pad becomes its background; the app keeps a reduced copy of it, and the user drags and zooms it to choose the part the pad shows. While it plays it shows its times and a border that gets shorter as the sound goes on, and the tab row shows how many sounds are playing.
 - The library follows its folders while the app runs (files added, removed, renamed). Loose files are added with "Add Sounds…" or dropped on the window: they are copied into the sounds folder, which is a tab.
 - Pads can be favorites (a star, and a "Favorites" tab), a search finds sounds in every folder and locates them, the pads are sorted by name or by most recent file, and tabs can be renamed and moved.
 - The bottom bar has "Stop all", the "Headphones" and "Call" volume sliders, the selector of the app the sounds are sent to, and the "Send sounds to call" switch. Below 780 pixels of width it is stacked in rows and the pads get narrower; the window works down to 360 pixels.
@@ -57,6 +57,5 @@ The SVGs in `mockups/` are the visual reference:
 - More languages.
 - One limiter for every sound together: each playback has its own, so two loud sounds playing at once can still clip the call.
 - Global shortcuts ([shortcuts.md](shortcuts.md) has what was measured).
-- Cropping or moving the background of a pad: the picture is centered and covers the pad.
 - Formats gdk-pixbuf cannot read (with ImageMagick, for example) as pad backgrounds.
 - Durations on idle pads would need a scan of each folder (for example with `GstDiscoverer`), done asynchronously so that a folder with hundreds of files stays fast.

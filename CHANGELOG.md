@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Loud sounds no longer clip the call: each sound reaches the call at -6 dBFS at most, with no distortion, while the headphones hear it at its full level. "Limit Call Level" in the preferences turns it off.
+- The background of a pad can be placed and zoomed: "Adjust Background" opens right after an image is dropped on a pad or chosen in its dialog, and again from "Adjust Background…" in the pad dialog. The picture is dragged behind a frame shaped like a pad, and zoomed up to three times with the wheel, the slider, or the keys.
 
 ## [1.2.0] - 2026-10-06
 

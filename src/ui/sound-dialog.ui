@@ -81,6 +81,13 @@
                   </object>
                 </child>
                 <child>
+                  <object class="AdwButtonRow" id="background_adjust">
+                    <property name="title" translatable="yes">Adjust Background…</property>
+                    <property name="end-icon-name">go-next-symbolic</property>
+                    <property name="visible">False</property>
+                  </object>
+                </child>
+                <child>
                   <object class="AdwActionRow">
                     <property name="title" translatable="yes">Volume</property>
                     <child type="suffix">

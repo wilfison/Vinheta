@@ -20,6 +20,8 @@
 
 //! Interface components: each widget with its `.ui` template.
 
+pub mod background_dialog;
+pub mod background_editor;
 pub mod call_guide_dialog;
 pub mod device_selector;
 pub mod folder_page;

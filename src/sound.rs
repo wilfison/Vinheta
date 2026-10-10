@@ -25,7 +25,7 @@ use std::time::{Duration, SystemTime};
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
-use vinheta::pads::{PadColor, PadSettings};
+use vinheta::pads::{Crop, PadColor, PadSettings};
 
 mod imp {
     use super::*;
@@ -60,6 +60,10 @@ mod imp {
         /// empty.
         #[property(get)]
         pub background: RefCell<String>,
+        /// The area of the background shown, as "x y width height", or
+        /// empty for the whole picture.
+        #[property(get = Self::crop_text, name = "crop", type = String)]
+        pub crop: Cell<Option<Crop>>,
         /// When the file was last modified, in seconds since the epoch.
         #[property(get, set, construct)]
         modified: Cell<i64>,
@@ -84,6 +88,7 @@ mod imp {
                 favorite: Cell::new(false),
                 shortcut: RefCell::default(),
                 background: RefCell::default(),
+                crop: Cell::new(None),
                 modified: Cell::new(0),
                 elapsed: Cell::new(-1),
                 duration: Cell::new(-1),
@@ -92,6 +97,13 @@ mod imp {
     }
 
     impl Sound {
+        fn crop_text(&self) -> String {
+            self.crop
+                .get()
+                .map(|crop| crop.to_string())
+                .unwrap_or_default()
+        }
+
         fn display_name(&self) -> String {
             let custom = self.custom_name.borrow().clone();
             custom.unwrap_or_else(|| self.name.get().cloned().unwrap_or_default())
@@ -161,6 +173,7 @@ impl Sound {
             favorite: imp.favorite.get(),
             shortcut: imp.shortcut.borrow().chars().next(),
             background: Some(imp.background.borrow().clone()).filter(|name| !name.is_empty()),
+            crop: imp.crop.get(),
         }
     }
 
@@ -191,6 +204,14 @@ impl Sound {
         if imp.background.replace(background.clone()) != background {
             self.notify_background();
         }
+        if imp.crop.replace(settings.crop) != settings.crop {
+            self.notify_crop();
+        }
+    }
+
+    /// The area of the background the pad shows, `None` for all of it.
+    pub fn crop_area(&self) -> Option<Crop> {
+        self.imp().crop.get()
     }
 
     /// How far along the playback is, or `None` when it is not known.

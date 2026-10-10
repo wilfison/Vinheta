@@ -82,6 +82,14 @@ cat >"$fixtures/background.json" <<JSON
 }}
 JSON
 
+cat >"$fixtures/crop.json" <<JSON
+{"version": 1, "pads": {
+  "$fixtures/Fixture/Applause.wav": {"background": "background.png", "color": "purple",
+    "crop": {"x": 0.5, "y": 0.5, "width": 0.5, "height": 0.5}},
+  "$fixtures/Fixture/Air Horn.wav": {"background": "background.png"}
+}}
+JSON
+
 cat <<LIST
 $fixtures/Fixture       Air Horn, Applause, Crickets (20 s, silent)
 $fixtures/Palette       eight pads; --pads $fixtures/palette.json colors seven
@@ -97,4 +105,6 @@ $fixtures/background.png  a 512 by 384 picture, for --background
 $fixtures/photo.jpg     a 4000 by 3000 photo, for app.set-background
 $fixtures/background.json  background.png on Applause (purple) and Air Horn
                         (no color); needs --background $fixtures/background.png
+$fixtures/crop.json     the same, with the bottom right quarter of the picture
+                        as the crop of Applause; needs --background too
 LIST

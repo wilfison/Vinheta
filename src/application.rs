@@ -319,7 +319,18 @@ impl VinhetaApplication {
             .activate(move |app: &Self, _, parameter| {
                 let parameter = parameter.and_then(|parameter| parameter.get::<(String, String)>());
                 if let Some((path, image)) = parameter {
-                    app.set_background(&path, &image);
+                    app.set_background(&path, &image, false);
+                }
+            })
+            .build();
+        // The same with an image, and then the dialog that adjusts it: what
+        // a drop on a pad and the file chooser of the pad dialog do.
+        let add_background_action = gio::ActionEntry::builder("add-background")
+            .parameter_type(Some(glib::VariantTy::new("(ss)").unwrap()))
+            .activate(move |app: &Self, _, parameter| {
+                let parameter = parameter.and_then(|parameter| parameter.get::<(String, String)>());
+                if let Some((path, image)) = parameter.filter(|(_, image)| !image.is_empty()) {
+                    app.set_background(&path, &image, true);
                 }
             })
             .build();
@@ -373,6 +384,7 @@ impl VinhetaApplication {
             reset_sound_action,
             set_shortcut_action,
             set_background_action,
+            add_background_action,
             trigger_shortcut_action,
             stop_all_action,
         ]);
@@ -669,8 +681,9 @@ impl VinhetaApplication {
     }
 
     /// Stores a reduced copy of the image off the main thread and makes it
-    /// the background of the sound. An empty `image` removes the background.
-    fn set_background(&self, path: &str, image: &str) {
+    /// the background of the sound, then opens the dialog that adjusts it
+    /// when `adjust` is set. An empty `image` removes the background.
+    fn set_background(&self, path: &str, image: &str, adjust: bool) {
         let Some(sound) = self.find_sound(path) else {
             glib::g_debug!("vinheta", "no sound {path} to give a background");
             return;
@@ -678,6 +691,7 @@ impl VinhetaApplication {
         if image.is_empty() {
             let mut settings = sound.settings();
             settings.background = None;
+            settings.crop = None;
             self.update_sound(&sound, settings);
             return;
         }
@@ -704,8 +718,19 @@ impl VinhetaApplication {
                         imp.textures.borrow_mut().remove(&name);
                         if let Some(sound) = app.find_sound(&path) {
                             let mut settings = sound.settings();
+                            // A crop is an area of the picture it was made for.
+                            if settings.background.as_deref() != Some(name.as_str()) {
+                                settings.crop = None;
+                            }
                             settings.background = Some(name);
                             app.update_sound(&sound, settings);
+                            if let (true, Some(window)) = (adjust, app.window()) {
+                                let _ = WidgetExt::activate_action(
+                                    &window,
+                                    "win.adjust-background",
+                                    Some(&path.to_variant()),
+                                );
+                            }
                         }
                     }
                     Ok(Err(error)) => {

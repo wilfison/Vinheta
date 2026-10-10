@@ -10,7 +10,7 @@ A map of the source tree. Each area has its own document.
 | `src/ui/` | The widgets, their `.ui` templates, and the CSS | [interface.md](interface.md), [shortcuts.md](shortcuts.md) |
 | `src/library.rs` | Folder scan, diff, pad names, import of loose files | [library.md](library.md) |
 | `src/pads.rs` | Pad settings and their file, keys, trigger rule, search match, sort order | [library.md](library.md) |
-| `src/backgrounds.rs` | Which files are images, the reduced copy of a pad background, the removal of unused copies | [library.md](library.md) |
+| `src/backgrounds.rs` | Which files are images, the reduced copy of a pad background, the removal of unused copies, the geometry of the area a pad shows | [library.md](library.md) |
 | `src/devices.rs` | The entries of a device selector | [interface.md](interface.md) |
 | `src/editors.rs` | Which installed app opens a sound for editing | [application.md](application.md) |
 | `src/audio/` | The audio engine (PipeWire and GStreamer); `limiter.rs` is the limiter of the call branch | [audio.md](audio.md) |

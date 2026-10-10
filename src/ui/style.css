@@ -356,3 +356,10 @@ gridview.pads > child > .pad.drop-target {
   color: var(--accent-fg-color);
   background-color: var(--accent-bg-color);
 }
+
+/* The editor of a pad background takes the keys: show when it has them. */
+background-editor:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+  border-radius: 12px;
+}

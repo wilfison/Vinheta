@@ -30,6 +30,7 @@ use gtk::{gdk, gio, glib};
 use vinheta::library::{self, ImportReport, SkipReason};
 use vinheta::pads::{self, SortKey, SortOrder};
 
+use super::background_dialog::BackgroundDialog;
 use super::device_selector;
 use super::folder_page::FolderPage;
 use super::sound_dialog::SoundDialog;
@@ -94,6 +95,7 @@ mod imp {
         pub tab_menu: TemplateChild<gio::MenuModel>,
         pub settings: OnceCell<gio::Settings>,
         pub sound_dialog: glib::WeakRef<SoundDialog>,
+        pub background_dialog: glib::WeakRef<BackgroundDialog>,
         /// The order of the pads in every view.
         pub sorter: OnceCell<gtk::CustomSorter>,
         pub sort_order: Rc<Cell<SortOrder>>,
@@ -689,6 +691,7 @@ impl VinhetaWindow {
             move_right,
             search,
             path_action("edit-sound", Self::edit_sound),
+            path_action("adjust-background", Self::adjust_background),
             path_action("locate-sound", Self::locate_sound),
             path_action("activate-result", Self::activate_result),
         ]);
@@ -710,6 +713,26 @@ impl VinhetaWindow {
         };
         let dialog = SoundDialog::new(&app, &sound);
         imp.sound_dialog.set(Some(&dialog));
+        dialog.present(Some(self));
+    }
+
+    /// One at a time; it goes over the dialog of the pad when that is open.
+    fn adjust_background(&self, path: &str) {
+        let imp = self.imp();
+        if imp.background_dialog.upgrade().is_some() {
+            glib::g_debug!("vinheta", "a background is already being adjusted");
+            return;
+        }
+        let (Some(app), Some(sound)) = (app(), self.find_sound(path)) else {
+            glib::g_debug!("vinheta", "no sound {path} to adjust");
+            return;
+        };
+        let Some(texture) = app.background_texture(&sound.background()) else {
+            glib::g_debug!("vinheta", "{path} has no background to adjust");
+            return;
+        };
+        let dialog = BackgroundDialog::new(&app, &sound, &texture);
+        imp.background_dialog.set(Some(&dialog));
         dialog.present(Some(self));
     }
 

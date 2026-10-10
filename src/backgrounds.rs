@@ -19,7 +19,8 @@
  */
 
 //! The background images of pads: which files are images, the reduced copy
-//! the app keeps of one, and the removal of copies no pad uses. GdkPixbuf
+//! the app keeps of one, the removal of copies no pad uses, and the geometry
+//! of the area a pad shows. GdkPixbuf
 //! needs no display, so this runs in the tests and off the main thread.
 
 use std::collections::BTreeSet;
@@ -29,6 +30,8 @@ use std::sync::OnceLock;
 
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::glib;
+
+use crate::pads::Crop;
 
 /// The longer side of a stored copy, enough for a pad at twice the scale.
 pub const MAX_SIZE: i32 = 512;
@@ -136,6 +139,79 @@ pub fn sweep(dir: &Path, referenced: &BTreeSet<String>) -> usize {
         }
     }
     removed
+}
+
+/// A width and a height.
+pub type Size = (f64, f64);
+/// An x, a y, a width, and a height.
+pub type Rect = (f64, f64, f64, f64);
+
+/// The width over the height of a pad of the wide layout, 144 by 96: the
+/// frame the background is adjusted in.
+pub const PAD_ASPECT: f64 = 1.5;
+pub const MIN_ZOOM: f64 = 1.0;
+/// The copies are 512 pixels at most, so a larger zoom would be blurry.
+pub const MAX_ZOOM: f64 = 3.0;
+
+impl Crop {
+    /// The largest centered crop of that aspect inside the picture.
+    pub fn fit(image: Size, aspect: f64) -> Self {
+        let image_aspect = image.0 / image.1;
+        let (width, height) = if image_aspect > aspect {
+            (aspect / image_aspect, 1.0)
+        } else {
+            (1.0, image_aspect / aspect)
+        };
+        Self {
+            x: (1.0 - width) / 2.0,
+            y: (1.0 - height) / 2.0,
+            width,
+            height,
+        }
+    }
+
+    /// The crop of the fitted aspect that is `zoom` times smaller than the
+    /// fitted one, around the same center, kept inside the picture.
+    pub fn zoomed(self, image: Size, aspect: f64, zoom: f64) -> Self {
+        let fit = Self::fit(image, aspect);
+        let zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        let (width, height) = (fit.width / zoom, fit.height / zoom);
+        let (center_x, center_y) = (self.x + self.width / 2.0, self.y + self.height / 2.0);
+        Self {
+            x: center_x - width / 2.0,
+            y: center_y - height / 2.0,
+            width,
+            height,
+        }
+        .moved(0.0, 0.0)
+    }
+
+    /// How many times smaller than the fitted crop this one is.
+    pub fn zoom(self, image: Size, aspect: f64) -> f64 {
+        Self::fit(image, aspect).width / self.width
+    }
+
+    /// Moved by fractions of the picture, without leaving it.
+    pub fn moved(self, dx: f64, dy: f64) -> Self {
+        let clamp = |value: f64, size: f64| value.clamp(0.0, (1.0 - size).max(0.0));
+        Self {
+            x: clamp(self.x + dx, self.width),
+            y: clamp(self.y + dy, self.height),
+            ..self
+        }
+    }
+}
+
+/// Where the whole picture goes so that the crop (or the whole picture)
+/// covers the target, centered, keeping its aspect.
+pub fn cover(image: Size, crop: Option<Crop>, target: Size) -> Rect {
+    let crop = crop.unwrap_or(Crop::WHOLE);
+    let (crop_width, crop_height) = (crop.width * image.0, crop.height * image.1);
+    let scale = (target.0 / crop_width).max(target.1 / crop_height);
+    let (width, height) = (image.0 * scale, image.1 * scale);
+    let x = target.0 / 2.0 - (crop.x + crop.width / 2.0) * width;
+    let y = target.1 / 2.0 - (crop.y + crop.height / 2.0) * height;
+    (x, y, width, height)
 }
 
 #[cfg(test)]
