@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 15:46-0300\n"
+"POT-Creation-Date: 2026-10-10 16:36-0300\n"
 "PO-Revision-Date: 2026-10-10 19:00-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: French\n"
@@ -30,8 +30,8 @@ msgstr "Jouez des sons dans vos appels"
 #: data/io.github.wilfison.Vinheta.desktop.in:9
 msgid "soundboard;sounds;effects;jingle;microphone;call;meeting;stream;"
 msgstr ""
-"soundboard;sons;effets;jingle;effets sonores;microphone;micro;appel;réunion;"
-"stream;direct;"
+"soundboard;sons;effets;jingle;effets "
+"sonores;microphone;micro;appel;réunion;stream;direct;"
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:6
 msgid "Sound folders"
@@ -243,13 +243,23 @@ msgstr "Le guide de configuration d’appel"
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
 msgid ""
+"Loud sounds are kept at -6 dBFS in the call, the background of a pad can be "
+"placed and zoomed, and the interface speaks Spanish, Portuguese, German, and "
+"French."
+msgstr ""
+"Les sons forts restent à -6 dBFS dans l’appel, le fond d’un pad peut être "
+"placé et zoomé, et l’interface parle espagnol, portugais, allemand et "
+"français."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+msgid ""
 "A pad can have a background image, and the audio comes back by itself when "
 "PipeWire restarts."
 msgstr ""
 "Un pad peut avoir une image de fond, et l’audio revient tout seul quand "
 "PipeWire redémarre."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
 msgid ""
 "The sounds play straight into the apps that use your microphone, with no "
 "virtual microphone to choose, and the app has a new icon."
@@ -258,7 +268,7 @@ msgstr ""
 "microphone, sans microphone virtuel à choisir, et l’application a une "
 "nouvelle icône."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:65
 msgid ""
 "The first release: folders as tabs, pads with a name, a color, a volume, a "
 "loop and a key, favorites, search, and a virtual microphone that sends the "

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 15:46-0300\n"
+"POT-Creation-Date: 2026-10-10 16:36-0300\n"
 "PO-Revision-Date: 2026-10-10 18:00-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Spanish\n"
@@ -244,13 +244,23 @@ msgstr "La guía de configuración de llamada"
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
 msgid ""
+"Loud sounds are kept at -6 dBFS in the call, the background of a pad can be "
+"placed and zoomed, and the interface speaks Spanish, Portuguese, German, and "
+"French."
+msgstr ""
+"Los sonidos fuertes se mantienen a -6 dBFS en la llamada, el fondo de un pad "
+"se puede colocar y ampliar, y la interfaz habla español, portugués, alemán y "
+"francés."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+msgid ""
 "A pad can have a background image, and the audio comes back by itself when "
 "PipeWire restarts."
 msgstr ""
 "Un pad puede tener una imagen de fondo, y el audio vuelve solo cuando "
 "PipeWire se reinicia."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
 msgid ""
 "The sounds play straight into the apps that use your microphone, with no "
 "virtual microphone to choose, and the app has a new icon."
@@ -259,7 +269,7 @@ msgstr ""
 "micrófono, sin micrófono virtual que elegir, y la aplicación tiene un icono "
 "nuevo."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:65
 msgid ""
 "The first release: folders as tabs, pads with a name, a color, a volume, a "
 "loop and a key, favorites, search, and a virtual microphone that sends the "
@@ -470,7 +480,8 @@ msgstr "Enviar sonidos a la llamada"
 
 #: src/ui/preferences-dialog.ui:21
 msgid "Play sounds into the apps that are using the microphone"
-msgstr "Reproduce los sonidos en las aplicaciones que están usando el micrófono"
+msgstr ""
+"Reproduce los sonidos en las aplicaciones que están usando el micrófono"
 
 #: src/ui/preferences-dialog.ui:26 src/ui/window.rs:333 src/ui/window.ui:448
 #: src/ui/window.ui:512
@@ -539,7 +550,8 @@ msgstr "Editor de audio"
 
 #: src/ui/preferences_dialog.rs:96
 msgid "Sounds play together; a click on a playing pad stops it"
-msgstr "Los sonidos suenan juntos; un clic en un pad que está sonando lo detiene"
+msgstr ""
+"Los sonidos suenan juntos; un clic en un pad que está sonando lo detiene"
 
 #: src/ui/preferences_dialog.rs:98
 msgid "A click on a playing pad starts it again"

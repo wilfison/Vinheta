@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 15:46-0300\n"
+"POT-Creation-Date: 2026-10-10 16:36-0300\n"
 "PO-Revision-Date: 2026-10-10 19:00-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: German\n"
@@ -29,9 +29,7 @@ msgstr "Sounds in Ihre Anrufe einspielen"
 
 #: data/io.github.wilfison.Vinheta.desktop.in:9
 msgid "soundboard;sounds;effects;jingle;microphone;call;meeting;stream;"
-msgstr ""
-"soundboard;sounds;klänge;effekte;jingle;mikrofon;anruf;besprechung;meeting;"
-"stream;"
+msgstr "soundboard;sounds;klänge;effekte;jingle;mikrofon;anruf;besprechung;meeting;stream;"
 
 #: data/io.github.wilfison.Vinheta.gschema.xml:6
 msgid "Sound folders"
@@ -245,13 +243,23 @@ msgstr "Die Anleitung zur Anrufeinrichtung"
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
 msgid ""
+"Loud sounds are kept at -6 dBFS in the call, the background of a pad can be "
+"placed and zoomed, and the interface speaks Spanish, Portuguese, German, and "
+"French."
+msgstr ""
+"Laute Klänge bleiben im Anruf bei -6 dBFS, der Hintergrund eines Pads kann "
+"verschoben und gezoomt werden, und die Oberfläche spricht Spanisch, "
+"Portugiesisch, Deutsch und Französisch."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+msgid ""
 "A pad can have a background image, and the audio comes back by itself when "
 "PipeWire restarts."
 msgstr ""
 "Ein Pad kann ein Hintergrundbild haben, und das Audio kommt von selbst "
 "zurück, wenn PipeWire neu startet."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
 msgid ""
 "The sounds play straight into the apps that use your microphone, with no "
 "virtual microphone to choose, and the app has a new icon."
@@ -260,7 +268,7 @@ msgstr ""
 "verwenden, ohne ein virtuelles Mikrofon auszuwählen, und die App hat ein "
 "neues Symbol."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:65
 msgid ""
 "The first release: folders as tabs, pads with a name, a color, a volume, a "
 "loop and a key, favorites, search, and a virtual microphone that sends the "
@@ -310,7 +318,8 @@ msgstr "Der Audio-Editor konnte nicht geöffnet werden"
 #. Translators: {} is the name of an audio output.
 #: src/application.rs:1171
 msgid "Output “{}” is not connected. Using the system default."
-msgstr "Die Ausgabe „{}“ ist nicht verbunden. Die Systemvorgabe wird verwendet."
+msgstr ""
+"Die Ausgabe „{}“ ist nicht verbunden. Die Systemvorgabe wird verwendet."
 
 #. Translators: {} is the name of a sound.
 #: src/application.rs:1263

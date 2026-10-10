@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 15:46-0300\n"
+"POT-Creation-Date: 2026-10-10 16:36-0300\n"
 "PO-Revision-Date: 2026-10-10 18:00-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Portuguese\n"
@@ -240,13 +240,23 @@ msgstr "O guia de configuração de chamada"
 
 #: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
 msgid ""
+"Loud sounds are kept at -6 dBFS in the call, the background of a pad can be "
+"placed and zoomed, and the interface speaks Spanish, Portuguese, German, and "
+"French."
+msgstr ""
+"Os sons altos ficam a -6 dBFS na chamada, o fundo de um pad pode ser "
+"posicionado e ampliado, e a interface fala espanhol, português, alemão e "
+"francês."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+msgid ""
 "A pad can have a background image, and the audio comes back by itself when "
 "PipeWire restarts."
 msgstr ""
 "Um pad pode ter uma imagem de fundo, e o áudio volta sozinho quando o "
 "PipeWire reinicia."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
 msgid ""
 "The sounds play straight into the apps that use your microphone, with no "
 "virtual microphone to choose, and the app has a new icon."
@@ -254,7 +264,7 @@ msgstr ""
 "Os sons tocam diretamente nas aplicações que usam o seu microfone, sem "
 "microfone virtual para escolher, e a aplicação tem um ícone novo."
 
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:65
 msgid ""
 "The first release: folders as tabs, pads with a name, a color, a volume, a "
 "loop and a key, favorites, search, and a virtual microphone that sends the "

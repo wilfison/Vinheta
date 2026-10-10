@@ -4,7 +4,7 @@ All notable changes to Vinheta are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-10-10
 
 ### Added
 
@@ -56,7 +56,7 @@ The first public release.
 - A narrow layout: the window works down to 360 pixels of width.
 - A Brazilian Portuguese translation.
 
-[Unreleased]: https://github.com/wilfison/Vinheta/compare/v1.2.0...HEAD
+[1.3.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.3.0
 [1.2.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.2.0
 [1.1.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.1.0
 [1.0.0]: https://github.com/wilfison/Vinheta/releases/tag/v1.0.0
