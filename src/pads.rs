@@ -239,6 +239,16 @@ impl PadSettings {
         self
     }
 
+    /// With another background, or none. A crop is an area of the picture
+    /// it was made for, so it only stays with the same picture.
+    pub fn with_background(mut self, name: Option<String>) -> Self {
+        if name.is_none() || name != self.background {
+            self.crop = None;
+        }
+        self.background = name;
+        self
+    }
+
     /// A field of the wrong type goes back to its default.
     fn from_json(value: &Value) -> Self {
         Self {

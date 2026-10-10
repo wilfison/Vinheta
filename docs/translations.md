@@ -5,12 +5,13 @@ UI strings are written in English in the code and marked as translatable (gettex
 After adding or changing a string:
 
 ```sh
-meson compile -C build vinheta-pot            # writes po/vinheta.pot (git-ignored)
-msgmerge --update --backup=none po/pt_BR.po po/vinheta.pot
-# translate the new and the fuzzy entries of po/pt_BR.po, then:
+scripts/check-translations.sh --update        # merges the strings into po/*.po and lists the ones to translate
+# translate them in po/pt_BR.po, then:
 scripts/check-translations.sh
 scripts/screenshot.sh NAME --lang pt_BR ...   # read the result
 ```
+
+- `--update` merges without fuzzy matching: `msgmerge` alone proposed "Fundo" (the translation of "Background") for "Adjust Background", a guess that is easy to keep by mistake. It also drops the obsolete strings.
 
 - `xgettext` does not know Rust and reads the `.rs` files as C, with warnings. It has found every call so far; the check compares the number of `gettext(` and `ngettext(` calls of each file with the template.
 - Product names ("Vinheta", "PipeWire") are not translated, the `{}` placeholders and the typographic quotes are kept, and an accelerator underscore must sit on a letter that no other item of the same menu uses.

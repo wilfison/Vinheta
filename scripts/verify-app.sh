@@ -4,7 +4,9 @@
 # switch and the call volume measured on what a fake call app records, the
 # app the sounds are sent to, the monitor output, the pad settings (volume,
 # loop), the trigger modes, files removed and renamed while the app runs,
-# the settings of deleted files dropped at the start, a pad key, audio
+# the settings of deleted files dropped at the start, a pad key, the
+# background of a pad and the dialog that places it (keys, a drag, the
+# wheel, Escape), audio
 # coming back after "Try Again" and by itself after a lost connection, and
 # the cleanup on exit.
 # It uses the real PipeWire: a quiet tone (-45 dBFS) plays on the default
@@ -70,6 +72,11 @@ mkdir -p "$(dirname "$pads")"
 cat >"$pads" <<JSON
 {"version": 1, "pads": {"$tone": {"shortcut": "q"}, "$quiet": {"volume": 0.5}, "$looped": {"loop": true}, "$kept": {"color": "red"}, "$deleted": {"loop": true}, "$unmounted": {"loop": true}}}
 JSON
+# Two pictures for the background of a pad, outside the folder of sounds.
+picture="$work/picture.png"
+other_picture="$work/other-picture.png"
+ffmpeg -loglevel error -f lavfi -i testsrc2=size=640x480 -frames:v 1 "$picture" || exit 1
+ffmpeg -loglevel error -f lavfi -i smptebars=size=640x480 -frames:v 1 "$other_picture" || exit 1
 test_sink=vinheta-app-test-sink
 test_mic=vinheta-app-test-mic
 # The fake call apps, as the app names them.
@@ -103,6 +110,32 @@ pad_field() {
     python3 -c 'import json, sys
 pad = json.load(open(sys.argv[1]))["pads"].get(sys.argv[2])
 print("no entry" if pad is None else json.dumps(pad.get(sys.argv[3])))' "$pads" "$1" "$2"
+}
+# pad_is PATH FIELD VALUE: a field of the entry of a pad (crop.width for a
+# nested one) has that value; numbers with 3 decimals, none when missing.
+pad_is() {
+    [ "$(python3 -c 'import json, sys
+pad = json.load(open(sys.argv[1]))["pads"].get(sys.argv[2], {})
+for part in sys.argv[3].split("."):
+    pad = pad.get(part) if isinstance(pad, dict) else None
+if pad is None:
+    print("none")
+elif isinstance(pad, float):
+    print(f"{pad:.3f}".rstrip("0").rstrip("."))
+else:
+    print(pad)' "$pads" "$1" "$2")" = "$3" ]
+}
+has_background() { python3 -c 'import json, sys
+pad = json.load(open(sys.argv[1]))["pads"].get(sys.argv[2], {})
+sys.exit(0 if str(pad.get("background", "")).endswith(".jpg") else 1)' "$pads" "$1"; }
+# adjust_with KEYS...: opens "Adjust Background" for the loud tone and
+# presses the keys; the window gets them once the pointer is over it.
+adjust_with() {
+    activate win.adjust-background "'$loud'"
+    sleep 0.7
+    xdotool mousemove 500 400
+    key "$@"
+    sleep 1
 }
 loop_saved() { [ "$(pad_field "$tone" loop)" = true ]; }
 entry_removed() { [ "$(pad_field "$quiet" volume)" = "no entry" ]; }
@@ -357,6 +390,37 @@ session() {
         sleep 1
         off=$(call_level key-off)
         check "a pad key starts and stops a sound ($on dBFS, then $off dBFS)" at_least "$on" "$off" 20
+    fi
+
+    # The dialog is centered in the window: its frame is around 500,324.
+    if section "pad background"; then
+        activate set-background "('$loud', '$picture')"
+        check "an image set through the action is stored and saved" within 3 has_background "$loud"
+        adjust_with plus plus plus plus Right Right Return
+        check "the keys zoom and move the picture, Return applies" within 3 eval \
+            "pad_is '$loud' crop.width 0.5 && pad_is '$loud' crop.x 0.27"
+        adjust_with plus Escape
+        check "Escape leaves the crop as it was" pad_is "$loud" crop.width 0.5
+        activate win.adjust-background "'$loud'"
+        sleep 0.7
+        xdotool mousemove 500 324 mousedown 1 sleep 0.2 mousemove 460 324 sleep 0.2 mousemove 420 324 sleep 0.2 mouseup 1
+        key Return
+        check "a drag of 80 pixels moves the crop by 80/294 of its width" within 3 pad_is "$loud" crop.x 0.406
+        activate win.adjust-background "'$loud'"
+        sleep 0.7
+        xdotool mousemove 500 324 click 4
+        key Return
+        check "a notch of the wheel zooms by 1.1" within 3 pad_is "$loud" crop.width 0.455
+        activate set-background "('$loud', '$other_picture')"
+        check "another picture drops the crop" within 3 eval \
+            "has_background '$loud' && pad_is '$loud' crop none"
+        activate add-background "('$loud', '$picture')"
+        sleep 1.5
+        xdotool mousemove 500 400
+        key plus plus plus plus Return
+        check "add-background opens the dialog on the new picture" within 3 pad_is "$loud" crop.width 0.5
+        activate set-background "('$loud', '')"
+        check "removing the picture removes the crop" within 3 pad_is "$loud" background none
     fi
 
     # The app starts while its PipeWire instance (a private one, with no

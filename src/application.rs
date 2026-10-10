@@ -689,10 +689,7 @@ impl VinhetaApplication {
             return;
         };
         if image.is_empty() {
-            let mut settings = sound.settings();
-            settings.background = None;
-            settings.crop = None;
-            self.update_sound(&sound, settings);
+            self.update_sound(&sound, sound.settings().with_background(None));
             return;
         }
         let image = PathBuf::from(image);
@@ -717,12 +714,7 @@ impl VinhetaApplication {
                         // A file that could not be loaded before is there now.
                         imp.textures.borrow_mut().remove(&name);
                         if let Some(sound) = app.find_sound(&path) {
-                            let mut settings = sound.settings();
-                            // A crop is an area of the picture it was made for.
-                            if settings.background.as_deref() != Some(name.as_str()) {
-                                settings.crop = None;
-                            }
-                            settings.background = Some(name);
+                            let settings = sound.settings().with_background(Some(name));
                             app.update_sound(&sound, settings);
                             if let (true, Some(window)) = (adjust, app.window()) {
                                 let _ = WidgetExt::activate_action(

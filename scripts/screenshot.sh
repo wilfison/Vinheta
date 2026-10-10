@@ -69,10 +69,17 @@ Steps run in the given order once the window is up, before the capture:
 --expect-setting 'KEY VALUE'  fails the run unless the key of the app's
                settings has that value, as "gsettings get" prints it (false,
                0.5, 'text'); it waits up to 2 seconds for it
+--expect-pad 'FIELD VALUE SOUND'  fails the run unless the pad file the
+               app wrote has that value for the absolute path SOUND. FIELD
+               may be nested (crop.width); a number is compared with 3
+               decimals (0.5, 0.386), a missing field is none, true and
+               false are lower case. It waits up to 2 seconds (a change is
+               saved within half a second)
 --expect-playing N  fails the run unless N sounds are playing (the call
                streams of the app in PipeWire); it waits up to 2 seconds
---exec COMMAND runs a shell command; a status other than 0 is reported as a
-               failed step (end it with "|| true" when that is expected)
+--exec COMMAND runs a shell command; what it prints is shown at the end, and
+               a status other than 0 is reported as a failed step (end it
+               with "|| true" when that is expected)
 
 Warnings and criticals logged by the app are printed at the end.
 
@@ -114,7 +121,7 @@ while [ $# -gt 0 ]; do
             fake_names+=("${2%% *}")
             shift
             ;;
-        --action | --click | --right-click | --drop | --key | --size | --wait | --exec | --expect-setting | --expect-playing | --plug-app | --plug-sink | --unplug | --capture | --crop)
+        --action | --click | --right-click | --drop | --key | --size | --wait | --exec | --expect-setting | --expect-pad | --expect-playing | --plug-app | --plug-sink | --unplug | --capture | --crop)
             [ $# -ge 2 ] || usage
             steps+=("${1#--} $2")
             case $1 in
@@ -212,6 +219,31 @@ fake_device() {
 # How many sounds play: each has one call stream.
 playing_count() { pw-dump | grep -c '"node.name": "vinheta-call-'; }
 
+# pad_value FIELD SOUND: the value of a field of the entry of a sound in the
+# pad file the app wrote, as --expect-pad compares it.
+pad_value() {
+    python3 -I - "$config/data/vinheta/pads.json" "$1" "$2" <<'PYTHON'
+import json, sys
+
+path, field, sound = sys.argv[1:]
+try:
+    with open(path) as file:
+        value = json.load(file)["pads"].get(sound, {})
+except (OSError, ValueError, KeyError):
+    value = {}
+for part in field.split("."):
+    value = value.get(part) if isinstance(value, dict) else None
+if value is None:
+    print("none")
+elif isinstance(value, bool):
+    print(str(value).lower())
+elif isinstance(value, (int, float)):
+    print(f"{value:.3f}".rstrip("0").rstrip("."))
+else:
+    print(value if isinstance(value, str) else json.dumps(value))
+PYTHON
+}
+
 # expect WHAT VALUE COMMAND...: the command prints VALUE within 2 seconds.
 expect() {
     local what=$1 value=$2 got i
@@ -287,9 +319,14 @@ session() {
             key) key "$value" ;;
             size) resize_window "${value%,*}" "${value#*,}" ;;
             wait) sleep "$value" ;;
-            exec) bash -c "$value" ;;
+            # What it prints is shown at the end, with the failures.
+            exec) bash -c "$value" 2>&1 | sed 's/^/exec: /'; [ "${PIPESTATUS[0]}" -eq 0 ] ;;
             expect-setting) expect "setting ${value%% *}" "${value#* }" gsettings get "$app_id" "${value%% *}" ;;
             expect-playing) expect "sounds playing" "$value" playing_count ;;
+            expect-pad)
+                setting=${value#* }
+                expect "${setting#* }: ${value%% *}" "${setting%% *}" pad_value "${value%% *}" "${setting#* }"
+                ;;
             plug-app) fake_device app "${value%% *}" "${value#* }" ;;
             plug-sink) fake_device sink "${value%% *}" "${value#* }" ;;
             unplug) unplug "$value" ;;
@@ -313,7 +350,7 @@ session() {
     echo ". '$root/scripts/dev-common.sh'"
     echo ". '$root/scripts/audio-common.sh'"
     declare -p directories shots name settings steps first_run private_name private_pid_file private_socket config app_mic app_pids
-    declare -f fake_device unplug playing_count expect start_pipewire stop_pipewire session
+    declare -f fake_device unplug playing_count pad_value expect start_pipewire stop_pipewire session
     echo session
 } >"$config/session.sh"
 
@@ -337,7 +374,7 @@ if [ -n "$sheet" ] && [ "$status" -eq 0 ]; then
     for capture in "${captures[@]}"; do files+=("$shots/$capture.png"); done
     convert "${files[@]}" -append "$shots/$name-sheet.png" && echo "$shots/$name-sheet.png"
 fi
-grep -E "^(expected|step failed)" "$log" >&2
+grep -E "^(expected|step failed|exec: )" "$log" >&2
 grep -q "^step failed: expect-" "$log" && status=1
 # What the app itself complained about (and its debug lines with --debug).
 grep -E "^\(vinheta:[0-9]+\): .*-(WARNING|CRITICAL)${debug:+|^\(vinheta:[0-9]+\): vinheta-DEBUG}" "$log" >&2

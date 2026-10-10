@@ -249,3 +249,40 @@ fn cover_fills_the_target_with_the_crop() {
     assert!(close(x + crop.x * width, 0.0) && close(y + crop.y * height, 0.0));
     assert!(close(crop.width * width, 144.0) && close(crop.height * height, 96.0));
 }
+
+#[test]
+fn dragged_moves_the_crop_against_the_pointer() {
+    let image = (512.0, 384.0);
+    let frame = (294.0, 196.0);
+    let crop = Crop::fit(image, PAD_ASPECT).zoomed(image, PAD_ASPECT, 2.0);
+    // 80 pixels of the frame to the left: the crop goes right by 80 / 294
+    // of its width.
+    let left = crop.dragged(image, frame, -80.0, 0.0);
+    assert!(
+        close(left.x, crop.x + 80.0 / 294.0 * crop.width),
+        "{left:?}"
+    );
+    assert!(close(left.y, crop.y));
+    let down = crop.dragged(image, frame, 0.0, 49.0);
+    assert!(
+        close(down.y, crop.y - 49.0 / 196.0 * crop.height),
+        "{down:?}"
+    );
+    let far = crop.dragged(image, frame, -10_000.0, 10_000.0);
+    assert!(
+        close(far.x + far.width, 1.0) && close(far.y, 0.0),
+        "{far:?}"
+    );
+}
+
+#[test]
+fn nudged_moves_by_its_own_size() {
+    let crop = Crop {
+        x: 0.25,
+        y: 0.25,
+        width: 0.5,
+        height: 0.4,
+    };
+    assert!(close_crop(crop.nudged(0.02, -0.1), (0.26, 0.21, 0.5, 0.4)));
+    assert!(close_crop(crop.nudged(1.0, 1.0), (0.5, 0.6, 0.5, 0.4)));
+}

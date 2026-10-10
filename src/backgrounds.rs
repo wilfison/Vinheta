@@ -191,6 +191,18 @@ impl Crop {
         Self::fit(image, aspect).width / self.width
     }
 
+    /// Dragged by pixels of a frame the crop covers: the picture follows the
+    /// pointer, so the crop goes the other way.
+    pub fn dragged(self, image: Size, frame: Size, dx: f64, dy: f64) -> Self {
+        let (_, _, width, height) = cover(image, Some(self), frame);
+        self.moved(-dx / width, -dy / height)
+    }
+
+    /// Moved by fractions of its own size, as the arrow keys do.
+    pub fn nudged(self, dx: f64, dy: f64) -> Self {
+        self.moved(dx * self.width, dy * self.height)
+    }
+
     /// Moved by fractions of the picture, without leaving it.
     pub fn moved(self, dx: f64, dy: f64) -> Self {
         let clamp = |value: f64, size: f64| value.clamp(0.0, (1.0 - size).max(0.0));

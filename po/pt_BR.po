@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinheta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 15:24-0300\n"
+"POT-Creation-Date: 2026-10-10 15:46-0300\n"
 "PO-Revision-Date: 2026-10-04 00:51-0300\n"
 "Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -23,7 +23,7 @@ msgid "Vinheta"
 msgstr "Vinheta"
 
 #: data/io.github.wilfison.Vinheta.desktop.in:3
-#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1288
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1280
 msgid "Play sounds into your calls"
 msgstr "Toque sons nas suas chamadas"
 
@@ -281,36 +281,36 @@ msgid "Pad settings could not be saved"
 msgstr "Não foi possível salvar as configurações dos pads"
 
 #. Translators: {} is the file name of an image.
-#: src/application.rs:741
+#: src/application.rs:733
 msgid "Could not use “{}” as a background"
 msgstr "Não foi possível usar “{}” como fundo"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:864
+#: src/application.rs:856
 msgid "Moved “{}” to the trash"
 msgstr "“{}” foi movido para a lixeira"
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:868
+#: src/application.rs:860
 msgid "Could not move “{}” to the trash"
 msgstr "Não foi possível mover “{}” para a lixeira"
 
-#: src/application.rs:929
+#: src/application.rs:921
 msgid "Could not open the audio editor"
 msgstr "Não foi possível abrir o editor de áudio"
 
 #. Translators: {} is the name of an audio output.
-#: src/application.rs:1179
+#: src/application.rs:1171
 msgid "Output “{}” is not connected. Using the system default."
 msgstr "A saída “{}” não está conectada. Usando o padrão do sistema."
 
 #. Translators: {} is the name of a sound.
-#: src/application.rs:1271
+#: src/application.rs:1263
 msgid "Could not play “{}”"
 msgstr "Não foi possível tocar “{}”"
 
 #. Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
-#: src/application.rs:1294
+#: src/application.rs:1286
 msgid "translator-credits"
 msgstr "wilfison"
 

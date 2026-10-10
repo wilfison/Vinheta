@@ -2,10 +2,20 @@
 # Checks the translations without touching the working tree: po/POTFILES.in
 # lists every file with strings, every gettext call of the Rust files reached
 # the template, and every language of po/LINGUAS translates every string.
+# --update first merges the template into the .po files of po/LINGUAS,
+# without fuzzy matching (it guessed "Fundo" for "Adjust Background") and
+# without obsolete strings, and lists the strings left to translate.
 set -uo pipefail
 
+update=
+case ${1:-} in
+    --update) update=1 ;;
+    "") ;;
+    *) echo "usage: check-translations.sh [--update]" >&2; exit 2 ;;
+esac
+
 . "$(dirname "$0")/dev-common.sh"
-require_tools xgettext msgmerge msgfmt
+require_tools xgettext msgmerge msgfmt msgattrib
 cd "$root" || exit 1
 
 work=tmp/check/translations
@@ -35,6 +45,16 @@ for file in $(listed | grep '\.rs$'); do
     found=$(grep '^#:' "$pot" | grep -oE "(^| )$file:[0-9]+" | wc -l)
     [ "$calls" -eq "$found" ] || fail "$file has $calls gettext calls, the template has $found"
 done
+
+if [ -n "$update" ]; then
+    for language in $(grep -v '^#' po/LINGUAS); do
+        po="po/$language.po"
+        msgmerge --quiet --update --backup=none --no-fuzzy-matching "$po" "$pot" &&
+            msgattrib --no-obsolete -o "$po" "$po" || { fail "updating $po"; continue; }
+        left=$(msgattrib --untranslated "$po" | grep -A1 '^msgid' | grep -v '^--$' | tail -n +3)
+        [ -z "$left" ] || printf '%s, to translate:\n%s\n' "$po" "$left"
+    done
+fi
 
 for language in $(grep -v '^#' po/LINGUAS); do
     po="po/$language.po"

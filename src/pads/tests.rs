@@ -652,3 +652,17 @@ fn the_crop_as_text() {
         assert_eq!(text.parse::<Crop>(), Err(()), "{text}");
     }
 }
+
+#[test]
+fn a_new_background_drops_the_crop() {
+    let cropped = pad(QUARTER);
+    let same = cropped.clone().with_background(Some("a.jpg".into()));
+    assert_eq!(same, cropped);
+    let other = cropped.clone().with_background(Some("b.jpg".into()));
+    assert_eq!(other.background.as_deref(), Some("b.jpg"));
+    assert_eq!(other.crop, None);
+    let none = cropped.with_background(None);
+    assert_eq!((none.background, none.crop), (None, None));
+    let first = PadSettings::default().with_background(Some("a.jpg".into()));
+    assert_eq!(first.background.as_deref(), Some("a.jpg"));
+}

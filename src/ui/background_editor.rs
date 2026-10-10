@@ -208,13 +208,8 @@ impl BackgroundEditor {
     /// Moves the crop by pixels of the frame from where it was.
     fn drag_from(&self, from: Crop, dx: f64, dy: f64) {
         let frame = self.frame();
-        let (_, _, width, height) = backgrounds::cover(
-            self.image_size(),
-            Some(from),
-            (f64::from(frame.width()), f64::from(frame.height())),
-        );
-        // The picture follows the pointer, so the crop goes the other way.
-        self.set_crop(from.moved(-dx / width, -dy / height));
+        let frame = (f64::from(frame.width()), f64::from(frame.height()));
+        self.set_crop(from.dragged(self.image_size(), frame, dx, dy));
     }
 
     fn setup_controllers(&self) {
@@ -277,12 +272,11 @@ impl BackgroundEditor {
         } else {
             STEP
         };
-        let (dx, dy) = (crop.width * step, crop.height * step);
         match keyval {
-            gdk::Key::Left | gdk::Key::KP_Left => self.set_crop(crop.moved(-dx, 0.0)),
-            gdk::Key::Right | gdk::Key::KP_Right => self.set_crop(crop.moved(dx, 0.0)),
-            gdk::Key::Up | gdk::Key::KP_Up => self.set_crop(crop.moved(0.0, -dy)),
-            gdk::Key::Down | gdk::Key::KP_Down => self.set_crop(crop.moved(0.0, dy)),
+            gdk::Key::Left | gdk::Key::KP_Left => self.set_crop(crop.nudged(-step, 0.0)),
+            gdk::Key::Right | gdk::Key::KP_Right => self.set_crop(crop.nudged(step, 0.0)),
+            gdk::Key::Up | gdk::Key::KP_Up => self.set_crop(crop.nudged(0.0, -step)),
+            gdk::Key::Down | gdk::Key::KP_Down => self.set_crop(crop.nudged(0.0, step)),
             gdk::Key::plus | gdk::Key::KP_Add | gdk::Key::equal => {
                 self.set_zoom(self.zoom() + KEY_ZOOM);
             }
