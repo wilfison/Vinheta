@@ -111,6 +111,7 @@ There is no browser and no Playwright here. Every story ends with the criterion 
 |---|---|
 | Any code | `scripts/check.sh` passes (clippy without warnings, a single glib version, no em dash, one version, complete translations, `meson test`) |
 | A new or changed UI string | `po/pt_BR.po` translates it (`scripts/check-translations.sh`), and a screenshot check with `--lang pt_BR` shows it |
+| A new GSettings key | its `summary` and `description` are in the template too, so `po/pt_BR.po` translates them |
 | Engine (`src/audio/`) | `scripts/check.sh --audio` passes, and the harness `scripts/verify-audio.sh` gains a check for each new engine operation, exposed through an option of `vinheta-audio-test` |
 | Logic without interface | Rust unit tests in the module itself, run by `cargo test --lib` |
 | Interface (`src/ui/`) | "Screenshot check": `scripts/screenshot.sh NAME ...` in the described state, read and compared with the mockup and with the criteria; in the dark and `--light` styles when the story creates a new screen |
@@ -140,7 +141,7 @@ Limits the PRD must respect (do not write criteria that depend on them):
 - If another Vinheta instance is open, the engine fails with "node already exists". For the same reason, two checks that start the app (screenshots, `verify-app.sh`) cannot run at the same time.
 - The fallback of a removed or missing device is the real default device. A check of that fallback must play nothing audible (monitor volume at 0, or a silent file) and record nothing from the real microphone.
 - A level is measured on what a fake call app records from a silent fake microphone (`call_app` and `call_level` of `scripts/verify-app.sh`), with `call-target` set to that app. Every app as the target would reach the real apps that are recording: check that case on the links, with the call volume at 0.
-- Real clicks on a list entry, drags inside the app, and typing are not simulated reliably. Write the criterion on the state (the setting, the action) and mark the gesture for manual testing. A drop of files from outside the app is real with `--drop`.
+- Real clicks on a list entry, drags inside the app, and typing are not simulated reliably. Write the criterion on the state (the setting, the action) and mark the gesture for manual testing. A click on the switch of an `AdwSwitchRow` is reliable: `--action preferences --click X,Y --expect-setting 'KEY false'`, with X,Y read from a screenshot of the dialog (verified on 2026-10-10 with "Limit Call Level"); write that criterion instead of a manual one. A drop of files from outside the app is real with `--drop`.
 - Screenshots go to `tmp/screenshots/` and are deleted at the end of the story.
 - The CI (GitHub Actions, `.github/workflows/ci.yml`) only runs the checks of `scripts/check.sh --deb`: it has no PipeWire session and no display, so the audio harness and `scripts/verify-app.sh` stay local.
 - The audio harness only uses fake devices; nothing in it needs a person listening. A test on a real call is always optional.

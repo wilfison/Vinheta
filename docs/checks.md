@@ -63,7 +63,7 @@ scripts/screenshot.sh grid --folder DIR --action "toggle-sound '/abs/path/sound.
 - With every app as the target, which is the default, a sound reaches the real apps that are recording. A check that plays something audible sets the target to a fake call app first (`call-target`, or `--target` of the test binary); the case of every app is checked on the links, with the call volume at 0.
 - A level is measured on what a fake call app records from a silent fake microphone, so the real microphone never hides a quiet tone.
 - `loud_sound` of `scripts/dev-common.sh` makes a 0 dBFS tone, for the limiter. It plays only with the monitor volume at 0 and a fake call app as the target.
-- Real clicks on a list entry, drags inside the app, and typing are not simulated reliably. Check the state (the setting, the action) and test the gesture by hand. A drop of files from outside the app is real with `--drop` (`drop_files` of `scripts/dev-common.sh`).
+- Real clicks on a list entry, drags inside the app, and typing are not simulated reliably. Check the state (the setting, the action) and test the gesture by hand. A click on the switch of an `AdwSwitchRow` is reliable (`--click X,Y` then `--expect-setting`). A drop of files from outside the app is real with `--drop` (`drop_files` of `scripts/dev-common.sh`).
 
 ## Tested by hand only
 
