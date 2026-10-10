@@ -1,0 +1,1024 @@
+# European Portuguese translation of Vinheta.
+# Copyright 2026 wilfison
+# This file is distributed under the same license as the vinheta package.
+#
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: vinheta\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-10 15:46-0300\n"
+"PO-Revision-Date: 2026-10-10 18:00-0300\n"
+"Last-Translator: wilfison <wilfisonbatista@gmail.com>\n"
+"Language-Team: Portuguese\n"
+"Language: pt\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: data/io.github.wilfison.Vinheta.desktop.in:2
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:7 src/ui/window.ui:6
+msgid "Vinheta"
+msgstr "Vinheta"
+
+#: data/io.github.wilfison.Vinheta.desktop.in:3
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:8 src/application.rs:1280
+msgid "Play sounds into your calls"
+msgstr "Reproduza sons nas suas chamadas"
+
+#: data/io.github.wilfison.Vinheta.desktop.in:9
+msgid "soundboard;sounds;effects;jingle;microphone;call;meeting;stream;"
+msgstr ""
+"soundboard;sons;efeitos;vinheta;efeitos "
+"sonoros;microfone;chamada;reunião;direto;"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:6
+msgid "Sound folders"
+msgstr "Pastas de sons"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:7
+msgid "Absolute paths of the folders shown as tabs, in tab order."
+msgstr ""
+"Caminhos absolutos das pastas mostradas como separadores, pela ordem dos "
+"separadores."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:11 src/ui/window.ui:524
+msgid "Send sounds to call"
+msgstr "Sons na chamada"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:12
+msgid ""
+"Whether sounds are played into the apps that are recording a microphone in "
+"addition to the local output."
+msgstr ""
+"Se os sons são reproduzidos nas aplicações que estão a gravar um microfone, "
+"além da saída local."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:16
+msgid "Limit call level"
+msgstr "Limitar o nível na chamada"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:17
+msgid ""
+"Whether loud sounds are kept at -6 dBFS in the call, so that they do not "
+"clip."
+msgstr ""
+"Se os sons altos são mantidos a -6 dBFS na chamada, para que não distorçam."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:22 src/ui/window.ui:383
+msgid "Headphones volume"
+msgstr "Volume dos auscultadores"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:23
+msgid ""
+"Position of the slider that sets how loud sounds are on the local output, "
+"from 0 to 1."
+msgstr ""
+"Posição do controlo que define o volume dos sons na saída local, de 0 a 1."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:28 src/ui/window.ui:427
+msgid "Call volume"
+msgstr "Volume da chamada"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:29
+msgid ""
+"Position of the slider that sets how loud sounds are in the call, from 0 to "
+"1."
+msgstr "Posição do controlo que define o volume dos sons na chamada, de 0 a 1."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:33
+msgid "App the sounds are sent to"
+msgstr "Aplicação que recebe os sons"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:34
+msgid ""
+"Name of the binary of the app that gets the sounds, among the ones that are "
+"recording a microphone. Empty is all of them."
+msgstr ""
+"Nome do binário da aplicação que recebe os sons, entre as que estão a gravar "
+"um microfone. Vazio significa todas."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:38
+msgid "Monitor output"
+msgstr "Saída de monitorização"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:39
+msgid ""
+"PipeWire node name of the output where sounds are heard. Empty follows the "
+"system default."
+msgstr ""
+"Nome do nó do PipeWire da saída onde os sons são ouvidos. Vazio segue a "
+"predefinição do sistema."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:48
+msgid "When a pad is triggered"
+msgstr "Quando um pad é acionado"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:49
+msgid ""
+"What a click on a pad does: \"overlap\" plays sounds together and stops a "
+"pad that is playing, \"restart\" starts a playing pad again, \"stop-others\" "
+"stops every other sound when a pad starts."
+msgstr ""
+"O que um clique num pad faz: “overlap” reproduz os sons em conjunto e para "
+"um pad que está a tocar, “restart” reinicia um pad que está a tocar, “stop-"
+"others” para todos os outros sons quando um pad começa."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:53
+msgid "Fade out on stop"
+msgstr "Desvanecer ao parar"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:54
+msgid "Whether a stopped sound fades out instead of being cut."
+msgstr "Se um som parado diminui gradualmente em vez de ser cortado."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:62
+msgid "Sort order"
+msgstr "Ordenação"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:63
+msgid ""
+"The order of the pads in every view: \"name\" sorts by the shown name, "
+"\"recent\" puts the most recently modified files first."
+msgstr ""
+"A ordem dos pads em todas as vistas: “name” ordena pelo nome mostrado, "
+"“recent” coloca primeiro os ficheiros modificados mais recentemente."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:67
+msgid "Tab names"
+msgstr "Nomes dos separadores"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:68
+msgid ""
+"The label of a tab, by the absolute path of its folder. A folder without an "
+"entry shows its own name."
+msgstr ""
+"O rótulo de um separador, pelo caminho absoluto da pasta. Uma pasta sem "
+"entrada mostra o seu próprio nome."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:72
+msgid "Sounds folder"
+msgstr "Pasta de sons"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:73
+msgid ""
+"Absolute path of the folder that receives the copies of loose files. Empty "
+"means \"sounds\" inside the data directory of the app."
+msgstr ""
+"Caminho absoluto da pasta que recebe as cópias dos ficheiros avulsos. Vazio "
+"significa “sounds” dentro do diretório de dados da aplicação."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:77
+msgid "Audio editor"
+msgstr "Editor de áudio"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:78
+msgid ""
+"Name of the desktop file of the app that opens a sound for editing. Empty "
+"means the first audio editor that is installed."
+msgstr ""
+"Nome do ficheiro desktop da aplicação que abre um som para edição. Vazio "
+"significa o primeiro editor de áudio instalado."
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:82
+msgid "Call setup guide shown"
+msgstr "Guia de configuração de chamada mostrado"
+
+#: data/io.github.wilfison.Vinheta.gschema.xml:83
+msgid ""
+"Whether the call setup guide was shown on the first run. While false, the "
+"guide opens by itself when the app starts with working audio."
+msgstr ""
+"Se o guia de configuração de chamada foi mostrado na primeira execução. "
+"Enquanto for falso, o guia abre sozinho quando a aplicação inicia com o "
+"áudio a funcionar."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:10
+msgid ""
+"Vinheta is a soundboard. Add your folders of sounds, and each one becomes a "
+"tab with a pad per sound: click a pad, or press its key, to play it. Pads "
+"can have a name, a color, a volume, and a loop, and your favorites are kept "
+"in a tab of their own."
+msgstr ""
+"O Vinheta é um soundboard. Adicione as suas pastas de sons e cada uma passa "
+"a ser um separador com um pad por som: clique num pad, ou prima a tecla "
+"dele, para o reproduzir. Os pads podem ter nome, cor, volume e repetição, e "
+"os seus favoritos ficam num separador próprio."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:11
+msgid ""
+"While it runs, Vinheta plays your sounds into the apps that are using your "
+"microphone. Join a call as usual, and the other side hears the sounds "
+"together with your voice. You hear them on your own headphones, with a "
+"separate volume."
+msgstr ""
+"Enquanto está aberto, o Vinheta reproduz os seus sons nas aplicações que "
+"estão a usar o seu microfone. Entre numa chamada como de costume e o outro "
+"lado ouve os sons junto com a sua voz. Ouve-os nos seus auscultadores, com "
+"um volume separado."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:12
+msgid ""
+"Sending sounds to the call can be switched off at any time, leaving only "
+"your own output."
+msgstr ""
+"O envio dos sons para a chamada pode ser desligado a qualquer momento, "
+"deixando apenas a sua saída de áudio."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:35
+msgid "Pads with colors, keys, and a sound playing"
+msgstr "Pads com cores, teclas e um som a tocar"
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:39
+msgid "Audio and playback preferences"
+msgstr "Preferências de áudio e de reprodução"
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:43
+msgid "The call setup guide"
+msgstr "O guia de configuração de chamada"
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:50
+msgid ""
+"A pad can have a background image, and the audio comes back by itself when "
+"PipeWire restarts."
+msgstr ""
+"Um pad pode ter uma imagem de fundo, e o áudio volta sozinho quando o "
+"PipeWire reinicia."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:55
+msgid ""
+"The sounds play straight into the apps that use your microphone, with no "
+"virtual microphone to choose, and the app has a new icon."
+msgstr ""
+"Os sons tocam diretamente nas aplicações que usam o seu microfone, sem "
+"microfone virtual para escolher, e a aplicação tem um ícone novo."
+
+#: data/io.github.wilfison.Vinheta.metainfo.xml.in:60
+msgid ""
+"The first release: folders as tabs, pads with a name, a color, a volume, a "
+"loop and a key, favorites, search, and a virtual microphone that sends the "
+"sounds to your calls."
+msgstr ""
+"A primeira versão: pastas como separadores, pads com nome, cor, volume, "
+"repetição e tecla, favoritos, pesquisa e um microfone virtual que envia os "
+"sons para as suas chamadas."
+
+#: src/application.rs:555
+msgid ""
+"Pad settings could not be read and were reset. The old file was kept as "
+"“pads.json.corrupt”."
+msgstr ""
+"Não foi possível ler as definições dos pads, e foram repostas. O ficheiro "
+"antigo foi mantido como “pads.json.corrupt”."
+
+#: src/application.rs:560
+msgid "Pad settings could not be read. Changes to pads will not be saved."
+msgstr ""
+"Não foi possível ler as definições dos pads. As alterações aos pads não "
+"serão guardadas."
+
+#: src/application.rs:590
+msgid "Pad settings could not be saved"
+msgstr "Não foi possível guardar as definições dos pads"
+
+#. Translators: {} is the file name of an image.
+#: src/application.rs:733
+msgid "Could not use “{}” as a background"
+msgstr "Não foi possível usar “{}” como fundo"
+
+#. Translators: {} is the name of a sound.
+#: src/application.rs:856
+msgid "Moved “{}” to the trash"
+msgstr "“{}” foi movido para o lixo"
+
+#. Translators: {} is the name of a sound.
+#: src/application.rs:860
+msgid "Could not move “{}” to the trash"
+msgstr "Não foi possível mover “{}” para o lixo"
+
+#: src/application.rs:921
+msgid "Could not open the audio editor"
+msgstr "Não foi possível abrir o editor de áudio"
+
+#. Translators: {} is the name of an audio output.
+#: src/application.rs:1171
+msgid "Output “{}” is not connected. Using the system default."
+msgstr "A saída “{}” não está ligada. A usar a predefinição do sistema."
+
+#. Translators: {} is the name of a sound.
+#: src/application.rs:1263
+msgid "Could not play “{}”"
+msgstr "Não foi possível reproduzir “{}”"
+
+#. Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
+#: src/application.rs:1286
+msgid "translator-credits"
+msgstr "wilfison"
+
+#: src/ui/background-dialog.ui:6 src/ui/background-dialog.ui:18
+msgid "Adjust Background"
+msgstr "Ajustar fundo"
+
+#: src/ui/background-dialog.ui:23 src/ui/sound_dialog.rs:329
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/ui/background-dialog.ui:28
+msgid "Apply"
+msgstr "Aplicar"
+
+#: src/ui/background-dialog.ui:70
+msgid "Zoom"
+msgstr "Zoom"
+
+#: src/ui/background-dialog.ui:84
+msgid "Drag the image to place it"
+msgstr "Arraste a imagem para a posicionar"
+
+#: src/ui/background_editor.rs:78
+msgid "Background preview"
+msgstr "Pré-visualização do fundo"
+
+#: src/ui/background_editor.rs:80
+msgid ""
+"Drag the image to move it. The arrow keys move it, plus and minus zoom it."
+msgstr ""
+"Arraste a imagem para a mover. As setas movem-na, mais e menos mudam o zoom."
+
+#: src/ui/call-guide-dialog.ui:6
+msgid "Use Vinheta in a Call"
+msgstr "Usar o Vinheta numa chamada"
+
+#: src/ui/call-guide-dialog.ui:32
+msgid ""
+"Vinheta plays your sounds into the apps that are using your microphone. For "
+"the other side of a call to hear them:"
+msgstr ""
+"O Vinheta reproduz os seus sons nas aplicações que estão a usar o seu "
+"microfone. Para que o outro lado da chamada os ouça:"
+
+#: src/ui/call-guide-dialog.ui:46
+msgid "Join the call as usual"
+msgstr "Entre na chamada como de costume"
+
+#: src/ui/call-guide-dialog.ui:47
+msgid ""
+"Keep your own microphone in the call app. Vinheta adds the sounds to what "
+"the app records, while both are running."
+msgstr ""
+"Mantenha o seu próprio microfone na aplicação de chamadas. O Vinheta "
+"acrescenta os sons ao que a aplicação grava, enquanto ambos estão abertos."
+
+#: src/ui/call-guide-dialog.ui:53
+msgid "Step 1"
+msgstr "Passo 1"
+
+#: src/ui/call-guide-dialog.ui:65
+msgid "Choose where the sounds go"
+msgstr "Escolha para onde vão os sons"
+
+#: src/ui/call-guide-dialog.ui:66
+msgid ""
+"Every app that is using the microphone gets them. To leave the others out, "
+"pick one app in the bottom bar."
+msgstr ""
+"Todas as aplicações que estão a usar o microfone os recebem. Para deixar as "
+"outras de fora, escolha uma aplicação na barra inferior."
+
+#: src/ui/call-guide-dialog.ui:72
+msgid "Step 2"
+msgstr "Passo 2"
+
+#: src/ui/call-guide-dialog.ui:85
+msgid ""
+"If the sounds come through choppy, look in the call app for how to turn off "
+"its noise suppression."
+msgstr ""
+"Se os sons chegarem cortados, procure na aplicação de chamadas como "
+"desativar a supressão de ruído."
+
+#: src/ui/call-guide-dialog.ui:95
+msgid "Got It"
+msgstr "Percebi"
+
+#: src/ui/device_selector.rs:60
+msgid "System Default"
+msgstr "Predefinição do sistema"
+
+#. Translators: the sounds are sent to every app that is using the microphone.
+#: src/ui/device_selector.rs:62
+msgid "All Apps"
+msgstr "Todas as aplicações"
+
+#. Translators: {} is the name of an audio device that is not connected.
+#: src/ui/device_selector.rs:66
+msgid "{} (unavailable)"
+msgstr "{} (indisponível)"
+
+#. Translators: {} is the name of an app that is not using the microphone.
+#: src/ui/device_selector.rs:70
+msgid "{} (not recording)"
+msgstr "{} (não está a gravar)"
+
+#: src/ui/folder-page.ui:35
+msgid "No Audio Files"
+msgstr "Sem ficheiros de áudio"
+
+#: src/ui/folder-page.ui:36
+msgid "This folder has no supported audio files"
+msgstr "Esta pasta não tem ficheiros de áudio suportados"
+
+#: src/ui/folder-page.ui:47
+msgid "Folder Not Found"
+msgstr "Pasta não encontrada"
+
+#: src/ui/folder-page.ui:54
+msgid "Locate Folder…"
+msgstr "Localizar pasta…"
+
+#: src/ui/folder-page.ui:65
+msgid "Remove Folder"
+msgstr "Remover pasta"
+
+#: src/ui/preferences-dialog.ui:6
+msgid "Preferences"
+msgstr "Preferências"
+
+#: src/ui/preferences-dialog.ui:11
+msgid "Audio"
+msgstr "Áudio"
+
+#: src/ui/preferences-dialog.ui:14
+msgid "Monitor Output"
+msgstr "Saída de monitorização"
+
+#: src/ui/preferences-dialog.ui:15
+msgid "Where you hear the sounds"
+msgstr "Onde ouve os sons"
+
+#: src/ui/preferences-dialog.ui:20
+msgid "Send Sounds to Call"
+msgstr "Enviar sons para a chamada"
+
+#: src/ui/preferences-dialog.ui:21
+msgid "Play sounds into the apps that are using the microphone"
+msgstr "Reproduz os sons nas aplicações que estão a usar o microfone"
+
+#: src/ui/preferences-dialog.ui:26 src/ui/window.rs:333 src/ui/window.ui:448
+#: src/ui/window.ui:512
+msgid "Send Sounds To"
+msgstr "Enviar sons para"
+
+#: src/ui/preferences-dialog.ui:27
+msgid "An app that is using the microphone, or all of them"
+msgstr "Uma aplicação que está a usar o microfone, ou todas"
+
+#: src/ui/preferences-dialog.ui:32
+msgid "Limit Call Level"
+msgstr "Limitar o nível na chamada"
+
+#: src/ui/preferences-dialog.ui:33
+msgid "Keeps loud sounds from clipping in the call"
+msgstr "Evita que os sons altos distorçam na chamada"
+
+#: src/ui/preferences-dialog.ui:40 src/ui/shortcuts-dialog.ui:6
+msgid "Playback"
+msgstr "Reprodução"
+
+#: src/ui/preferences-dialog.ui:43
+msgid "When a Pad Is Triggered"
+msgstr "Quando um pad é acionado"
+
+#: src/ui/preferences-dialog.ui:47
+msgid "Overlap"
+msgstr "Sobrepor"
+
+#: src/ui/preferences-dialog.ui:48
+msgid "Restart"
+msgstr "Reiniciar"
+
+#: src/ui/preferences-dialog.ui:49
+msgid "Stop Others"
+msgstr "Parar os outros"
+
+#: src/ui/preferences-dialog.ui:57
+msgid "Fade Out on Stop"
+msgstr "Desvanecer ao parar"
+
+#: src/ui/preferences-dialog.ui:58
+msgid "Avoids abrupt cuts when stopping a sound"
+msgstr "Evita cortes bruscos ao parar um som"
+
+#: src/ui/preferences-dialog.ui:65
+msgid "Library"
+msgstr "Biblioteca"
+
+#: src/ui/preferences-dialog.ui:68 src/ui/preferences_dialog.rs:314
+msgid "Sounds Folder"
+msgstr "Pasta de sons"
+
+#: src/ui/preferences-dialog.ui:73 src/ui/preferences-dialog.ui:76
+msgid "Open Folder"
+msgstr "Abrir pasta"
+
+#: src/ui/preferences-dialog.ui:86 src/ui/preferences-dialog.ui:89
+msgid "Choose Folder…"
+msgstr "Escolher pasta…"
+
+#: src/ui/preferences-dialog.ui:100
+msgid "Audio Editor"
+msgstr "Editor de áudio"
+
+#: src/ui/preferences_dialog.rs:96
+msgid "Sounds play together; a click on a playing pad stops it"
+msgstr "Os sons tocam em conjunto; um clique num pad que está a tocar para-o"
+
+#: src/ui/preferences_dialog.rs:98
+msgid "A click on a playing pad starts it again"
+msgstr "Um clique num pad que está a tocar reinicia-o"
+
+#: src/ui/preferences_dialog.rs:99
+msgid "Starting a pad stops every other sound"
+msgstr "Iniciar um pad para todos os outros sons"
+
+#: src/ui/preferences_dialog.rs:150 src/ui/window.rs:329
+msgid "Not recording. The sounds are not sent to it."
+msgstr "Não está a gravar. Os sons não lhe são enviados."
+
+#: src/ui/preferences_dialog.rs:153
+msgid "Not connected. Using the system default."
+msgstr "Não ligada. A usar a predefinição do sistema."
+
+#: src/ui/preferences_dialog.rs:224
+msgid "Automatic"
+msgstr "Automático"
+
+#. Translators: {} is the name of an app, as in "Uses Audacity".
+#: src/ui/preferences_dialog.rs:236
+msgid "Uses {}"
+msgstr "Usa {}"
+
+#: src/ui/preferences_dialog.rs:237
+msgid "No audio editor was found"
+msgstr "Não foi encontrado nenhum editor de áudio"
+
+#: src/ui/preferences_dialog.rs:307
+msgid "Could not open the folder"
+msgstr "Não foi possível abrir a pasta"
+
+#: src/ui/rename-dialog.ui:6
+msgid "Rename Tab"
+msgstr "Renomear separador"
+
+#: src/ui/rename-dialog.ui:7
+msgid "The folder on disk keeps its name"
+msgstr "A pasta no disco mantém o seu nome"
+
+#: src/ui/rename-dialog.ui:14
+msgid "Tab name"
+msgstr "Nome do separador"
+
+#: src/ui/rename-dialog.ui:19
+msgid "_Cancel"
+msgstr "_Cancelar"
+
+#: src/ui/rename-dialog.ui:20
+msgid "_Rename"
+msgstr "_Renomear"
+
+#: src/ui/shortcuts-dialog.ui:9
+msgctxt "shortcut window"
+msgid "Stop All"
+msgstr "Parar tudo"
+
+#: src/ui/shortcuts-dialog.ui:15
+msgctxt "shortcut window"
+msgid "Send Sounds to Call"
+msgstr "Enviar sons para a chamada"
+
+#: src/ui/shortcuts-dialog.ui:23
+msgid "General"
+msgstr "Geral"
+
+#: src/ui/shortcuts-dialog.ui:26
+msgctxt "shortcut window"
+msgid "Show Shortcuts"
+msgstr "Mostrar atalhos"
+
+#: src/ui/shortcuts-dialog.ui:32
+msgctxt "shortcut window"
+msgid "Search"
+msgstr "Pesquisar"
+
+#: src/ui/shortcuts-dialog.ui:38
+msgctxt "shortcut window"
+msgid "Move Tab Left"
+msgstr "Mover separador para a esquerda"
+
+#: src/ui/shortcuts-dialog.ui:44
+msgctxt "shortcut window"
+msgid "Move Tab Right"
+msgstr "Mover separador para a direita"
+
+#: src/ui/shortcuts-dialog.ui:50
+msgctxt "shortcut window"
+msgid "Preferences"
+msgstr "Preferências"
+
+#: src/ui/shortcuts-dialog.ui:56
+msgctxt "shortcut window"
+msgid "Quit"
+msgstr "Sair"
+
+#: src/ui/sound-dialog.ui:6 src/ui/sound-dialog.ui:14
+msgid "Edit Sound"
+msgstr "Editar som"
+
+#: src/ui/sound-dialog.ui:25
+msgid "Name"
+msgstr "Nome"
+
+#: src/ui/sound-dialog.ui:30
+msgid "Color"
+msgstr "Cor"
+
+#: src/ui/sound-dialog.ui:41
+msgid "Background"
+msgstr "Fundo"
+
+#: src/ui/sound-dialog.ui:70 src/ui/sound-dialog.ui:74
+msgid "Remove Image"
+msgstr "Remover imagem"
+
+#: src/ui/sound-dialog.ui:85
+msgid "Adjust Background…"
+msgstr "Ajustar fundo…"
+
+#: src/ui/sound-dialog.ui:92 src/ui/sound-dialog.ui:107
+msgid "Volume"
+msgstr "Volume"
+
+#: src/ui/sound-dialog.ui:124
+msgid "Loop"
+msgstr "Repetir"
+
+#: src/ui/sound-dialog.ui:125
+msgid "Play again and again until stopped"
+msgstr "Reproduz vezes sem conta até ser parado"
+
+#: src/ui/sound-dialog.ui:130
+msgid "Shortcut"
+msgstr "Atalho"
+
+#: src/ui/sound-dialog.ui:144 src/ui/sound-dialog.ui:147
+msgid "Remove Shortcut"
+msgstr "Remover atalho"
+
+#: src/ui/sound-pad.ui:55
+msgid "Favorite"
+msgstr "Favorito"
+
+#: src/ui/sound-pad.ui:67
+msgid "Loops"
+msgstr "Repete"
+
+#: src/ui/sound-pad.ui:111
+msgid "_Edit…"
+msgstr "_Editar…"
+
+#: src/ui/sound-pad.ui:115
+msgid "_Open in Audio Editor"
+msgstr "_Abrir no editor de áudio"
+
+#: src/ui/sound-pad.ui:120
+msgid "_Loop"
+msgstr "_Repetir"
+
+#: src/ui/sound-pad.ui:124
+msgid "_Favorite"
+msgstr "_Favorito"
+
+#: src/ui/sound-pad.ui:128
+msgid "_Stop"
+msgstr "_Parar"
+
+#: src/ui/sound-pad.ui:134
+msgid "_Reset"
+msgstr "Rep_or"
+
+#: src/ui/sound-pad.ui:138
+msgid "Move to _Trash"
+msgstr "Mover para o _lixo"
+
+#. Translators: {} is a volume, from 0 to 100.
+#: src/ui/sound_dialog.rs:142 src/ui/window.rs:160
+msgid "{}%"
+msgstr "{}%"
+
+#: src/ui/sound_dialog.rs:219
+msgid "No Color"
+msgstr "Sem cor"
+
+#: src/ui/sound_dialog.rs:220
+msgid "Blue"
+msgstr "Azul"
+
+#: src/ui/sound_dialog.rs:221
+msgid "Green"
+msgstr "Verde"
+
+#: src/ui/sound_dialog.rs:222
+msgid "Yellow"
+msgstr "Amarelo"
+
+#: src/ui/sound_dialog.rs:223
+msgid "Orange"
+msgstr "Laranja"
+
+#: src/ui/sound_dialog.rs:224
+msgid "Red"
+msgstr "Vermelho"
+
+#: src/ui/sound_dialog.rs:225
+msgid "Purple"
+msgstr "Roxo"
+
+#: src/ui/sound_dialog.rs:226
+msgid "Brown"
+msgstr "Castanho"
+
+#: src/ui/sound_dialog.rs:322
+msgid "None"
+msgstr "Nenhum"
+
+#: src/ui/sound_dialog.rs:330 src/ui/sound_dialog.rs:373
+msgid "Change…"
+msgstr "Alterar…"
+
+#: src/ui/sound_dialog.rs:331
+msgid "Set…"
+msgstr "Definir…"
+
+#: src/ui/sound_dialog.rs:336
+msgid "Press a letter or a digit"
+msgstr "Prima uma letra ou um dígito"
+
+#. Translators: {} is the name of the pad that had the key before.
+#: src/ui/sound_dialog.rs:338
+msgid "Taken from “{}”"
+msgstr "Tirada de “{}”"
+
+#: src/ui/sound_dialog.rs:339
+msgid "Plays this pad while the window is focused"
+msgstr "Reproduz este pad enquanto a janela tem o foco"
+
+#: src/ui/sound_dialog.rs:374
+msgid "Choose…"
+msgstr "Escolher…"
+
+#: src/ui/sound_dialog.rs:383
+msgid "Images"
+msgstr "Imagens"
+
+#: src/ui/sound_dialog.rs:388
+msgid "Choose Image"
+msgstr "Escolher imagem"
+
+#. Translators: the first {} is the file name of a sound, the
+#. second {} is the key that plays it, as in "Applause.wav, key Q".
+#: src/ui/sound_pad.rs:267
+msgid "{}, key {}"
+msgstr "{}, tecla {}"
+
+#. Translators: {} is the key that plays a sound, as in "Key Q".
+#: src/ui/sound_pad.rs:364
+msgid "Key {}"
+msgstr "Tecla {}"
+
+#: src/ui/sound_pad.rs:374
+msgid "Playing"
+msgstr "A tocar"
+
+#. Translators: the first {} is the elapsed time of a sound, the
+#. second {} is its duration, as in "Playing, 00:23 of 01:35".
+#: src/ui/sound_pad.rs:378
+msgid "Playing, {} of {}"
+msgstr "A tocar, {} de {}"
+
+#. Translators: {} is the elapsed time of a sound, as in "Playing, 00:23".
+#: src/ui/sound_pad.rs:383
+msgid "Playing, {}"
+msgstr "A tocar, {}"
+
+#: src/ui/window.rs:277
+msgid "Audio is unavailable: PipeWire is not running"
+msgstr "Áudio indisponível: o PipeWire não está em execução"
+
+#: src/ui/window.rs:280
+msgid "Audio stopped: the connection to PipeWire was lost"
+msgstr "O áudio parou: a ligação ao PipeWire foi perdida"
+
+#: src/ui/window.rs:282
+msgid "Audio is unavailable"
+msgstr "Áudio indisponível"
+
+#. Translators: {} is how many sounds are playing.
+#: src/ui/window.rs:300
+msgid "{} playing"
+msgid_plural "{} playing"
+msgstr[0] "{} a tocar"
+msgstr[1] "{} a tocar"
+
+#: src/ui/window.rs:331
+msgid "No app is using the microphone"
+msgstr "Nenhuma aplicação está a usar o microfone"
+
+#: src/ui/window.rs:807
+msgid "Add Folder"
+msgstr "Adicionar pasta"
+
+#: src/ui/window.rs:816 src/ui/window.rs:847 src/ui/window.rs:1107
+#: src/ui/window.rs:1128
+msgid "This folder cannot be added"
+msgstr "Esta pasta não pode ser adicionada"
+
+#: src/ui/window.rs:822
+msgid "Audio Files"
+msgstr "Ficheiros de áudio"
+
+#: src/ui/window.rs:829
+msgid "Add Sounds"
+msgstr "Adicionar sons"
+
+#: src/ui/window.rs:886
+msgid "{} sound added"
+msgid_plural "{} sounds added"
+msgstr[0] "{} som adicionado"
+msgstr[1] "{} sons adicionados"
+
+#: src/ui/window.rs:888
+msgid "{} file skipped"
+msgid_plural "{} files skipped"
+msgstr[0] "{} ficheiro ignorado"
+msgstr[1] "{} ficheiros ignorados"
+
+#. Translators: the first {} is "2 sounds added", the second is
+#. "1 file skipped".
+#: src/ui/window.rs:896
+msgid "{}, {}"
+msgstr "{}, {}"
+
+#: src/ui/window.rs:905
+msgid "No supported audio files"
+msgstr "Sem ficheiros de áudio suportados"
+
+#. Translators: {} is the name of a tab.
+#: src/ui/window.rs:1065
+msgid "Removed “{}”"
+msgstr "“{}” foi removido"
+
+#: src/ui/window.rs:1066
+msgid "Undo"
+msgstr "Anular"
+
+#: src/ui/window.rs:1099
+msgid "Locate Folder"
+msgstr "Localizar pasta"
+
+#: src/ui/window.rs:1124
+msgid "This folder is already in the library"
+msgstr "Esta pasta já está na biblioteca"
+
+#: src/ui/window.rs:1209
+msgid "Favorites"
+msgstr "Favoritos"
+
+#: src/ui/window.rs:1293
+msgid "Sounds"
+msgstr "Sons"
+
+#: src/ui/window.ui:28
+msgid "Add"
+msgstr "Adicionar"
+
+#: src/ui/window.ui:35
+msgid "Search"
+msgstr "Pesquisar"
+
+#: src/ui/window.ui:43
+msgid "Main Menu"
+msgstr "Menu principal"
+
+#: src/ui/window.ui:57
+msgid "Search sounds"
+msgstr "Pesquisar sons"
+
+#: src/ui/window.ui:66
+msgid "Try Again"
+msgstr "Tentar novamente"
+
+#: src/ui/window.ui:75
+msgid "Drop sounds to add them"
+msgstr "Largue os sons para os adicionar"
+
+#: src/ui/window.ui:92
+msgid "No Sounds Yet"
+msgstr "Ainda sem sons"
+
+#: src/ui/window.ui:93
+msgid "Add audio files or drop them here to build your soundboard"
+msgstr ""
+"Adicione ficheiros de áudio ou largue-os aqui para montar o seu soundboard"
+
+#: src/ui/window.ui:104
+msgid "Add Sounds…"
+msgstr "Adicionar sons…"
+
+#: src/ui/window.ui:115
+msgid "Add Folder…"
+msgstr "Adicionar pasta…"
+
+#: src/ui/window.ui:131
+msgid ""
+"Tip: join a call with your usual microphone, and the sounds you play are "
+"heard there"
+msgstr ""
+"Dica: entre numa chamada com o seu microfone de sempre, e os sons que "
+"reproduzir serão ouvidos lá"
+
+#: src/ui/window.ui:142
+msgid "Call Setup Guide"
+msgstr "Guia de configuração de chamada"
+
+#: src/ui/window.ui:240
+msgid "No Results Found"
+msgstr "Sem resultados"
+
+#: src/ui/window.ui:241
+msgid "Try a different search"
+msgstr "Tente outra pesquisa"
+
+#: src/ui/window.ui:346
+msgid "Stop all"
+msgstr "Parar tudo"
+
+#: src/ui/window.ui:365
+msgid "Headphones"
+msgstr "Auscultadores"
+
+#: src/ui/window.ui:409
+msgid "Call"
+msgstr "Chamada"
+
+#: src/ui/window.ui:548
+msgid "Add _Sounds…"
+msgstr "Adicionar _sons…"
+
+#: src/ui/window.ui:552
+msgid "Add _Folder…"
+msgstr "Adicionar pas_ta…"
+
+#: src/ui/window.ui:559
+msgid "Sort By"
+msgstr "Ordenar por"
+
+#: src/ui/window.ui:561
+msgid "_Name"
+msgstr "_Nome"
+
+#: src/ui/window.ui:566
+msgid "Recently _Added"
+msgstr "_Adicionados recentemente"
+
+#: src/ui/window.ui:573
+msgid "_Preferences"
+msgstr "_Preferências"
+
+#: src/ui/window.ui:577
+msgid "_Call Setup Guide"
+msgstr "_Guia de configuração de chamada"
+
+#: src/ui/window.ui:581
+msgid "_Keyboard Shortcuts"
+msgstr "Atalhos de te_clado"
+
+#: src/ui/window.ui:585
+msgid "_About Vinheta"
+msgstr "S_obre o Vinheta"
+
+#: src/ui/window.ui:593
+msgid "Re_name Tab…"
+msgstr "Re_nomear separador…"
+
+#: src/ui/window.ui:599
+msgid "Move Tab _Left"
+msgstr "Mover separador para a _esquerda"
+
+#: src/ui/window.ui:603
+msgid "Move Tab _Right"
+msgstr "Mover separador para a _direita"
+
+#: src/ui/window.ui:609
+msgid "Remo_ve Folder"
+msgstr "Remo_ver pasta"

@@ -48,12 +48,21 @@ app_env() {
 # pad settings, vinheta/pads.json) in CONFIG_DIR/data, so nothing shows up on
 # the desktop and the user's settings and pads are not touched. PipeWire is
 # still the real one. The app runs in English whatever the language of the
-# user, unless session_language is set (pt_BR).
+# user, unless session_language is set to a language of po/LINGUAS (de, es,
+# fr, pt, pt_BR). gettext ignores LANGUAGE under the C locale, so the session needs a
+# locale that is generated on the machine: the one of the language, or of one
+# of its regions (pt_PT for pt), or any other, which still gives the right
+# strings.
 virtual_session() {
-    local config=$1 language=${session_language:-}
+    local config=$1 language=${session_language:-} locale=C.UTF-8
     shift
     app_env
-    LANGUAGE=$language LANG=${language:-C}.UTF-8 LC_ALL=${language:-C}.UTF-8 \
+    if [ -n "$language" ]; then
+        locale=$(locale -a | grep -iE "^${language}(_[A-Z]+)?\.utf-?8$" | head -n 1)
+        [ -n "$locale" ] || locale=$(locale -a | grep -iE '^[a-z]{2}_[A-Z]+\.utf-?8$' | head -n 1)
+        [ -n "$locale" ] || { echo "no UTF-8 locale is generated: the app cannot run in $language" >&2; return 1; }
+    fi
+    LANGUAGE=$language LANG=$locale LC_ALL=$locale \
         GDK_BACKEND=x11 GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME="$config" XDG_DATA_HOME="$config/data" \
         xvfb-run -a -s "-screen 0 1100x800x24" dbus-run-session -- "$@"
 }

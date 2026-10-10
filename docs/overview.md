@@ -16,7 +16,7 @@ The hard part of the app is the audio, not the interface: see [audio.md](audio.m
 - The preferences dialog has the "Audio" group (monitor output, send sounds to call, the app the sounds are sent to, limit call level), the "Playback" group (trigger mode, fade out on stop), and the "Library" group (sounds folder).
 - The call setup guide opens on the first run and from the primary menu.
 - Failures are told to the user: audio that is unavailable has a banner with the reason and "Try Again" (the app also retries by itself, and the banner goes away when audio is back), a chosen device that is not connected and a pad file that could not be read or saved have a toast, and a missing folder has "Locate Folder…" and "Remove Folder" on its page.
-- The interface is translated to Brazilian Portuguese.
+- The interface is translated to Brazilian Portuguese, European Portuguese, Spanish, German, and French.
 - The package is built and published by GitHub Actions from a `v*` tag.
 
 ## How a sound reaches the call
@@ -54,7 +54,7 @@ The SVGs in `mockups/` are the visual reference:
 - The tabs of a browser are one app: the sounds cannot be sent to one tab only.
 - The label of an unavailable device is ellipsized in the preferences rows, which can hide the "(unavailable)" part.
 - A PPA or another channel with updates, package signing, and other distributions.
-- More languages.
+- More languages (Italian, Russian, and Chinese are the ones worth adding next), and a review of the translations by native speakers.
 - One limiter for every sound together: each playback has its own, so two loud sounds playing at once can still clip the call.
 - Global shortcuts ([shortcuts.md](shortcuts.md) has what was measured).
 - Formats gdk-pixbuf cannot read (with ImageMagick, for example) as pad backgrounds.

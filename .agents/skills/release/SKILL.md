@@ -24,8 +24,8 @@ GitHub release is the only distribution channel (there is no PPA). Read
 The version lives in **four places** (`meson.build`, `Cargo.toml` and
 `Cargo.lock`, `debian/changelog`, the `release` of the metainfo), and
 `scripts/version.sh` fails when they differ. The release also needs a
-`## [VERSION]` section in `CHANGELOG.md` and the pt_BR translation of the
-release note of the metainfo.
+`## [VERSION]` section in `CHANGELOG.md` and the translation of the release
+note of the metainfo in every `.po` of `po/LINGUAS`.
 
 The pushes at the end are the only hard-to-undo steps; everything before them is
 local and safe to redo. Treat the work before the push as freely revisable, and
@@ -123,12 +123,12 @@ edit it; the commit log is the raw material, not the final prose.
 ## Step 4: Translate the release note
 
 The `<p>` of the new `<release>` in the metainfo is a translatable string, and
-`po/pt_BR.po` must translate every string. Follow `docs/translations.md`:
+every `.po` of `po/LINGUAS` must translate every string. Follow
+`docs/translations.md`:
 
 ```bash
-meson compile -C build vinheta-pot
-msgmerge --update --backup=none po/pt_BR.po po/vinheta.pot
-# translate the new entry of po/pt_BR.po (and any fuzzy one), then:
+scripts/check-translations.sh --update
+# translate the new entry of every po/*.po, then:
 scripts/check-translations.sh
 ```
 
@@ -154,7 +154,7 @@ sentence, no prefix, no `Co-Authored-By` or any tool attribution):
 
 ```bash
 git add meson.build Cargo.toml Cargo.lock debian/changelog \
-    data/io.github.wilfison.Vinheta.metainfo.xml.in po/pt_BR.po CHANGELOG.md
+    data/io.github.wilfison.Vinheta.metainfo.xml.in po/*.po CHANGELOG.md
 git commit -m "Release <version>"
 ```
 
@@ -223,7 +223,7 @@ preflight (main, clean, synced, scripts/check.sh, is the current version tagged?
   → ask major/minor/patch
   → bump.sh --write --summary   (meson.build, Cargo.toml, Cargo.lock, debian/changelog, metainfo)
   → draft CHANGELOG + link, user confirms it and the summary
-  → translate the release note in po/pt_BR.po
+  → translate the release note in every po/*.po
   → scripts/check.sh --all      (background; ci-container.sh when the packaging changed)
   → git add <release files> && commit "Release X.Y.Z"
   → git tag -a vX.Y.Z -m "Release X.Y.Z"

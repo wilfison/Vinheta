@@ -11,7 +11,7 @@ Add your folders of sounds, and each one becomes a tab with a pad per sound. Cli
 - Favorites, search, and sorting by name or by most recent file.
 - Separate volumes for your headphones and for the call.
 - A "Send sounds to call" switch, and a choice of the app the sounds are sent to.
-- English and Brazilian Portuguese.
+- English, Portuguese (Brazil and Portugal), Spanish, German, and French.
 
 ## Install
 
@@ -42,6 +42,10 @@ scripts/build-deb.sh           # builds the .deb under tmp/deb
 ```
 
 The documentation is in [docs/](docs/): start with [docs/overview.md](docs/overview.md) and [docs/architecture.md](docs/architecture.md). [docs/development.md](docs/development.md) and [docs/checks.md](docs/checks.md) cover building and the checks, and [docs/audio.md](docs/audio.md) the audio engine.
+
+## Translations
+
+The interface is in English, and the translations live in [po/](po/): Brazilian Portuguese is by the author, and the others (European Portuguese, Spanish, German, French) were made with the help of an AI assistant and have not been reviewed by native speakers yet. Reviews and corrections are very welcome: edit the `.po` file of your language and open a pull request, or open an issue with the strings that read wrong. A new language is a new `.po` file plus a line in `po/LINGUAS`; [docs/translations.md](docs/translations.md) has the steps.
 
 ## License
 

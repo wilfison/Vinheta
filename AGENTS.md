@@ -66,7 +66,7 @@ Things to keep in sync:
 - The version lives in four places: `meson.build`, `Cargo.toml` (and `Cargo.lock`), `debian/changelog`, and the `release` of the metainfo.
 - The minimum versions in `debian/control` (GTK 4.20, libadwaita 1.8) follow the `Cargo.toml` features and the APIs the `.ui` and `.css` files use. New native libraries go in `Build-Depends`.
 - The app ID `io.github.wilfison.Vinheta` is spread across file names, the gresource prefix, the schema, and the desktop files: change all of them or none.
-- UI strings are written in English and marked as translatable (gettext, domain `vinheta`), and `po/pt_BR.po` must translate every string: follow `docs/translations.md` after adding or changing one.
+- UI strings are written in English and marked as translatable (gettext, domain `vinheta`), and every `.po` of `po/LINGUAS` (`de`, `es`, `fr`, `pt`, `pt_BR`) must translate every string: follow `docs/translations.md` after adding or changing one.
 
 ## Planning
 

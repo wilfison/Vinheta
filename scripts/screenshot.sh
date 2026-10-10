@@ -10,7 +10,7 @@ usage: screenshot.sh NAME [--folder DIR]... [--setting 'KEY VALUE']... [--pads F
                      [--background FILE]...
                      [--fake-app 'NAME DESCRIPTION']... [--fake-sink 'NODE DESCRIPTION']...
                      [STEP]... [--no-audio] [--private-pipewire] [--first-run]
-                     [--lang LOCALE] [--light] [--debug] [--sheet]
+                     [--lang LANG] [--light] [--debug] [--sheet]
        screenshot.sh --clean
 
 Writes tmp/screenshots/NAME.png from the app installed in build/install.
@@ -39,7 +39,7 @@ Writes tmp/screenshots/NAME.png from the app installed in build/install.
                --expect-playing cannot be used with it
 --first-run    leaves call-guide-shown at its default, so the call setup guide
                opens by itself (every other run starts with it set to true)
---lang LOCALE  runs the app in that language (pt_BR)
+--lang LANG    runs the app in that language (de, es, fr, pt, pt_BR)
 --light        uses the light style instead of the dark one
 --debug        prints the app's debug messages (playback start times) at the end
 --sheet        also writes tmp/screenshots/NAME-sheet.png, every capture of
